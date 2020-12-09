@@ -1,10 +1,10 @@
 name:                ad-mini-project
 version:             0.1.0.0
-github:              "githubuser/ad-mini-project"
+git:                 "https://git.science.uu.nl/p.debruin/ad-mini-project"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2020 Author name here"
+author:              "Philip de Bruin, Pieter Knops, Danny de Jong"
+maintainer:          "Philip de Bruin <p.debruin@students.uu.nl>, Pieter Knops <p.d.knops@students.uu.nl>, Danny de Jong <g.j.dejong2@students.uu.nl>"
+copyright:           "2020 Philip de Bruin, Pieter Knops, Danny de Jong"
 
 extra-source-files:
 - README.md
@@ -17,7 +17,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/ad-mini-project#readme>
+description:         Please see the README <https://git.science.uu.nl/p.debruin/ad-mini-project/-/blob/master/README.md>
 
 dependencies:
 - base >= 4.7 && < 5

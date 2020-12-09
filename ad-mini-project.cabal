@@ -4,16 +4,14 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e6e63b46b0fec95c0b4393495b7f2893be8f036b196a5359bb155cb2b6c463ae
+-- hash: 9004d83c6894d693d52c209f6efbfeba5fcd41c1f88af187262eb3b401b0270b
 
 name:           ad-mini-project
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/ad-mini-project#readme>
-homepage:       https://github.com/githubuser/ad-mini-project#readme
-bug-reports:    https://github.com/githubuser/ad-mini-project/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2020 Author name here
+description:    Please see the README <https://git.science.uu.nl/p.debruin/ad-mini-project/-/blob/master/README.md>
+author:         Philip de Bruin, Pieter Knops, Danny de Jong
+maintainer:     Philip de Bruin <p.debruin@students.uu.nl>, Pieter Knops <p.d.knops@students.uu.nl>, Danny de Jong <g.j.dejong2@students.uu.nl>
+copyright:      2020 Philip de Bruin, Pieter Knops, Danny de Jong
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -23,7 +21,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/ad-mini-project
+  location: https://git.science.uu.nl/p.debruin/ad-mini-project
 
 library
   exposed-modules:
