@@ -1,6 +1,7 @@
-module Lib
-    ( someFunc
-    ) where
+module Lib where
+
+type RealN = [Double]
+
 
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"
