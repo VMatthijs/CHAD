@@ -1,28 +1,38 @@
+{-# LANGUAGE GADTs #-}
 module SourceLanguage where
 
-import Operation (Operation)
+import Lib ((&&&))
+import LanguageTypes (RealN)
+import Operation (Operation, evalOp)
 
--- TODO:
--- - Point-free
--- - Remove var
--- - Identity
--- - Composition
--- Page 9
 
 -- | Terms of the source language
-data STerm =
-           -- | Identity function
-             Id
-           -- | Composition
-           | Comp STerm STerm
-           -- Product tuples
-           | Unit                 -- Empty tuple
-           | Tuple (STerm, STerm) -- Binary product
-           | Fst
-           | Snd
-           -- | Evaluation
-           | Ev
-           -- | Curry
-           | Curry STerm
-           -- | Operation
-           | Op Operation
+data STerm t where
+    -- | Identity function
+    Id    :: STerm (a -> a)
+    -- | Composition
+    --   Read as: f; g
+    Comp  :: STerm (a -> b) -> STerm (b -> c) -> STerm (a -> c)
+    -- Product tuples
+    Unit  :: STerm (a -> ())
+    Pair  :: STerm (a -> b) -> STerm (a -> c) -> STerm (a -> (b, c))
+    Fst   :: STerm ((a, b) -> a)
+    Snd   :: STerm ((a, b) -> b)
+    -- | Evaluation
+    Ev    :: STerm ((a -> b, a) -> b)
+    -- | Curry
+    Curry :: STerm ((a, b) -> c) -> STerm (a -> b -> c)
+    -- | Operators
+    Op    :: Operation a -> STerm (a -> RealN)
+
+-- | Evaluate the source language
+evalSt :: STerm t -> t
+evalSt  Id        = id
+evalSt (Comp f g) = evalSt g . evalSt f
+evalSt  Unit      = const ()
+evalSt (Pair a b) = evalSt a &&& evalSt b
+evalSt  Fst       = fst
+evalSt  Snd       = snd
+evalSt  Ev        = uncurry ($)
+evalSt (Curry a)  = curry $ evalSt a
+evalSt (Op op)    = evalOp op
