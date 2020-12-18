@@ -15,8 +15,8 @@ data TTerm =
            | LApp  TTerm TTerm
            | LEval TTerm -- Function form of LApp?!
            -- Tuples
-           | LFst -- Question: Doesn't have a term?! Why is a function here but not in the source language?
-           | LSnd -- 👆🏻
+           | LFst
+           | LSnd
            | LPair TTerm TTerm
            -- Singleton
            | Singleton TTerm

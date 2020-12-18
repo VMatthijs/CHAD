@@ -2,16 +2,27 @@ module SourceLanguage where
 
 import Operation (Operation)
 
+-- TODO:
+-- - Point-free
+-- - Remove var
+-- - Identity
+-- - Composition
+-- Page 9
+
 -- | Terms of the source language
-data STerm = Var String -- TODO: Also needs a type?
+data STerm =
+           -- | Identity function
+             Id
+           -- | Composition
+           | Comp STerm STerm
            -- Product tuples
-           | Nullary              -- Empty tuple
+           | Unit                 -- Empty tuple
            | Tuple (STerm, STerm) -- Binary product
-           | Fst STerm
-           | Snd STerm
-           -- Functions
-           | Lambda String STerm -- TODO: Have to specify type of the var?
-           | Apply STerm STerm
-           -- Operations
-           -- Idea: Op OperationName STerm, where OperationName is an enum with the operations
-           | Op Operation STerm
+           | Fst
+           | Snd
+           -- | Evaluation
+           | Ev
+           -- | Curry
+           | Curry STerm
+           -- | Operation
+           | Op Operation
