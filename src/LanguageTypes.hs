@@ -16,6 +16,10 @@ class LT a where
     zero :: a
     plus :: a -> a -> a
 
+instance LT () where
+    zero     = ()
+    plus _ _ = ()
+
 instance LT RealN where
     zero = singleton 0 -- TODO: Correct zero type?
     plus = zipWith (+)

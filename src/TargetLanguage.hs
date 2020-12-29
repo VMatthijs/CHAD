@@ -3,49 +3,78 @@ module TargetLanguage where
 
 import Lib ((&&&))
 import LanguageTypes (LFun, Tens, RealN, LT(..))
-import SourceLanguage (STerm, evalSt)
-import Operation (LinearOperation)
+import Operation (Operation, LinearOperation, evalOp)
 
 
 -- | Terms of the target language
-data TTerm t where
-    -- | Term of the source language
-    ST        :: STerm a -> TTerm a
+data TTerm a b where
+    -- Terms from source language
+
+    -- | Identity function
+    Id    :: TTerm a a
+    -- | Composition
+    --   Read as: f; g
+    Comp  :: TTerm a b -> TTerm b c -> TTerm a c
+    -- Product tuples
+    Unit  :: TTerm a ()
+    Pair  :: TTerm a b -> TTerm a c -> TTerm a (b, c)
+    Fst   :: TTerm (a, b) a
+    Snd   :: TTerm (a, b) b
+    -- | Evaluation
+    Ev    :: TTerm (a -> b, a) b
+    -- | Curry
+    Curry :: TTerm (a, b) c -> TTerm a (b -> c)
+    -- | Operators
+    Op    :: Operation a -> TTerm a RealN
+
+    -- Target language extension
+
     -- | Linear operation
-    LOp       :: LinearOperation a -> TTerm (LFun a RealN)
+    LOp       :: LinearOperation a -> TTerm a RealN
     --   Linear functions
-    LId       :: TTerm (LFun a a)
-    LComp     :: TTerm (LFun a b) -> TTerm (LFun b c) -> TTerm (LFun a c)
-    LApp      :: TTerm (LFun a b) -> TTerm a -> TTerm b
-    LEval     :: TTerm a -> TTerm (LFun (a -> b) b)
+    LId       :: TTerm a (LFun b b) -- Correct? Why?
+    LComp     :: TTerm a b -> TTerm b c -> TTerm a c
+    LApp      :: TTerm a b -> TTerm () a -> TTerm () b
+    LEval     :: TTerm () a -> TTerm (a -> b) b
     -- Tuples
-    LFst      :: TTerm ((a, b) -> a)
-    LSnd      :: TTerm ((a, b) -> b)
-    LPair     :: TTerm (LFun a b) -> TTerm (LFun a c) -> TTerm (LFun a (b, c))
+    LFst      :: TTerm (a, b) a
+    LSnd      :: TTerm (a, b) b
+    LPair     :: TTerm a b -> TTerm a c -> TTerm a (b, c)
+    -- LPair     :: TTerm i1 (LFun a b) -> TTerm i2 (LFun a c) -> TTerm i3 (LFun a (b, c))
     -- | Singleton
-    Singleton :: TTerm a -> TTerm (LFun b (Tens a b))
+    Singleton :: TTerm () a -> TTerm b (Tens a b)
     -- Zero
-    Zero      :: LT a => TTerm a
+    Zero      :: LT b => TTerm a b
     -- Plus
-    Plus      :: LT a => TTerm a -> TTerm a -> TTerm a
+    Plus      :: LT b => TTerm a b -> TTerm a b -> TTerm a b
     -- Swap
-    LSwap     :: TTerm (a -> LFun b c) -> TTerm (LFun b (a -> c))
+    LSwap     :: TTerm a (LFun b c) -> TTerm b (a -> c)
     -- | Tensor-elimination
-    LCur      :: (LT a, LT b, LT c) => TTerm (a -> LFun b c) -> TTerm (LFun (Tens a b) c)
+    LCur      :: (LT a, LT b, LT c) => TTerm a (LFun b c) -> TTerm (Tens a b) c
 
 -- | Evaluate the target language
-evalTt :: TTerm t -> t
-evalTt (ST st)       = evalSt st
+evalTt :: TTerm a b -> a -> b
+-- Source language terms
+evalTt  Id           = id
+evalTt (Comp f g)    = evalTt g . evalTt f
+evalTt  Unit         = const ()
+evalTt (Pair a b)    = evalTt a &&& evalTt b
+evalTt  Fst          = fst
+evalTt  Snd          = snd
+evalTt  Ev           = uncurry ($)
+evalTt (Curry a)     = curry $ evalTt a
+evalTt (Op op)       = evalOp op
+-- Target language extension
 evalTt (LOp lop)     = undefined -- TODO
-evalTt  LId          = id
+evalTt  LId          = const id
 evalTt (LComp f g)   = evalTt g . evalTt f
-evalTt (LApp f a)    = evalTt f (evalTt a)
+evalTt (LApp f a)    = \() -> evalTt f (evalTt a ())
 evalTt  LFst         = fst
 evalTt  LSnd         = snd
 evalTt (LPair a b)   = evalTt a &&& evalTt b
-evalTt (Singleton t) = \x -> [(evalTt t, x)]
-evalTt  Zero         = zero
-evalTt (Plus a b)    = plus (evalTt a) (evalTt b)
+evalTt (Singleton t) = \x -> [(evalTt t (), x)]
+evalTt  Zero         = const zero
+evalTt (Plus a b)    = \x -> plus (evalTt a x) (evalTt b x)
 evalTt (LSwap t)     = flip $ evalTt t
 evalTt (LCur t)      = foldr f zero
     where f x acc = plus (uncurry (evalTt t) x) acc
