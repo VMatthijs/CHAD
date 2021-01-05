@@ -2,7 +2,7 @@
 module Operation where
 
 import Prelude hiding (sum, map, zipWith)
-import LanguageTypes (RealN)
+import Types (RealN)
 import Data.Vector (sum, singleton, map, zipWith)
 
 

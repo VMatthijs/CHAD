@@ -1,36 +1,11 @@
-{-# LANGUAGE GADTs, TypeOperators #-}
+{-# LANGUAGE GADTs #-}
 module TargetLanguage where
 
 import Lib ((&&&))
-import LanguageTypes (LFun, Tens, RealN, LT(..))
-import Operation (Operation, LinearOperation, evalOp)
-import Data.Type.Equality ((:~:)(Refl), (:~:))
-
-data Type a where
-    TRealN  :: Type RealN
-    TArrow  :: Type a -> Type b -> Type (a -> b)
-    TPair   :: Type a -> Type b -> Type (a, b)
-    TUnit   :: Type ()
-
-    TLinFun :: Type a -> Type b -> Type (LFun a b)
-    TTens   :: Type a -> Type b -> Type (Tens a b)
-
-eqTy :: Type u -> Type v -> Maybe (u :~: v)
-eqTy TRealN  TRealN = Just Refl
-eqTy TUnit   TUnit  = Just Refl
-eqTy (TArrow u1 u2) (TArrow v1 v2) =
-    do Refl <- eqTy u1 v1
-       Refl <- eqTy u2 v2
-       return Refl
-eqTy (TPair u1 u2) (TPair v1 v2) =
-    do Refl <- eqTy u1 v1
-       Refl <- eqTy u2 v2
-       return Refl
-eqTy (TLinFun u1 u2) (TLinFun v1 v2) =
-    do Refl <- eqTy u1 v1
-       Refl <- eqTy u2 v2
-       return Refl
-eqTy _ _ = Nothing
+import Types (Type, LFun, Tens, RealN, eqTy)
+import LanguageTypes (LT(..))
+import Operation (Operation, evalOp)
+import Data.Type.Equality ((:~:)(Refl))
 
 
 -- | Terms of the target language

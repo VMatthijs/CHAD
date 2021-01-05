@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 82b6af6631eeec6b75f2e2b43b5a0a1d45f119d8937f26d71d95ff39fb2cf658
+-- hash: ffff9acde86be5c69bf67691e1d5d62bda75cc8f86ea1cceecb441501c8c00d8
 
 name:           ad-mini-project
 version:        0.1.0.0
@@ -31,6 +31,7 @@ library
       ReverseAD
       SourceLanguage
       TargetLanguage
+      Types
   other-modules:
       Paths_ad_mini_project
   hs-source-dirs:

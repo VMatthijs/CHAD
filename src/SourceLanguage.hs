@@ -2,7 +2,7 @@
 module SourceLanguage where
 
 import Lib ((&&&))
-import LanguageTypes (RealN)
+import Types (RealN)
 import Operation (Operation, evalOp)
 
 
