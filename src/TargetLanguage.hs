@@ -1,81 +1,129 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, TypeOperators #-}
 module TargetLanguage where
 
 import Lib ((&&&))
 import LanguageTypes (LFun, Tens, RealN, LT(..))
 import Operation (Operation, LinearOperation, evalOp)
+import Data.Type.Equality ((:~:)(Refl), (:~:))
+
+data Type a where
+    TRealN  :: Type RealN
+    TArrow  :: Type a -> Type b -> Type (a -> b)
+    TPair   :: Type a -> Type b -> Type (a, b)
+    TUnit   :: Type ()
+
+    TLinFun :: Type a -> Type b -> Type (LFun a b)
+    TTens   :: Type a -> Type b -> Type (Tens a b)
+
+eqTy :: Type u -> Type v -> Maybe (u :~: v)
+eqTy TRealN  TRealN = Just Refl
+eqTy TUnit   TUnit  = Just Refl
+eqTy (TArrow u1 u2) (TArrow v1 v2) =
+    do Refl <- eqTy u1 v1
+       Refl <- eqTy u2 v2
+       return Refl
+eqTy (TPair u1 u2) (TPair v1 v2) =
+    do Refl <- eqTy u1 v1
+       Refl <- eqTy u2 v2
+       return Refl
+eqTy (TLinFun u1 u2) (TLinFun v1 v2) =
+    do Refl <- eqTy u1 v1
+       Refl <- eqTy u2 v2
+       return Refl
+eqTy _ _ = Nothing
 
 
 -- | Terms of the target language
-data TTerm a b where
+data TTerm t where
     -- Terms from source language
-
-    -- | Identity function
-    Id    :: TTerm a a
-    -- | Composition
-    --   Read as: f; g
-    Comp  :: TTerm a b -> TTerm b c -> TTerm a c
-    -- Product tuples
-    Unit  :: TTerm a ()
-    Pair  :: TTerm a b -> TTerm a c -> TTerm a (b, c)
-    Fst   :: TTerm (a, b) a
-    Snd   :: TTerm (a, b) b
-    -- | Evaluation
-    Ev    :: TTerm (a -> b, a) b
-    -- | Curry
-    Curry :: TTerm (a, b) c -> TTerm a (b -> c)
+    Var    :: String -> Type a -> TTerm a
+    Lambda :: String -> Type a -> TTerm b -> TTerm (a -> b)
+    App    :: TTerm (a -> b) -> TTerm a -> TTerm b
+    Unit   :: TTerm ()
+    Pair   :: TTerm a -> TTerm b -> TTerm (a, b)
+    Fst    :: TTerm (a, b) -> TTerm a
+    Snd    :: TTerm (a, b) -> TTerm b
+    Lift   :: a -> Type a -> TTerm a
     -- | Operators
-    Op    :: Operation a -> TTerm a RealN
+    -- Op  :: Operation n m -> TTerm(RealN n) -> TTerm (RealN m) -- fix arity here
+    Op     :: Operation a -> TTerm a -> TTerm RealN
 
     -- Target language extension
 
     -- | Linear operation
-    LOp       :: LinearOperation a -> TTerm a RealN
-    --   Linear functions
-    LId       :: TTerm a (LFun b b) -- Correct? Why?
-    LComp     :: TTerm a b -> TTerm b c -> TTerm a c
-    LApp      :: TTerm a b -> TTerm () a -> TTerm () b
-    LEval     :: TTerm () a -> TTerm (a -> b) b
+    -- LOp :: LinearOperation k l m -> TTerm a (RealN k) -> TTerm a (LFun (RealN l) (RealN m)) -- fix arity here
+
+    -- Linear functions
+    LId       :: TTerm (LFun b b)
+    LComp     :: TTerm (LFun b c) -> TTerm (LFun c d) -> TTerm (LFun b d)
+    LApp      :: TTerm (LFun b c) -> TTerm b -> TTerm c
+    LEval     :: TTerm b -> TTerm (LFun (b -> c) c)
     -- Tuples
-    LFst      :: TTerm (a, b) a
-    LSnd      :: TTerm (a, b) b
-    LPair     :: TTerm a b -> TTerm a c -> TTerm a (b, c)
-    -- LPair     :: TTerm i1 (LFun a b) -> TTerm i2 (LFun a c) -> TTerm i3 (LFun a (b, c))
+    LFst      :: TTerm (LFun (b, c) b)
+    LSnd      :: TTerm (LFun (b, c) c)
+    LPair     :: TTerm (LFun b c) -> TTerm (LFun b d) -> TTerm (LFun b (c, d))
     -- | Singleton
-    Singleton :: TTerm () a -> TTerm b (Tens a b)
+    Singleton :: TTerm b -> TTerm (LFun c (Tens b c))
     -- Zero
-    Zero      :: LT b => TTerm a b
+    Zero      :: LT b => TTerm b
     -- Plus
-    Plus      :: LT b => TTerm a b -> TTerm a b -> TTerm a b
+    Plus      :: LT b => TTerm b -> TTerm b -> TTerm b
     -- Swap
-    LSwap     :: TTerm a (LFun b c) -> TTerm b (a -> c)
+    LSwap     :: TTerm (b -> LFun c d) -> TTerm (LFun c (b -> d))
     -- | Tensor-elimination
-    LCur      :: (LT a, LT b, LT c) => TTerm a (LFun b c) -> TTerm (Tens a b) c
+    LCur      :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun (Tens b c) d)
+
+
+-- | Substitute variable for term
+subst :: String -> u -> Type u -> TTerm t -> TTerm t
+subst x v u (Var y t)      | x == y    = case eqTy u t of
+                                            Just Refl -> Lift v u
+                                            Nothing   -> error "ill-typed substitution"
+                           | otherwise = Var y t
+subst x v u (Lambda y t e) | x == y    = Lambda y t e
+                           | otherwise = Lambda y t (subst x v u e)
+subst x v u (App f a)                  = App (subst x v u f) (subst x v u a)
+subst _ _ _  Unit                      = Unit
+subst x v u (Pair a b)                 = Pair (subst x v u a) (subst x v u b)
+subst x v u (Fst p)                    = Fst (subst x v u p)
+subst x v u (Snd p)                    = Snd (subst x v u p)
+subst _ _ _ (Lift x t)                 = Lift x t
+-- Target language extension
+subst _ _ _  LId                       = LId
+subst x v u (LComp f g)                = LComp (subst x v u f) (subst x v u g)
+subst x v u (LApp f a)                 = LApp (subst x v u f) (subst x v u a)
+subst _ _ _  LFst                      = LFst
+subst _ _ _  LSnd                      = LSnd
+subst x v u (LPair a b)                = LPair (subst x v u a) (subst x v u b)
+subst x v u (Singleton t)              = Singleton (subst x v u t)
+subst _ _ _  Zero                      = Zero
+subst x v u (Plus a b)                 = Plus (subst x v u a) (subst x v u b)
+subst x v u (LSwap t)                  = LSwap (subst x v u t)
+subst x v u (LCur t)                   = LCur (subst x v u t)
+
 
 -- | Evaluate the target language
-evalTt :: TTerm a b -> a -> b
--- Source language terms
-evalTt  Id           = id
-evalTt (Comp f g)    = evalTt g . evalTt f
-evalTt  Unit         = const ()
-evalTt (Pair a b)    = evalTt a &&& evalTt b
-evalTt  Fst          = fst
-evalTt  Snd          = snd
-evalTt  Ev           = uncurry ($)
-evalTt (Curry a)     = curry $ evalTt a
-evalTt (Op op)       = evalOp op
+evalTt :: TTerm t -> t
+-- Source language extension
+evalTt (Var _ _)         = error "Free variable has no value"
+evalTt (Lambda x t e)    = \v -> evalTt $ subst x v t e
+evalTt (App f a)         = evalTt f (evalTt a)
+evalTt  Unit             = ()
+evalTt (Pair a b)        = (evalTt a, evalTt b)
+evalTt (Fst p)           = fst $ evalTt p
+evalTt (Snd p)           = snd $ evalTt p
+evalTt (Lift x _)        = x
+evalTt (Op op a)         = evalOp op (evalTt a)
 -- Target language extension
-evalTt (LOp lop)     = undefined -- TODO
-evalTt  LId          = const id
-evalTt (LComp f g)   = evalTt g . evalTt f
-evalTt (LApp f a)    = \() -> evalTt f (evalTt a ())
-evalTt  LFst         = fst
-evalTt  LSnd         = snd
-evalTt (LPair a b)   = evalTt a &&& evalTt b
-evalTt (Singleton t) = \x -> [(evalTt t (), x)]
-evalTt  Zero         = const zero
-evalTt (Plus a b)    = \x -> plus (evalTt a x) (evalTt b x)
-evalTt (LSwap t)     = flip $ evalTt t
-evalTt (LCur t)      = foldr f zero
+evalTt  LId              = id
+evalTt (LComp f g)       = evalTt g . evalTt f
+evalTt (LApp f a)        = evalTt f (evalTt a)
+evalTt  LFst             = fst
+evalTt  LSnd             = snd
+evalTt (LPair a b)       = evalTt a &&& evalTt b
+evalTt (Singleton t)     = \x -> [(evalTt t, x)]
+evalTt  Zero             = zero
+evalTt (Plus a b)        = plus (evalTt a) (evalTt b)
+evalTt (LSwap t)         = flip $ evalTt t
+evalTt (LCur  t)         = foldr f zero
     where f x acc = plus (uncurry (evalTt t) x) acc
-
