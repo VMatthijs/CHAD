@@ -8,8 +8,8 @@ import Types (Type(..), Tens, RealN)
 
 -- | Operators defined over multiple language types
 class LT a where
-    zero :: a
-    plus :: a -> a -> a
+    zero      :: a
+    plus      :: a -> a -> a
     inferType :: Type a
 
 instance LT () where
