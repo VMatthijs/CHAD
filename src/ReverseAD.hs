@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 module ReverseAD where
 
 import qualified SourceLanguage as SL
@@ -12,6 +13,7 @@ type family D1 a where
     D1 (a -> b) = D1 a -> (D1 b, LFun (D2 b) (D2 a))
     D1 (a, b)   = (D1 a, D1 b)
     D1 ()       = ()
+    D1 (Tens _ _) = ()
 
 type family D2 a where
     D2 RealN    = RealN
@@ -24,7 +26,12 @@ type family D2 a where
 d1 :: (LT a, LT (D1 a), LT (D1 b)) => SL.STerm a b -> TL.TTerm (D1 a -> D1 b)
 d1  SL.Id        = TL.Lambda "x" t (TL.Var "x" t)
     where t = inferType
-d1 (SL.Comp f g) = undefined -- TL.Comp (d1 f) (d1 g)
+d1 (SL.Comp f g) = TL.Lambda "x" t1 $ TL.subst "y" d1f t2 d1g -- TL.Comp (d1 f) (d1 g)
+    where t1  = inferType
+          d1f = TL.App (d1 f) (TL.Var "x" t1)
+          t2 :: Type (D1 b)
+          t2  = inferType
+          d1g = TL.App (d1 g) (TL.Var "y" t2)
 d1  SL.Unit      = TL.Lambda "_" inferType TL.Unit
 d1 (SL.Pair f g) = undefined -- TL.Lambda "x" t $ TL.Pair fstPair sndPair
     -- where t = inferType
@@ -47,12 +54,13 @@ d1 SL.Ev         = TL.Lambda "x" t $ TL.Fst (TL.App (TL.Fst (TL.Var "x" t)) (TL.
 d1 (SL.Op op)    = TL.Lambda "x" inferType $ TL.Op op (TL.Var "x" inferType) -- TL.Op op ??
 
 
-d2 :: (LT (D1 a), LT (D1 b), LT (D2 a), LT (D2 b)) => SL.STerm a b -> TL.TTerm (D1 a -> LFun (D2 b) (D2 a))
+d2 :: (LT a, LT b)
+   => SL.STerm a b -> TL.TTerm (D1 a -> LFun (D2 b) (D2 a))
 d2  SL.Id        = TL.Lambda "_" inferType TL.LId
 d2 (SL.Comp f g) = TL.LComp undefined undefined--(TL.Comp (d1 f) (d2 g)) (d2 f)
 d2  SL.Unit      = TL.Zero
 d2 (SL.Pair t s) = undefined -- TL.Plus (TL.LComp TL.LFst (d2 t)) (TL.LComp TL.LSnd (d2 s))
-d2  SL.Fst       = undefined -- TL.Lambda "x" inferType $ TL.LPair TL.LId  TL.Zero
+d2  SL.Fst       = TL.Lambda "x" inferType $ TL.LPair TL.LId  TL.Zero
 d2  SL.Snd       = undefined -- TL.Lambda "x" inferType $ TL.LPair TL.Zero TL.LId
 d2  SL.Ev        = TL.Lambda "x" t $ TL.LPair (TL.Singleton y) z
     where t = inferType
