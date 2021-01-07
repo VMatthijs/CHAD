@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 module ReverseAD where
 
 import qualified SourceLanguage as SL
@@ -8,14 +7,13 @@ import qualified TargetLanguage as TL
 import Types
 import LanguageTypes
 
-type family D1 a where
+type family D1 a = r | r -> a where
     D1 RealN    = RealN
     D1 (a -> b) = D1 a -> (D1 b, LFun (D2 b) (D2 a))
     D1 (a, b)   = (D1 a, D1 b)
     D1 ()       = ()
-    D1 (Tens _ _) = ()
 
-type family D2 a where
+type family D2 a = r | r -> a where
     D2 RealN    = RealN
     D2 (a -> b) = Tens (D1 a) (D2 b)
     D2 (a, b)   = (D2 a, D2 b)
@@ -23,13 +21,12 @@ type family D2 a where
 
 -- TODO: Gensym oid voor genereren lambda vars
 
-d1 :: (LT a, LT (D1 a), LT (D1 b)) => SL.STerm a b -> TL.TTerm (D1 a -> D1 b)
+d1 :: (LT a, LT b) => SL.STerm a b -> TL.TTerm (D1 a -> D1 b)
 d1  SL.Id        = TL.Lambda "x" t (TL.Var "x" t)
     where t = inferType
-d1 (SL.Comp f g) = TL.Lambda "x" t1 $ TL.subst "y" d1f t2 d1g -- TL.Comp (d1 f) (d1 g)
+d1 (SL.Comp f g) = TL.Lambda "x" t1 $ TL.substTt "y" d1f t2 d1g -- TL.Comp (d1 f) (d1 g)
     where t1  = inferType
           d1f = TL.App (d1 f) (TL.Var "x" t1)
-          t2 :: Type (D1 b)
           t2  = inferType
           d1g = TL.App (d1 g) (TL.Var "y" t2)
 d1  SL.Unit      = TL.Lambda "_" inferType TL.Unit
@@ -54,14 +51,13 @@ d1 SL.Ev         = TL.Lambda "x" t $ TL.Fst (TL.App (TL.Fst (TL.Var "x" t)) (TL.
 d1 (SL.Op op)    = TL.Lambda "x" inferType $ TL.Op op (TL.Var "x" inferType) -- TL.Op op ??
 
 
-d2 :: (LT a, LT b)
-   => SL.STerm a b -> TL.TTerm (D1 a -> LFun (D2 b) (D2 a))
+d2 :: (LT a, LT b) => SL.STerm a b -> TL.TTerm (D1 a -> LFun (D2 b) (D2 a))
 d2  SL.Id        = TL.Lambda "_" inferType TL.LId
 d2 (SL.Comp f g) = TL.LComp undefined undefined--(TL.Comp (d1 f) (d2 g)) (d2 f)
 d2  SL.Unit      = TL.Zero
 d2 (SL.Pair t s) = undefined -- TL.Plus (TL.LComp TL.LFst (d2 t)) (TL.LComp TL.LSnd (d2 s))
 d2  SL.Fst       = TL.Lambda "x" inferType $ TL.LPair TL.LId  TL.Zero
-d2  SL.Snd       = undefined -- TL.Lambda "x" inferType $ TL.LPair TL.Zero TL.LId
+d2  SL.Snd       = TL.Lambda "x" inferType $ TL.LPair TL.Zero TL.LId
 d2  SL.Ev        = TL.Lambda "x" t $ TL.LPair (TL.Singleton y) z
     where t = inferType
           x = TL.Var "x" t

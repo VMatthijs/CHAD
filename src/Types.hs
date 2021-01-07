@@ -2,8 +2,9 @@
 {-# LANGUAGE TypeOperators #-}
 module Types where
 
-import Data.Vector (Vector)
 import Data.Type.Equality ((:~:)(Refl), (:~:))
+import GHC.TypeNats (sameNat, Nat, KnownNat)
+import Data.Vector (Vector)
 
 type RealN = Vector Double
 

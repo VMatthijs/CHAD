@@ -2,7 +2,7 @@
 module TargetLanguage where
 
 import Lib ((&&&))
-import Types (Type, LFun, Tens, RealN, eqTy)
+import Types
 import LanguageTypes (LT(..))
 import Operation (Operation, evalOp)
 import Data.Type.Equality ((:~:)(Refl))
@@ -76,6 +76,32 @@ subst x v u (Plus a b)                 = Plus (subst x v u a) (subst x v u b)
 subst x v u (LSwap t)                  = LSwap (subst x v u t)
 subst x v u (LCur t)                   = LCur (subst x v u t)
 
+-- | Substitute variable for a TTerm
+substTt :: String -> TTerm u -> Type u -> TTerm t -> TTerm t
+substTt x v u (Var y t)      | x == y    = case eqTy u t of
+                                            Just Refl -> v
+                                            Nothing   -> error "ill-typed substTtitution"
+                           | otherwise = Var y t
+substTt x v u (Lambda y t e) | x == y    = Lambda y t e
+                           | otherwise = Lambda y t (substTt x v u e)
+substTt x v u (App f a)                  = App (substTt x v u f) (substTt x v u a)
+substTt _ _ _  Unit                      = Unit
+substTt x v u (Pair a b)                 = Pair (substTt x v u a) (substTt x v u b)
+substTt x v u (Fst p)                    = Fst (substTt x v u p)
+substTt x v u (Snd p)                    = Snd (substTt x v u p)
+substTt _ _ _ (Lift x t)                 = Lift x t
+-- Target language extension
+substTt _ _ _  LId                       = LId
+substTt x v u (LComp f g)                = LComp (substTt x v u f) (substTt x v u g)
+substTt x v u (LApp f a)                 = LApp (substTt x v u f) (substTt x v u a)
+substTt _ _ _  LFst                      = LFst
+substTt _ _ _  LSnd                      = LSnd
+substTt x v u (LPair a b)                = LPair (substTt x v u a) (substTt x v u b)
+substTt x v u (Singleton t)              = Singleton (substTt x v u t)
+substTt _ _ _  Zero                      = Zero
+substTt x v u (Plus a b)                 = Plus (substTt x v u a) (substTt x v u b)
+substTt x v u (LSwap t)                  = LSwap (substTt x v u t)
+substTt x v u (LCur t)                   = LCur (substTt x v u t)
 
 -- | Evaluate the target language
 evalTt :: TTerm t -> t
@@ -102,3 +128,28 @@ evalTt (Plus a b)        = plus (evalTt a) (evalTt b)
 evalTt (LSwap t)         = flip $ evalTt t
 evalTt (LCur  t)         = foldr f zero
     where f x acc = plus (uncurry (evalTt t) x) acc
+
+
+printTt :: TTerm t -> String
+-- Source language extension
+printTt (Var x _)         = x
+printTt (Lambda x t e)    = "\\" ++ x ++ " -> " ++ printTt e
+printTt (App f a)         = printTt f ++ "(" ++ printTt a ++ ")"
+printTt  Unit             = "()"
+printTt (Pair a b)        = "(" ++ printTt a ++ ", " ++ printTt b ++ ")"
+printTt (Fst p)           = "Fst(" ++ printTt p ++ ")"
+printTt (Snd p)           = "Snd(" ++ printTt p ++ ")"
+printTt (Lift x _)        = undefined
+printTt (Op op a)         = "evalOp op " ++ printTt a
+-- Target language extension
+printTt  LId              = "lid"
+printTt (LComp f g)       = printTt g ++ ";;" ++ printTt f
+printTt (LApp f a)        = printTt f ++ "(" ++ printTt a ++ ")"
+printTt  LFst             = "lfst"
+printTt  LSnd             = "lsnd"
+printTt (LPair a b)       = "lpair(" ++ printTt a ++ ", " ++ printTt b ++ ")"
+printTt (Singleton t)     = "[(" ++ printTt t ++ ", -)]"
+printTt  Zero             = "0"
+printTt (Plus a b)        = "(" ++ printTt a ++ ") + (" ++ printTt b ++ ")"
+printTt (LSwap t)         = "lswap(" ++ printTt t ++ ")"
+printTt (LCur  t)         = "lcur⁻¹(" ++ printTt t ++ ")"
