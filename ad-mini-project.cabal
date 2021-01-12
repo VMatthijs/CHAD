@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ffff9acde86be5c69bf67691e1d5d62bda75cc8f86ea1cceecb441501c8c00d8
+-- hash: 49d2c892d703ca4d5f852bca01963c6aa6d3acafe7ee2c1023b63dff5f0fb24e
 
 name:           ad-mini-project
 version:        0.1.0.0
@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      ForwardAD
       LanguageTypes
       Lib
       Operation

@@ -1,29 +1,54 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 module SourceLanguage where
 
 import Lib ((&&&))
-import Types (RealN)
+import Types
 import Operation (Operation, evalOp)
+import LanguageTypes
 
 
 -- | Terms of the source language
 data STerm a b where
     -- | Identity function
-    Id    :: STerm a a
+    Id    :: (LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a))
+          => STerm a a
     -- | Composition
     --   Read as: f; g
-    Comp  :: STerm a b -> STerm b c -> STerm a c
+    Comp  :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
+             , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
+             )
+          => STerm a b -> STerm b c -> STerm a c
     -- Product tuples
-    Unit  :: STerm a ()
-    Pair  :: STerm a b -> STerm a c -> STerm a (b, c)
-    Fst   :: STerm (a, b) a
-    Snd   :: STerm (a, b) b
+    Unit  :: (LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a))
+          => STerm a ()
+    Pair  :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
+             , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
+             , LT c, LT (Dr1 c), LT (Dr2 c), LT (Df1 c), LT (Df2 c)
+             )
+          => STerm a b -> STerm a c -> STerm a (b, c)
+    Fst   :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
+             , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
+             )
+          => STerm (a, b) a
+    Snd   :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
+             , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
+             )
+          => STerm (a, b) b
     -- | Evaluation
-    Ev    :: STerm (a -> b, a) b
+    Ev    :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
+             , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
+             )
+          => STerm (a -> b, a) b
     -- | Curry
-    Curry :: STerm (a, b) c -> STerm a (b -> c)
+    Curry :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
+             , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
+             , LT c, LT (Dr1 c), LT (Dr2 c), LT (Df1 c), LT (Df2 c)
+             )
+          => STerm (a, b) c -> STerm a (b -> c)
     -- | Operators
-    Op    :: Operation a -> STerm a RealN
+    Op    :: (LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a))
+          => Operation a -> STerm a RealN
 
 -- | Evaluate the source language
 evalSt :: STerm a b -> a -> b

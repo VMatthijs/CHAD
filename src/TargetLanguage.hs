@@ -4,7 +4,7 @@ module TargetLanguage where
 import Lib ((&&&))
 import Types
 import LanguageTypes (LT(..))
-import Operation (Operation, evalOp)
+import Operation (Operation, LinearOperation, evalOp, evalLOp, showOp, showLOp)
 import Data.Type.Equality ((:~:)(Refl))
 
 
@@ -27,6 +27,7 @@ data TTerm t where
 
     -- | Linear operation
     -- LOp :: LinearOperation k l m -> TTerm a (RealN k) -> TTerm a (LFun (RealN l) (RealN m)) -- fix arity here
+    LOp       :: LinearOperation a b -> TTerm (LFun a b)
 
     -- Linear functions
     LId       :: TTerm (LFun b b)
@@ -81,9 +82,9 @@ substTt :: String -> TTerm u -> Type u -> TTerm t -> TTerm t
 substTt x v u (Var y t)      | x == y    = case eqTy u t of
                                             Just Refl -> v
                                             Nothing   -> error "ill-typed substTtitution"
-                           | otherwise = Var y t
+                             | otherwise = Var y t
 substTt x v u (Lambda y t e) | x == y    = Lambda y t e
-                           | otherwise = Lambda y t (substTt x v u e)
+                             | otherwise = Lambda y t (substTt x v u e)
 substTt x v u (App f a)                  = App (substTt x v u f) (substTt x v u a)
 substTt _ _ _  Unit                      = Unit
 substTt x v u (Pair a b)                 = Pair (substTt x v u a) (substTt x v u b)
@@ -115,6 +116,7 @@ evalTt (Fst p)           = fst $ evalTt p
 evalTt (Snd p)           = snd $ evalTt p
 evalTt (Lift x _)        = x
 evalTt (Op op a)         = evalOp op (evalTt a)
+evalTt (LOp lop)         = evalLOp lop
 -- Target language extension
 evalTt  LId              = id
 evalTt (LComp f g)       = evalTt g . evalTt f
@@ -140,7 +142,8 @@ printTt (Pair a b)        = "(" ++ printTt a ++ ", " ++ printTt b ++ ")"
 printTt (Fst p)           = "Fst(" ++ printTt p ++ ")"
 printTt (Snd p)           = "Snd(" ++ printTt p ++ ")"
 printTt (Lift x _)        = undefined
-printTt (Op op a)         = "evalOp op " ++ printTt a
+printTt (Op op a)         = "evalOp " ++ showOp op ++ " " ++ printTt a
+printTt (LOp lop)         = "evalLOp " ++ showLOp lop
 -- Target language extension
 printTt  LId              = "lid"
 printTt (LComp f g)       = printTt g ++ ";;" ++ printTt f
