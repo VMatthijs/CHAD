@@ -2,7 +2,7 @@
 module Operation where
 
 import Prelude hiding (sum, map, zipWith, length, replicate)
-import Types (RealN)
+import Types (LFun, RealN)
 import Data.Vector
 
 
@@ -42,26 +42,27 @@ sigmoid x = 1.0 / (1.0 + exp (negate x))
 dsigmoid :: Double -> Double
 dsigmoid x = (sigmoid x) * (1 - sigmoid x)
 
--- | D op and D op^t of the Operators in the source language?
-data LinearOperation a b where
-    DEAdd  :: LinearOperation (RealN, RealN) RealN
-    DEAddT :: LinearOperation RealN (RealN, RealN)
+-- | D op and D op^t of the Operators in the source language
+data LinearOperation a b c where
+    DEAdd   :: LinearOperation (RealN, RealN) (RealN, RealN)  RealN
+    DEAddT  :: LinearOperation (RealN, RealN)  RealN         (RealN, RealN)
+    DEProd  :: LinearOperation (RealN, RealN) (RealN, RealN)  RealN
+    DEProdT :: LinearOperation (RealN, RealN)  RealN         (RealN, RealN)
 
-{-
-[1 2 3 4 5] [5 4 3 2 1] = [30] = [15, 15]
-++ =
-[6 6 6 6 6]
 
-|1|   |2x  |    |x|    |x^2 |    |x + x^2 |    | 1 + 2x |
-|0| + |3x^2|  = |2|' + |x^3 |' = |2 + x^3 |' = | 3x^2   |
-|0|   |4x  |    |1|    |2x^2|    |1 + 2x^2|    | 4x     |
+showLOp :: LinearOperation a b c -> String
+showLOp DEAdd   = "DEadd"
+showLOp DEAddT  = "DEaddT"
+showLOp DEProd  = "DEProd"
+showLOp DEProdT = "DEProdT"
 
--}
 
-showLOp :: LinearOperation a b -> String
-showLOp DEAdd = "DEadd"
-showLOp DEAddT = "DEaddT"
-
-evalLOp :: LinearOperation a b -> a -> b
-evalLOp DEAdd  = \(a, b) -> fromList [sum a, sum b]
-evalLOp DEAddT = \r      -> (singleton (sum r), singleton (sum r))
+evalLOp :: LinearOperation a b c -> a -> LFun b c
+evalLOp DEAdd   (_x, _y) (a, b) = zipWith (+) a b
+evalLOp DEAddT  (_x, _y)  r     = (r, r)
+evalLOp DEProd  ( x,  y) (a, b) = zipWith (+) xDeriv yDeriv
+    where xDeriv = zipWith (*) y a
+          yDeriv = zipWith (*) x b
+evalLOp DEProdT ( x,  y)  r     = (xDeriv, yDeriv)
+    where xDeriv = zipWith (*) y r
+          yDeriv = zipWith (*) x r

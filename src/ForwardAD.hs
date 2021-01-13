@@ -5,9 +5,10 @@ import qualified SourceLanguage as SL
 import qualified TargetLanguage as TL
 import Types
 import LanguageTypes
+import Operation
 
 
-d1 :: (LT a, LT b) => SL.STerm a b -> TL.TTerm (Df1 a -> Df1 b)
+d1 :: SL.STerm a b -> TL.TTerm (Df1 a -> Df1 b)
 d1  SL.Id        = TL.Lambda "x" t (TL.Var "x" t)
     where t = inferType
 d1 (SL.Comp f g) = TL.Lambda "x" t1 $ TL.substTt "y" d1f t2 d1g
@@ -37,7 +38,7 @@ d1 (SL.Curry t)  = TL.Lambda "x" xType $ TL.Lambda "y" yType $ TL.Pair d1t sndPa
 d1 (SL.Op op)    = TL.Lambda "x" inferType $ TL.Op op (TL.Var "x" inferType)
 
 
-d2 :: (LT a, LT b) => SL.STerm a b -> TL.TTerm (Df1 a -> LFun (Df2 a) (Df2 b))
+d2 :: SL.STerm a b -> TL.TTerm (Df1 a -> LFun (Df2 a) (Df2 b))
 d2  SL.Id        = TL.Lambda "_" inferType TL.LId
 d2 (SL.Comp f g) = TL.Lambda "x" xType $ TL.LComp d2f d2g
     where xType = inferType
@@ -62,4 +63,10 @@ d2 (SL.Curry t)  = TL.Lambda "x" xType $ TL.LSwap $ TL.Lambda "y" yType $
     where xType = inferType
           yType = inferType
           d2t   = TL.App (d2 t) (TL.Pair (TL.Var "x" xType) (TL.Var "y" yType))
-d2 (SL.Op op)   = undefined
+-- Dop
+d2 (SL.Op (Constant _)) = TL.Lambda "x" inferType TL.Zero
+d2 (SL.Op EAdd   )      = TL.LOp DEAdd
+d2 (SL.Op EProd  )      = TL.LOp DEProd
+d2 (SL.Op MProd  )      = undefined -- undefined
+d2 (SL.Op Sum    )      = undefined -- [1, 1, 1, 1, ...]
+d2 (SL.Op Sigmoid)      = undefined --TL.Lambda "x" inferType (TL.Op (DSigmoid))

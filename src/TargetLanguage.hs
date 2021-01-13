@@ -27,7 +27,7 @@ data TTerm t where
 
     -- | Linear operation
     -- LOp :: LinearOperation k l m -> TTerm a (RealN k) -> TTerm a (LFun (RealN l) (RealN m)) -- fix arity here
-    LOp       :: LinearOperation a b -> TTerm (LFun a b)
+    LOp       :: LinearOperation a b c -> TTerm (a -> LFun b c)
 
     -- Linear functions
     LId       :: TTerm (LFun b b)
@@ -64,6 +64,7 @@ subst x v u (Pair a b)                 = Pair (subst x v u a) (subst x v u b)
 subst x v u (Fst p)                    = Fst (subst x v u p)
 subst x v u (Snd p)                    = Snd (subst x v u p)
 subst _ _ _ (Lift x t)                 = Lift x t
+subst x v u (Op op y)                  = Op op (subst x v u y)
 -- Target language extension
 subst _ _ _  LId                       = LId
 subst x v u (LComp f g)                = LComp (subst x v u f) (subst x v u g)
@@ -76,6 +77,7 @@ subst _ _ _  Zero                      = Zero
 subst x v u (Plus a b)                 = Plus (subst x v u a) (subst x v u b)
 subst x v u (LSwap t)                  = LSwap (subst x v u t)
 subst x v u (LCur t)                   = LCur (subst x v u t)
+subst _ _ _ (LOp lop)                  = LOp lop
 
 -- | Substitute variable for a TTerm
 substTt :: String -> TTerm u -> Type u -> TTerm t -> TTerm t
@@ -91,6 +93,7 @@ substTt x v u (Pair a b)                 = Pair (substTt x v u a) (substTt x v u
 substTt x v u (Fst p)                    = Fst (substTt x v u p)
 substTt x v u (Snd p)                    = Snd (substTt x v u p)
 substTt _ _ _ (Lift x t)                 = Lift x t
+substTt x v u (Op op y)                  = Op op (substTt x v u y)
 -- Target language extension
 substTt _ _ _  LId                       = LId
 substTt x v u (LComp f g)                = LComp (substTt x v u f) (substTt x v u g)
@@ -103,6 +106,8 @@ substTt _ _ _  Zero                      = Zero
 substTt x v u (Plus a b)                 = Plus (substTt x v u a) (substTt x v u b)
 substTt x v u (LSwap t)                  = LSwap (substTt x v u t)
 substTt x v u (LCur t)                   = LCur (substTt x v u t)
+substTt _ _ _ (LOp lop)                  = LOp lop
+
 
 -- | Evaluate the target language
 evalTt :: TTerm t -> t
