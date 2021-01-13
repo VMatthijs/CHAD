@@ -6,6 +6,7 @@ import qualified TargetLanguage as TL
 import Types
 import LanguageTypes
 import Operation
+
 -- TODO: Gensym oid voor genereren lambda vars
 
 d1 :: SL.STerm a b -> TL.TTerm (Dr1 a -> Dr1 b)
@@ -35,7 +36,8 @@ d1 (SL.Curry t)  = TL.Lambda "x" xType $ TL.Lambda "y" yType $
           yType  = inferType
           d1t    = TL.App (d1 t) (TL.Pair (TL.Var "x" xType) (TL.Var "y" yType))
           d2t    = TL.App (d2 t) (TL.Pair (TL.Var "x" xType) (TL.Var "y" yType))
-d1 (SL.Op op)    = TL.Lambda "x" inferType $ TL.Op op (TL.Var "x" inferType)
+d1 (SL.Op op)    = TL.Lambda "x" t $ TL.Op op (TL.Var "x" t)
+    where t = inferType
 
 
 d2 :: SL.STerm a b -> TL.TTerm (Dr1 a -> LFun (Dr2 b) (Dr2 a))
@@ -64,7 +66,7 @@ d2 (SL.Curry t)  = TL.Lambda "x" xType $ TL.LComp cur TL.LFst
           cur   = TL.LCur $ TL.Lambda "y" yType d2t
           d2t   = TL.App (d2 t) (TL.Pair (TL.Var "x" xType) (TL.Var "y" yType))
 -- Dop^t
-d2 (SL.Op (Constant _)) = TL.Lambda "x" inferType TL.Zero
+d2 (SL.Op (Constant _)) = TL.LOp DConstantT
 d2 (SL.Op EAdd   )      = TL.LOp DEAddT
 d2 (SL.Op EProd  )      = TL.LOp DEProdT
 d2 (SL.Op MProd  )      = undefined -- undefined

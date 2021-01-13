@@ -20,13 +20,11 @@ data TTerm t where
     Snd    :: TTerm (a, b) -> TTerm b
     Lift   :: a -> Type a -> TTerm a
     -- | Operators
-    -- Op  :: Operation n m -> TTerm(RealN n) -> TTerm (RealN m) -- fix arity here
-    Op     :: Operation a -> TTerm a -> TTerm RealN
+    Op     :: Operation a b -> TTerm a -> TTerm b
 
     -- Target language extension
 
     -- | Linear operation
-    -- LOp :: LinearOperation k l m -> TTerm a (RealN k) -> TTerm a (LFun (RealN l) (RealN m)) -- fix arity here
     LOp       :: LinearOperation a b c -> TTerm (a -> LFun b c)
 
     -- Linear functions

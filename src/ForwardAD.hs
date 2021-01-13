@@ -35,7 +35,8 @@ d1 (SL.Curry t)  = TL.Lambda "x" xType $ TL.Lambda "y" yType $ TL.Pair d1t sndPa
           d1t     = TL.App (d1 t) (TL.Pair (TL.Var "x" xType) (TL.Var "y" yType))
           d2t     = TL.App (d2 t) (TL.Pair (TL.Var "x" xType) (TL.Var "y" yType))
           sndPair = TL.LComp (TL.LPair TL.Zero TL.LId) d2t
-d1 (SL.Op op)    = TL.Lambda "x" inferType $ TL.Op op (TL.Var "x" inferType)
+d1 (SL.Op op)    = TL.Lambda "x" t $ TL.Op op (TL.Var "x" t)
+    where t = inferType
 
 
 d2 :: SL.STerm a b -> TL.TTerm (Df1 a -> LFun (Df2 a) (Df2 b))
@@ -64,7 +65,7 @@ d2 (SL.Curry t)  = TL.Lambda "x" xType $ TL.LSwap $ TL.Lambda "y" yType $
           yType = inferType
           d2t   = TL.App (d2 t) (TL.Pair (TL.Var "x" xType) (TL.Var "y" yType))
 -- Dop
-d2 (SL.Op (Constant _)) = TL.Lambda "x" inferType TL.Zero
+d2 (SL.Op (Constant _)) = TL.LOp DConstant
 d2 (SL.Op EAdd   )      = TL.LOp DEAdd
 d2 (SL.Op EProd  )      = TL.LOp DEProd
 d2 (SL.Op MProd  )      = undefined -- undefined

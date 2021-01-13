@@ -47,8 +47,12 @@ data STerm a b where
              )
           => STerm (a, b) c -> STerm a (b -> c)
     -- | Operators
-    Op    :: (LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a))
-          => Operation a -> STerm a RealN
+    Op    :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
+             , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
+             , LT a ~ LT (Dr1 a), LT b ~ LT (Dr1 b)
+             , LT a ~ LT (Df1 a), LT b ~ LT (Df1 b)
+             )
+          => Operation a b -> STerm a b
 
 -- | Evaluate the source language
 evalSt :: STerm a b -> a -> b

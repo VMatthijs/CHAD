@@ -1,8 +1,14 @@
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 module LanguageTypes where
 
-import Prelude hiding (zipWith)
-import Data.Vector (singleton, zipWith)
+import Prelude hiding (zipWith, replicate)
+import Data.Proxy (Proxy(Proxy))
+import Data.Vector.Sized (replicate, zipWith)
+import GHC.TypeNats (KnownNat)
+
 import Types (Type(..), Tens, RealN)
 
 
@@ -22,10 +28,10 @@ instance (LT a, LT b) => LT (a, b) where
     plus a b  = (fst a `plus` fst b, snd a `plus` snd b)
     inferType = TPair inferType inferType
 
-instance LT RealN where
-    zero      = singleton 0 -- TODO: Correct zero type?
+instance KnownNat n => LT (RealN n) where
+    zero      = replicate 0
     plus      = zipWith (+)
-    inferType = TRealN
+    inferType = TRealN (Proxy @n)
 
 instance (LT a, LT b) => LT (a -> b) where
     zero      = const zero
