@@ -49,8 +49,8 @@ data STerm a b where
     -- | Operators
     Op    :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
              , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
-             , LT a ~ LT (Dr1 a), LT b ~ LT (Dr1 b)
-             , LT a ~ LT (Df1 a), LT b ~ LT (Df1 b)
+             , a ~ Dr1 a, b ~ Dr1 b
+             , a ~ Df1 a, b ~ Df1 b
              )
           => Operation a b -> STerm a b
 

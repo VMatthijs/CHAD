@@ -5,7 +5,7 @@
 module Operation where
 
 import Prelude hiding (sum, map, zipWith, length, replicate)
-import Data.Vector.Sized
+import Data.Vector.Sized (map, replicate, singleton, sum, zipWith)
 import GHC.TypeNats as TN
 
 
@@ -21,17 +21,15 @@ data Operation a b where
              => Operation (RealN (n TN.* m), RealN m) (RealN n)
     Sum      :: Operation (RealN n) (RealN 1)
     Sigmoid  :: Operation (RealN 1) (RealN 1)
-    -- DSigmoid :: Operation  RealN
-    -- Map      :: Operation (Double -> Double, RealN)
+
 
 showOp :: Operation a b -> String
-showOp (Constant c) = "const"
+showOp (Constant c) = "const(" ++ show c ++ ")"
 showOp  EAdd        = "EAdd"
 showOp  EProd       = "EProd"
 showOp  MProd       = "MProd"
 showOp  Sum         = "Sum"
 showOp  Sigmoid     = "Sigmoid"
--- showOp  DSigmoid    = "DSigmoid"
 
 evalOp :: Operation a b -> a -> b
 evalOp (Constant c) = const c
@@ -40,7 +38,6 @@ evalOp  EProd       = uncurry $ zipWith (*)
 evalOp  MProd       = undefined
 evalOp  Sum         = singleton . sum
 evalOp  Sigmoid     = map sigmoid
--- evalOp  DSigmoid    = map dsigmoid
 
 
 sigmoid :: Double -> Double
@@ -61,10 +58,12 @@ data LinearOperation a b c where
 
 
 showLOp :: LinearOperation a b c -> String
-showLOp DEAdd   = "DEadd"
-showLOp DEAddT  = "DEaddT"
-showLOp DEProd  = "DEProd"
-showLOp DEProdT = "DEProdT"
+showLOp DConstant   = "DConstant"
+showLOp DConstantT  = "DConstantT"
+showLOp DEAdd       = "DEadd"
+showLOp DEAddT      = "DEaddT"
+showLOp DEProd      = "DEProd"
+showLOp DEProdT     = "DEProdT"
 
 
 evalLOp :: LinearOperation a b c -> a -> LFun b c
