@@ -5,7 +5,7 @@ module Types where
 
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl), (:~:))
-import Data.Vector.Sized (Vector)
+import Data.Vector.Unboxed.Sized (Vector)
 import GHC.TypeNats (KnownNat, sameNat)
 
 type RealN n = Vector n Double

@@ -3,8 +3,8 @@
 module Main where
 
 import Prelude hiding (replicate)
-import Data.Maybe (fromJust)
-import Data.Vector.Sized (Vector, replicate, fromList)
+import Data.Maybe (fromMaybe)
+import Data.Vector.Unboxed.Sized (Unbox, Vector, replicate, fromList)
 
 import qualified SourceLanguage as SL
 import qualified TargetLanguage as TL
@@ -16,12 +16,13 @@ import Types
 import GHC.TypeNats
 
 
-
 main :: IO ()
 main = undefined
 
-fromList' :: KnownNat n => [a] -> Vector n a
-fromList' = fromJust . fromList
+
+
+fromList' :: (KnownNat n, Unbox a) => [a] -> Vector n a
+fromList' = fromMaybe (error "Incorrect vector size") . fromList
 
 -- Constant
 constVec :: (KnownNat n, LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a))

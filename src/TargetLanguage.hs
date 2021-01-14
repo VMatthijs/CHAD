@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs #-}
 module TargetLanguage where
 
-import Data.Vector.Sized as V (map, index, singleton, zipWith, toList)
+import Data.Vector.Unboxed.Sized as V (map, index, singleton, zipWith, toList)
 
 import Lib ((&&&))
 import Types

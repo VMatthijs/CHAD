@@ -5,7 +5,7 @@ module LanguageTypes where
 
 import Prelude hiding (zipWith, replicate)
 import Data.Proxy (Proxy(Proxy))
-import Data.Vector.Sized (replicate, zipWith)
+import Data.Vector.Unboxed.Sized (replicate, zipWith)
 import GHC.TypeNats (KnownNat)
 
 import Types (Type(..), Tens, RealN)

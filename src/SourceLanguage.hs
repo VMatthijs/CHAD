@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 module SourceLanguage where
 
-import Data.Vector.Sized as V (map, singleton, index)
+import Data.Vector.Unboxed.Sized as V (map, singleton, index)
 
 import Lib ((&&&))
 import Types
