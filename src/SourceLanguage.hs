@@ -1,11 +1,15 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 module SourceLanguage where
+
+import Data.Vector.Sized as V (map, singleton, index)
 
 import Lib ((&&&))
 import Types
 import Operation (Operation, evalOp)
 import LanguageTypes
+import GHC.TypeNats (KnownNat)
 
 
 -- | Terms of the source language
@@ -53,6 +57,9 @@ data STerm a b where
              , a ~ Df1 a, b ~ Df1 b
              )
           => Operation a b -> STerm a b
+    -- | Map
+    Map   :: KnownNat n
+          => STerm (RealN 1 -> RealN 1, RealN n) (RealN n)
 
 -- | Evaluate the source language
 evalSt :: STerm a b -> a -> b
@@ -65,3 +72,4 @@ evalSt  Snd       = snd
 evalSt  Ev        = uncurry ($)
 evalSt (Curry a)  = curry $ evalSt a
 evalSt (Op op)    = evalOp op
+evalSt  Map       = \(f, v) -> V.map (flip index 0 . f . singleton) v

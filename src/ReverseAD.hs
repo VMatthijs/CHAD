@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 module ReverseAD where
 
@@ -6,6 +7,7 @@ import qualified TargetLanguage as TL
 import Types
 import LanguageTypes
 import Operation
+import GHC.TypeNats
 
 -- TODO: Gensym oid voor genereren lambda vars
 
@@ -38,6 +40,12 @@ d1 (SL.Curry t)  = TL.Lambda "x" xType $ TL.Lambda "y" yType $
           d2t    = TL.App (d2 t) (TL.Pair (TL.Var "x" xType) (TL.Var "y" yType))
 d1 (SL.Op op)    = TL.Lambda "x" t $ TL.Op op (TL.Var "x" t)
     where t = inferType
+-- x := (f, v)
+d1  SL.Map       = TL.Lambda "x" xType $ TL.Map f v
+    where xType = inferType
+          yType = inferType
+          f = TL.Lambda "y" yType $ TL.Fst $ TL.App (TL.Fst (TL.Var "x" xType)) (TL.Var "y" yType)
+          v = TL.Snd (TL.Var "x" xType)
 
 
 d2 :: SL.STerm a b -> TL.TTerm (Dr1 a -> LFun (Dr2 b) (Dr2 a))
@@ -65,10 +73,22 @@ d2 (SL.Curry t)  = TL.Lambda "x" xType $ TL.LComp cur TL.LFst
           yType = inferType
           cur   = TL.LCur $ TL.Lambda "y" yType d2t
           d2t   = TL.App (d2 t) (TL.Pair (TL.Var "x" xType) (TL.Var "y" yType))
+-- Map
+-- x := (f, v)
+-- y := w
+d2  SL.Map       = TL.Lambda "x" xType $ TL.Lambda "y" yType
+                 $ TL.Pair (TL.Zip v w) (TL.ZipWith f v w)
+    where xType = inferType
+          yType = inferType
+          zType = inferType
+          f     = TL.Lambda "z" zType $ TL.Snd
+                $ TL.App (TL.Fst (TL.Var "x" xType)) (TL.Var "z" zType)
+          v     = TL.Snd (TL.Var "x" xType)
+          w     = TL.Var "y" yType
 -- Dop^t
 d2 (SL.Op (Constant _)) = TL.LOp DConstantT
 d2 (SL.Op EAdd   )      = TL.LOp DEAddT
 d2 (SL.Op EProd  )      = TL.LOp DEProdT
 d2 (SL.Op MProd  )      = undefined -- undefined
-d2 (SL.Op Sum    )      = undefined -- [1, 1, 1, 1, ...]
+d2 (SL.Op Sum    )      = TL.LOp DSumT -- [1, 1, 1, 1, ...]
 d2 (SL.Op Sigmoid)      = undefined --TL.Lambda "x" inferType (TL.Op (DSigmoid))

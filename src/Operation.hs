@@ -5,7 +5,7 @@
 module Operation where
 
 import Prelude hiding (sum, map, zipWith, length, replicate)
-import Data.Vector.Sized (map, replicate, singleton, sum, zipWith)
+import Data.Vector.Sized (map, replicate, singleton, sum, zipWith, index)
 import GHC.TypeNats as TN
 
 
@@ -19,7 +19,7 @@ data Operation a b where
     EProd    :: Operation (RealN n, RealN n) (RealN n)
     MProd    :: (KnownNat n, KnownNat m)
              => Operation (RealN (n TN.* m), RealN m) (RealN n)
-    Sum      :: Operation (RealN n) (RealN 1)
+    Sum      :: KnownNat n => Operation (RealN n) (RealN 1)
     Sigmoid  :: Operation (RealN 1) (RealN 1)
 
 
@@ -55,6 +55,9 @@ data LinearOperation a b c where
     DEAddT     :: LinearOperation (RealN n, RealN n) (RealN n)           (RealN n, RealN n)
     DEProd     :: LinearOperation (RealN n, RealN n) (RealN n, RealN n)  (RealN n)
     DEProdT    :: LinearOperation (RealN n, RealN n) (RealN n)           (RealN n, RealN n)
+    DSum       :: LinearOperation (RealN n)          (RealN n)           (RealN 1)
+    DSumT      :: KnownNat n
+               => LinearOperation (RealN n)          (RealN 1)           (RealN n)
 
 
 showLOp :: LinearOperation a b c -> String
@@ -77,3 +80,6 @@ evalLOp DEProd     ( x,  y) (a, b) = zipWith (+) xDeriv yDeriv
 evalLOp DEProdT    ( x,  y)  r     = (xDeriv, yDeriv)
     where xDeriv = zipWith (*) y r
           yDeriv = zipWith (*) x r
+-- Jacobian: 1xn [1, 1, 1, ...]
+evalLOp DSum        _x       r     = singleton $ sum r
+evalLOp DSumT       _x       r     = replicate $ index r 0
