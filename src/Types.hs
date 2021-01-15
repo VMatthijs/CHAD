@@ -4,10 +4,10 @@
 {-# LANGUAGE TypeOperators #-}
 module Types (
     RealN,
-    LFun(..), lId, lConst, lDup, lComp, lApp, lUncurry, lZipWith, lPair,
+    LFun, lId, lConst, lDup, lComp, lApp, lUncurry, lZipWith, lZipWith', lPair,
           lMapTuple, lAdd, lProd, lSum, lExpand, lPlus, lFst, lSnd,
-          lSwap, lCur,
-    Tens(..), empty, (Types.++), tensFoldr, singleton,
+          lSwap, lCur, lZip, lMap,
+    Tens, empty, (Types.++), tensFoldr, singleton,
     Df1, Df2, Dr1, Dr2,
     Type(..), eqTy,
     LT(..),
@@ -16,7 +16,9 @@ module Types (
 
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl), (:~:))
-import qualified Data.Vector.Unboxed.Sized as V (Vector, zipWith, sum, singleton, replicate, index)
+import qualified Data.Vector.Unboxed.Sized as V (
+    Vector, zipWith, sum, singleton, replicate, index, toList, map
+    )
 import GHC.TypeNats (KnownNat, sameNat)
 
 -- | Vector of size n containing real values
@@ -67,6 +69,14 @@ lUncurry f = LFun $ uncurry (lApp . f)
 lZipWith :: (Double -> LFun Double Double) -> RealN n -> LFun (RealN n) (RealN n)
 lZipWith f a = LFun $ V.zipWith (lApp . f) a
 
+lZipWith' :: (RealN 1 -> LFun (RealN 1) (RealN 1)) -> RealN n -> LFun (RealN n) (RealN n)
+lZipWith' f a = LFun $ V.zipWith f' a
+    where f' x y = V.index (lApp (f (V.singleton x)) (V.singleton y)) 0
+
+lZip :: RealN n -> LFun (RealN n) (Tens (RealN 1) (RealN 1))
+lZip x = LFun $ \y -> Tens $ V.toList $ V.zipWith f x y
+    where f a b = (V.singleton a, V.singleton b)
+
 -- | Pair two functions
 lPair :: LFun a b -> LFun a c -> LFun a (b, c)
 lPair a b = LFun $ \x -> (lApp a x, lApp b x)
@@ -100,6 +110,10 @@ lSwap t = LFun $ \x y -> lApp (t y) x
 
 lCur :: (LT b, LT c) => ((a, b) -> c -> c) -> LFun (Tens a b) c
 lCur f = LFun $ tensFoldr f zero
+
+lMap :: KnownNat n => RealN n -> LFun (RealN 1 -> RealN 1) (RealN n)
+lMap x = LFun $ \g -> V.map (flip V.index 0 . g . V.singleton) x
+
 
 -- Forward mode AD type families
 

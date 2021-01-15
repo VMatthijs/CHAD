@@ -125,22 +125,10 @@ d2 (SL.Curry t)  = do val <- get
 -- Map
 -- x := (f, v)
 -- y := (g, w)
-d2  SL.Map      = do val <- get
+d2  SL.Map      = do val <- get; put (val + 1)
                      let xVar = "x" ++ show val
-                     let yVar = "y" ++ show (val + 1)
-                     let zVar = "z" ++ show (val + 2)
-                     put (val + 3)
-
-                     let f = TL.Lambda zVar zType $ TL.Snd
-                           $ TL.App (TL.Fst (TL.Var xVar xType)) (TL.Var zVar zType)
-                     let v = TL.Snd (TL.Var xVar xType)
-                     let g = TL.Fst (TL.Var yVar yType)
-                     let w = TL.Snd (TL.Var yVar yType)
-                     return $ TL.Lambda xVar xType $ TL.LLambda yVar yType
-                            $ TL.Plus (TL.Map g v) (TL.ZipWith f v w)
+                     return $ TL.Lambda xVar xType $ TL.DMap $ TL.Var xVar xType
     where xType = inferType
-          yType = inferType
-          zType = inferType
 -- Dop
 d2 (SL.Op (Constant _)) = return $ TL.LOp DConstant
 d2 (SL.Op EAdd   )      = return $ TL.LOp DEAdd

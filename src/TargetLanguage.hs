@@ -3,15 +3,16 @@
 {-# LANGUAGE GADTs #-}
 module TargetLanguage where
 
-import Data.Vector.Unboxed.Sized as V (map, index, singleton, zipWith, toList)
+import Data.Vector.Unboxed.Sized as V (map, index, singleton)
 
-import Lib ((&&&))
-import Types as T ( Type, LFun(..), Tens(..), LT(..), RealN
-             , eqTy, lComp, lApp, tensFoldr, lId, lFst, lSnd
-             , lSwap, singleton, lPair, lCur
+import Types as T ( Type, LFun, Tens, LT(..), RealN
+             , eqTy, lComp, lApp, lId, lFst, lSnd, lMap
+             , lSwap, singleton, lPair, lCur, lZipWith', lZip
              )
+import LanguageTypes ()
 import Operation (Operation, LinearOperation, evalOp, evalLOp, showOp, showLOp)
 import Data.Type.Equality ((:~:)(Refl))
+import GHC.TypeNats (KnownNat)
 
 
 -- | Terms of the target language
@@ -35,7 +36,6 @@ data TTerm t where
     LOp       :: LinearOperation a b c -> TTerm (a -> LFun b c)
 
     -- Linear functions
-    LLambda   :: String -> Type a -> TTerm b -> TTerm (LFun a b)
     LId       :: TTerm (LFun b b)
     LComp     :: TTerm (LFun b c) -> TTerm (LFun c d) -> TTerm (LFun b d)
     LApp      :: TTerm (LFun b c) -> TTerm b -> TTerm c
@@ -54,10 +54,11 @@ data TTerm t where
     LSwap     :: TTerm (b -> LFun c d) -> TTerm (LFun c (b -> d))
     -- | Tensor-elimination
     LCur      :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun (Tens b c) d)
-    -- Zipping
-    ZipWith   :: TTerm (RealN 1 -> LFun (RealN 1) (RealN 1))
-              -> TTerm (RealN n) -> TTerm (RealN n) -> TTerm (RealN n)
-    Zip       :: TTerm (RealN n) -> TTerm (RealN n) -> TTerm (Tens (RealN 1) (RealN 1))
+    -- Map derivatives
+    DMap      :: KnownNat n => TTerm (RealN 1 -> (RealN 1, LFun (RealN 1) (RealN 1)), RealN n)
+              -> TTerm (LFun (RealN 1 -> RealN 1, RealN n) (RealN n))
+    DtMap     :: TTerm (RealN 1 -> (RealN 1, LFun (RealN 1) (RealN 1)), RealN n)
+              -> TTerm (LFun (RealN n) (Tens (RealN 1) (RealN 1), RealN n))
 
 
 -- | Substitute variable for term
@@ -77,8 +78,6 @@ subst _ _ _ (Lift x t)                  = Lift x t
 subst x v u (Op op y)                   = Op op (subst x v u y)
 subst x v u (Map f y)                   = Map (subst x v u f) (subst x v u y)
 -- Target language extension
-subst x v u (LLambda y t e) | x == y    = LLambda y t e
-                            | otherwise = LLambda y t (subst x v u e)
 subst _ _ _  LId                        = LId
 subst x v u (LComp f g)                 = LComp (subst x v u f) (subst x v u g)
 subst x v u (LApp f a)                  = LApp (subst x v u f) (subst x v u a)
@@ -91,8 +90,8 @@ subst x v u (Plus a b)                  = Plus (subst x v u a) (subst x v u b)
 subst x v u (LSwap t)                   = LSwap (subst x v u t)
 subst x v u (LCur t)                    = LCur (subst x v u t)
 subst _ _ _ (LOp lop)                   = LOp lop
-subst x v u (ZipWith f y z)             = ZipWith (subst x v u f) (subst x v u y) (subst x v u z)
-subst x v u (Zip y z)                   = Zip (subst x v u y) (subst x v u z)
+subst x v u (DMap t)                    = DMap (subst x v u t)
+subst x v u (DtMap t)                   = DtMap (subst x v u t)
 
 -- | Substitute variable for a TTerm
 substTt :: String -> TTerm u -> Type u -> TTerm t -> TTerm t
@@ -111,8 +110,6 @@ substTt _ _ _ (Lift x t)                  = Lift x t
 substTt x v u (Op op y)                   = Op op (substTt x v u y)
 substTt x v u (Map f y)                   = Map (substTt x v u f) (substTt x v u y)
 -- Target language extension
-substTt x v u (LLambda y t e) | x == y    = LLambda y t e
-                              | otherwise = LLambda y t (substTt x v u e)
 substTt _ _ _  LId                        = LId
 substTt x v u (LComp f g)                 = LComp (substTt x v u f) (substTt x v u g)
 substTt x v u (LApp f a)                  = LApp (substTt x v u f) (substTt x v u a)
@@ -125,8 +122,8 @@ substTt x v u (Plus a b)                  = Plus (substTt x v u a) (substTt x v 
 substTt x v u (LSwap t)                   = LSwap (substTt x v u t)
 substTt x v u (LCur t)                    = LCur (substTt x v u t)
 substTt _ _ _ (LOp lop)                   = LOp lop
-substTt x v u (ZipWith f y z)             = ZipWith (substTt x v u f) (substTt x v u y) (substTt x v u z)
-substTt x v u (Zip y z)                   = Zip (substTt x v u y) (substTt x v u z)
+substTt x v u (DMap t)                    = DMap (substTt x v u t)
+substTt x v u (DtMap t)                   = DtMap (substTt x v u t)
 
 
 -- | Evaluate the target language
@@ -143,25 +140,23 @@ evalTt (Lift x _)        = x
 evalTt (Op op a)         = evalOp op (evalTt a)
 evalTt (Map f x)         = V.map (flip index 0 . evalTt f . V.singleton) (evalTt x)
 -- Target language extension
-evalTt (LLambda x t e)   = LFun $ \v -> evalTt $ subst x v t e
-evalTt (LOp lop)         = evalLOp lop
-evalTt  LId              = lId
-evalTt (LComp f g)       = lComp (evalTt f) (evalTt g)
-evalTt (LApp f a)        = lApp (evalTt f) (evalTt a)
-evalTt  LFst             = lFst
-evalTt  LSnd             = lSnd
-evalTt (LPair a b)       = lPair (evalTt a) (evalTt b)
-evalTt (Singleton t)     = T.singleton (evalTt t)
-evalTt  Zero             = zero
-evalTt (Plus a b)        = plus (evalTt a) (evalTt b)
-evalTt (LSwap t)         = lSwap (evalTt t)
-evalTt (LCur  t)         = lCur f
+evalTt (LOp lop)     = evalLOp lop
+evalTt  LId          = lId
+evalTt (LComp f g)   = lComp (evalTt f) (evalTt g)
+evalTt (LApp f a)    = lApp (evalTt f) (evalTt a)
+evalTt  LFst         = lFst
+evalTt  LSnd         = lSnd
+evalTt (LPair a b)   = lPair (evalTt a) (evalTt b)
+evalTt (Singleton t) = T.singleton (evalTt t)
+evalTt  Zero         = zero
+evalTt (Plus a b)    = plus (evalTt a) (evalTt b)
+evalTt (LSwap t)     = lSwap (evalTt t)
+evalTt (LCur  t)     = lCur f
     where f x acc = plus (lApp (evalTt t (fst x)) (snd x)) acc
-evalTt (ZipWith f x y)   = V.zipWith f' (evalTt x) (evalTt y)
-    where f' :: Double -> Double -> Double
-          f' a b = index (lApp (evalTt f (V.singleton a)) (V.singleton b)) 0
-evalTt (Zip x y)         = Tens $ V.toList $ V.zipWith f (evalTt x) (evalTt y)
-    where f a b = (V.singleton a, V.singleton b)
+evalTt (DMap t)      = plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith' (snd . f) v))
+    where (f, v) = evalTt t
+evalTt (DtMap t)     = lPair (lZip v) (lZipWith' (snd . f) v)
+    where (f, v) = evalTt t
 
 
 printTt :: TTerm t -> String
@@ -177,7 +172,6 @@ printTt (Lift x _)        = undefined
 printTt (Op op a)         = "evalOp " ++ showOp op ++ " " ++ printTt a
 printTt (Map f a)         = "map (" ++ printTt f ++ ") " ++ printTt a
 -- Target language extension
-printTt (LLambda x t e)   = "L\\" ++ x ++ " -> (" ++ printTt e ++ ")"
 printTt (LOp lop)         = "evalLOp " ++ showLOp lop
 printTt  LId              = "lid"
 printTt (LComp f g)       = printTt g ++ ";;" ++ printTt f
@@ -190,5 +184,6 @@ printTt  Zero             = "0"
 printTt (Plus a b)        = "(" ++ printTt a ++ ") + (" ++ printTt b ++ ")"
 printTt (LSwap t)         = "lswap(" ++ printTt t ++ ")"
 printTt (LCur  t)         = "lcur⁻¹(" ++ printTt t ++ ")"
-printTt (ZipWith f x y)   = "ZipWith (" ++ printTt f ++ ") " ++ printTt x ++ " " ++ printTt y
-printTt (Zip x y)         = "Zip " ++ printTt x ++ " " ++ printTt y
+printTt (DMap t)          = "DMap(" ++ printTt t ++ ")"
+printTt (DtMap t)         = "DtMap(" ++ printTt t ++ ")"
+
