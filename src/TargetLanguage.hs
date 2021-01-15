@@ -33,6 +33,7 @@ data TTerm t where
     LOp       :: LinearOperation a b c -> TTerm (a -> LFun b c)
 
     -- Linear functions
+    LLambda   :: String -> Type a -> TTerm b -> TTerm (LFun a b)
     LId       :: TTerm (LFun b b)
     LComp     :: TTerm (LFun b c) -> TTerm (LFun c d) -> TTerm (LFun b d)
     LApp      :: TTerm (LFun b c) -> TTerm b -> TTerm c
@@ -59,67 +60,71 @@ data TTerm t where
 
 -- | Substitute variable for term
 subst :: String -> u -> Type u -> TTerm t -> TTerm t
-subst x v u (Var y t)      | x == y    = case eqTy u t of
+subst x v u (Var y t)      | x == y     = case eqTy u t of
                                             Just Refl -> Lift v u
                                             Nothing   -> error "ill-typed substitution"
-                           | otherwise = Var y t
-subst x v u (Lambda y t e) | x == y    = Lambda y t e
-                           | otherwise = Lambda y t (subst x v u e)
-subst x v u (App f a)                  = App (subst x v u f) (subst x v u a)
-subst _ _ _  Unit                      = Unit
-subst x v u (Pair a b)                 = Pair (subst x v u a) (subst x v u b)
-subst x v u (Fst p)                    = Fst (subst x v u p)
-subst x v u (Snd p)                    = Snd (subst x v u p)
-subst _ _ _ (Lift x t)                 = Lift x t
-subst x v u (Op op y)                  = Op op (subst x v u y)
-subst x v u (Map f y)                  = Map (subst x v u f) (subst x v u y)
+                           | otherwise  = Var y t
+subst x v u (Lambda y t e) | x == y     = Lambda y t e
+                           | otherwise  = Lambda y t (subst x v u e)
+subst x v u (App f a)                   = App (subst x v u f) (subst x v u a)
+subst _ _ _  Unit                       = Unit
+subst x v u (Pair a b)                  = Pair (subst x v u a) (subst x v u b)
+subst x v u (Fst p)                     = Fst (subst x v u p)
+subst x v u (Snd p)                     = Snd (subst x v u p)
+subst _ _ _ (Lift x t)                  = Lift x t
+subst x v u (Op op y)                   = Op op (subst x v u y)
+subst x v u (Map f y)                   = Map (subst x v u f) (subst x v u y)
 -- Target language extension
-subst _ _ _  LId                       = LId
-subst x v u (LComp f g)                = LComp (subst x v u f) (subst x v u g)
-subst x v u (LApp f a)                 = LApp (subst x v u f) (subst x v u a)
-subst _ _ _  LFst                      = LFst
-subst _ _ _  LSnd                      = LSnd
-subst x v u (LPair a b)                = LPair (subst x v u a) (subst x v u b)
-subst x v u (Singleton t)              = Singleton (subst x v u t)
-subst _ _ _  Zero                      = Zero
-subst x v u (Plus a b)                 = Plus (subst x v u a) (subst x v u b)
-subst x v u (LSwap t)                  = LSwap (subst x v u t)
-subst x v u (LCur t)                   = LCur (subst x v u t)
-subst _ _ _ (LOp lop)                  = LOp lop
-subst x v u (ZipWith f y z)            = ZipWith (subst x v u f) (subst x v u y) (subst x v u z)
-subst x v u (Zip y z)                  = Zip (subst x v u y) (subst x v u z)
+subst x v u (LLambda y t e) | x == y    = LLambda y t e
+                            | otherwise = LLambda y t (subst x v u e)
+subst _ _ _  LId                        = LId
+subst x v u (LComp f g)                 = LComp (subst x v u f) (subst x v u g)
+subst x v u (LApp f a)                  = LApp (subst x v u f) (subst x v u a)
+subst _ _ _  LFst                       = LFst
+subst _ _ _  LSnd                       = LSnd
+subst x v u (LPair a b)                 = LPair (subst x v u a) (subst x v u b)
+subst x v u (Singleton t)               = Singleton (subst x v u t)
+subst _ _ _  Zero                       = Zero
+subst x v u (Plus a b)                  = Plus (subst x v u a) (subst x v u b)
+subst x v u (LSwap t)                   = LSwap (subst x v u t)
+subst x v u (LCur t)                    = LCur (subst x v u t)
+subst _ _ _ (LOp lop)                   = LOp lop
+subst x v u (ZipWith f y z)             = ZipWith (subst x v u f) (subst x v u y) (subst x v u z)
+subst x v u (Zip y z)                   = Zip (subst x v u y) (subst x v u z)
 
 -- | Substitute variable for a TTerm
 substTt :: String -> TTerm u -> Type u -> TTerm t -> TTerm t
-substTt x v u (Var y t)      | x == y    = case eqTy u t of
-                                            Just Refl -> v
-                                            Nothing   -> error "ill-typed substitution"
-                             | otherwise = Var y t
-substTt x v u (Lambda y t e) | x == y    = Lambda y t e
-                             | otherwise = Lambda y t (substTt x v u e)
-substTt x v u (App f a)                  = App (substTt x v u f) (substTt x v u a)
-substTt _ _ _  Unit                      = Unit
-substTt x v u (Pair a b)                 = Pair (substTt x v u a) (substTt x v u b)
-substTt x v u (Fst p)                    = Fst (substTt x v u p)
-substTt x v u (Snd p)                    = Snd (substTt x v u p)
-substTt _ _ _ (Lift x t)                 = Lift x t
-substTt x v u (Op op y)                  = Op op (substTt x v u y)
-substTt x v u (Map f y)                  = Map (substTt x v u f) (substTt x v u y)
+substTt x v u (Var y t)      | x == y     = case eqTy u t of
+                                              Just Refl -> v
+                                              Nothing   -> error "ill-typed substitution"
+                             | otherwise  = Var y t
+substTt x v u (Lambda y t e) | x == y     = Lambda y t e
+                             | otherwise  = Lambda y t (substTt x v u e)
+substTt x v u (App f a)                   = App (substTt x v u f) (substTt x v u a)
+substTt _ _ _  Unit                       = Unit
+substTt x v u (Pair a b)                  = Pair (substTt x v u a) (substTt x v u b)
+substTt x v u (Fst p)                     = Fst (substTt x v u p)
+substTt x v u (Snd p)                     = Snd (substTt x v u p)
+substTt _ _ _ (Lift x t)                  = Lift x t
+substTt x v u (Op op y)                   = Op op (substTt x v u y)
+substTt x v u (Map f y)                   = Map (substTt x v u f) (substTt x v u y)
 -- Target language extension
-substTt _ _ _  LId                       = LId
-substTt x v u (LComp f g)                = LComp (substTt x v u f) (substTt x v u g)
-substTt x v u (LApp f a)                 = LApp (substTt x v u f) (substTt x v u a)
-substTt _ _ _  LFst                      = LFst
-substTt _ _ _  LSnd                      = LSnd
-substTt x v u (LPair a b)                = LPair (substTt x v u a) (substTt x v u b)
-substTt x v u (Singleton t)              = Singleton (substTt x v u t)
-substTt _ _ _  Zero                      = Zero
-substTt x v u (Plus a b)                 = Plus (substTt x v u a) (substTt x v u b)
-substTt x v u (LSwap t)                  = LSwap (substTt x v u t)
-substTt x v u (LCur t)                   = LCur (substTt x v u t)
-substTt _ _ _ (LOp lop)                  = LOp lop
-substTt x v u (ZipWith f y z)            = ZipWith (substTt x v u f) (substTt x v u y) (substTt x v u z)
-substTt x v u (Zip y z)                  = Zip (substTt x v u y) (substTt x v u z)
+substTt x v u (LLambda y t e) | x == y    = LLambda y t e
+                              | otherwise = LLambda y t (substTt x v u e)
+substTt _ _ _  LId                        = LId
+substTt x v u (LComp f g)                 = LComp (substTt x v u f) (substTt x v u g)
+substTt x v u (LApp f a)                  = LApp (substTt x v u f) (substTt x v u a)
+substTt _ _ _  LFst                       = LFst
+substTt _ _ _  LSnd                       = LSnd
+substTt x v u (LPair a b)                 = LPair (substTt x v u a) (substTt x v u b)
+substTt x v u (Singleton t)               = Singleton (substTt x v u t)
+substTt _ _ _  Zero                       = Zero
+substTt x v u (Plus a b)                  = Plus (substTt x v u a) (substTt x v u b)
+substTt x v u (LSwap t)                   = LSwap (substTt x v u t)
+substTt x v u (LCur t)                    = LCur (substTt x v u t)
+substTt _ _ _ (LOp lop)                   = LOp lop
+substTt x v u (ZipWith f y z)             = ZipWith (substTt x v u f) (substTt x v u y) (substTt x v u z)
+substTt x v u (Zip y z)                   = Zip (substTt x v u y) (substTt x v u z)
 
 
 -- | Evaluate the target language
@@ -136,23 +141,24 @@ evalTt (Lift x _)        = x
 evalTt (Op op a)         = evalOp op (evalTt a)
 evalTt (Map f x)         = V.map (flip index 0 . evalTt f . singleton) (evalTt x)
 -- Target language extension
+evalTt (LLambda x t e)   = LFun $ \v -> evalTt $ subst x v t e
 evalTt (LOp lop)         = evalLOp lop
-evalTt  LId              = id
-evalTt (LComp f g)       = evalTt g . evalTt f
-evalTt (LApp f a)        = evalTt f (evalTt a)
-evalTt  LFst             = fst
-evalTt  LSnd             = snd
-evalTt (LPair a b)       = evalTt a &&& evalTt b
-evalTt (Singleton t)     = \x -> [(evalTt t, x)]
+evalTt  LId              = LFun id
+evalTt (LComp f g)       = lComp (evalTt f) (evalTt g)
+evalTt (LApp f a)        = lApp (evalTt f) (evalTt a)
+evalTt  LFst             = LFun fst
+evalTt  LSnd             = LFun snd
+evalTt (LPair a b)       = LFun $ \x -> (lApp (evalTt a) x, lApp (evalTt b) x) --evalTt a &&& evalTt b
+evalTt (Singleton t)     = LFun $ \x -> Tens [(evalTt t, x)]
 evalTt  Zero             = zero
 evalTt (Plus a b)        = plus (evalTt a) (evalTt b)
-evalTt (LSwap t)         = flip $ evalTt t
-evalTt (LCur  t)         = foldr f zero
-    where f x acc = plus (uncurry (evalTt t) x) acc
+evalTt (LSwap t)         = LFun $ \x y -> lApp (evalTt t y) x
+evalTt (LCur  t)         = LFun $ \(Tens x) -> foldr f zero x
+    where f x acc = plus (lApp (evalTt t (fst x)) (snd x)) acc
 evalTt (ZipWith f x y)   = V.zipWith f' (evalTt x) (evalTt y)
     where f' :: Double -> Double -> Double
-          f' a b = index (evalTt f (singleton a) (singleton b)) 0
-evalTt (Zip x y)         = V.toList $ V.zipWith f (evalTt x) (evalTt y)
+          f' a b = index (lApp (evalTt f (singleton a)) (singleton b)) 0
+evalTt (Zip x y)         = Tens $ V.toList $ V.zipWith f (evalTt x) (evalTt y)
     where f a b = (singleton a, singleton b)
 
 
@@ -169,6 +175,7 @@ printTt (Lift x _)        = undefined
 printTt (Op op a)         = "evalOp " ++ showOp op ++ " " ++ printTt a
 printTt (Map f a)         = "map (" ++ printTt f ++ ") " ++ printTt a
 -- Target language extension
+printTt (LLambda x t e)   = "L\\" ++ x ++ " -> (" ++ printTt e ++ ")"
 printTt (LOp lop)         = "evalLOp " ++ showLOp lop
 printTt  LId              = "lid"
 printTt (LComp f g)       = printTt g ++ ";;" ++ printTt f

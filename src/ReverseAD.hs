@@ -139,7 +139,7 @@ d2  SL.Map       = do val <- get
                             $ TL.App (TL.Fst (TL.Var xVar xType)) (TL.Var zVar zType)
                       let v = TL.Snd (TL.Var xVar xType)
                       let w = TL.Var yVar yType
-                      return $ TL.Lambda xVar xType $ TL.Lambda yVar yType
+                      return $ TL.Lambda xVar xType $ TL.LLambda yVar yType
                              $ TL.Pair (TL.Zip v w) (TL.ZipWith f v w)
     where xType = inferType
           yType = inferType

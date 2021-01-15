@@ -9,7 +9,7 @@ import Data.Vector.Unboxed.Sized (map, replicate, singleton, sum, zipWith, index
 import GHC.TypeNats as TN
 
 
-import Types (LFun, RealN)
+import Types (LFun(..), RealN)
 
 
 -- | Possible operators in the source language
@@ -70,16 +70,16 @@ showLOp DEProdT     = "DEProdT"
 
 
 evalLOp :: LinearOperation a b c -> a -> LFun b c
-evalLOp DConstant  ()       ()     = replicate 0
-evalLOp DConstantT ()       _r     = ()
-evalLOp DEAdd      (_x, _y) (a, b) = zipWith (+) a b
-evalLOp DEAddT     (_x, _y)  r     = (r, r)
-evalLOp DEProd     ( x,  y) (a, b) = zipWith (+) xDeriv yDeriv
-    where xDeriv = zipWith (*) y a
-          yDeriv = zipWith (*) x b
-evalLOp DEProdT    ( x,  y)  r     = (xDeriv, yDeriv)
-    where xDeriv = zipWith (*) y r
-          yDeriv = zipWith (*) x r
+evalLOp DConstant  ()       = LFun $ \() -> replicate 0
+evalLOp DConstantT ()       = LFun $ const ()
+evalLOp DEAdd      (_x, _y) = LFun $ uncurry $ zipWith (+)
+evalLOp DEAddT     (_x, _y) = LFun $ \r -> (r, r)
+evalLOp DEProd     ( x,  y) = LFun $ \(a, b) -> zipWith (+) (xDeriv a) (yDeriv b)
+    where xDeriv a = zipWith (*) y a
+          yDeriv b = zipWith (*) x b
+evalLOp DEProdT    ( x,  y) = LFun $ \r -> (xDeriv r, yDeriv r)
+    where xDeriv r = zipWith (*) y r
+          yDeriv r = zipWith (*) x r
 -- Jacobian: 1xn [1, 1, 1, ...]
-evalLOp DSum        _x       r     = singleton $ sum r
-evalLOp DSumT       _x       r     = replicate $ index r 0
+evalLOp DSum        _x      = LFun $ singleton . sum
+evalLOp DSumT       _x      = LFun $ \r -> replicate $ index r 0

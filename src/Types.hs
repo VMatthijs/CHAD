@@ -10,9 +10,15 @@ import GHC.TypeNats (KnownNat, sameNat)
 
 type RealN n = Vector n Double
 
-type Tens a b = [(a, b)]
+newtype Tens a b = Tens [(a, b)]
 -- | Linear function
-type LFun a b = a -> b
+newtype LFun a b = LFun (a -> b)
+
+lComp :: LFun a b -> LFun b c -> LFun a c
+lComp (LFun f) (LFun g) = LFun $ g . f
+
+lApp :: LFun a b -> a -> b
+lApp (LFun f) = f
 
 -- Forward mode AD type families
 

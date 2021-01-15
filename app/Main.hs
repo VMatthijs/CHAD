@@ -20,6 +20,8 @@ import GHC.TypeNats
 main :: IO ()
 main = undefined
 
+evalDerivative :: TL.TTerm (a -> LFun b c) -> a -> b -> c
+evalDerivative f a = lApp (TL.evalTt f a)
 
 fromList' :: (KnownNat n, Unbox a) => [a] -> Vector n a
 fromList' = fromMaybe (error "Incorrect vector size") . fromList
