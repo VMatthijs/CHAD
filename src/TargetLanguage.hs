@@ -6,8 +6,10 @@ module TargetLanguage where
 import Data.Vector.Unboxed.Sized as V (map, index, singleton, zipWith, toList)
 
 import Lib ((&&&))
-import Types
-import LanguageTypes (LT(..))
+import Types as T ( Type, LFun(..), Tens(..), LT(..), RealN
+             , eqTy, lComp, lApp, tensFoldr, lId, lFst, lSnd
+             , lSwap, singleton, lPair, lCur
+             )
 import Operation (Operation, LinearOperation, evalOp, evalLOp, showOp, showLOp)
 import Data.Type.Equality ((:~:)(Refl))
 
@@ -139,27 +141,27 @@ evalTt (Fst p)           = fst $ evalTt p
 evalTt (Snd p)           = snd $ evalTt p
 evalTt (Lift x _)        = x
 evalTt (Op op a)         = evalOp op (evalTt a)
-evalTt (Map f x)         = V.map (flip index 0 . evalTt f . singleton) (evalTt x)
+evalTt (Map f x)         = V.map (flip index 0 . evalTt f . V.singleton) (evalTt x)
 -- Target language extension
 evalTt (LLambda x t e)   = LFun $ \v -> evalTt $ subst x v t e
 evalTt (LOp lop)         = evalLOp lop
-evalTt  LId              = LFun id
+evalTt  LId              = lId
 evalTt (LComp f g)       = lComp (evalTt f) (evalTt g)
 evalTt (LApp f a)        = lApp (evalTt f) (evalTt a)
-evalTt  LFst             = LFun fst
-evalTt  LSnd             = LFun snd
-evalTt (LPair a b)       = LFun $ \x -> (lApp (evalTt a) x, lApp (evalTt b) x) --evalTt a &&& evalTt b
-evalTt (Singleton t)     = LFun $ \x -> Tens [(evalTt t, x)]
+evalTt  LFst             = lFst
+evalTt  LSnd             = lSnd
+evalTt (LPair a b)       = lPair (evalTt a) (evalTt b)
+evalTt (Singleton t)     = T.singleton (evalTt t)
 evalTt  Zero             = zero
 evalTt (Plus a b)        = plus (evalTt a) (evalTt b)
-evalTt (LSwap t)         = LFun $ \x y -> lApp (evalTt t y) x
-evalTt (LCur  t)         = LFun $ \(Tens x) -> foldr f zero x
+evalTt (LSwap t)         = lSwap (evalTt t)
+evalTt (LCur  t)         = lCur f
     where f x acc = plus (lApp (evalTt t (fst x)) (snd x)) acc
 evalTt (ZipWith f x y)   = V.zipWith f' (evalTt x) (evalTt y)
     where f' :: Double -> Double -> Double
-          f' a b = index (lApp (evalTt f (singleton a)) (singleton b)) 0
+          f' a b = index (lApp (evalTt f (V.singleton a)) (V.singleton b)) 0
 evalTt (Zip x y)         = Tens $ V.toList $ V.zipWith f (evalTt x) (evalTt y)
-    where f a b = (singleton a, singleton b)
+    where f a b = (V.singleton a, V.singleton b)
 
 
 printTt :: TTerm t -> String

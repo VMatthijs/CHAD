@@ -6,7 +6,7 @@ import Control.Monad.State.Lazy
 
 import qualified SourceLanguage as SL
 import qualified TargetLanguage as TL
-import Types
+import Types hiding ((++))
 import LanguageTypes
 import Operation
 

@@ -8,7 +8,6 @@ import Data.Vector.Unboxed.Sized as V (map, singleton, index)
 import Lib ((&&&))
 import Types
 import Operation (Operation, evalOp)
-import LanguageTypes
 import GHC.TypeNats (KnownNat)
 
 
@@ -72,4 +71,4 @@ evalSt  Snd       = snd
 evalSt  Ev        = uncurry ($)
 evalSt (Curry a)  = curry $ evalSt a
 evalSt (Op op)    = evalOp op
-evalSt  Map       = \(f, v) -> V.map (flip index 0 . f . singleton) v
+evalSt  Map       = \(f, v) -> V.map (flip index 0 . f . V.singleton) v

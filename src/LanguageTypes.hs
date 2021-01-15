@@ -8,14 +8,7 @@ import Data.Proxy (Proxy(Proxy))
 import Data.Vector.Unboxed.Sized (replicate, zipWith)
 import GHC.TypeNats (KnownNat)
 
-import Types (Type(..), Tens(..), LFun(..), RealN)
-
-
--- | Operators defined over multiple language types
-class LT a where
-    zero      :: a
-    plus      :: a -> a -> a
-    inferType :: Type a
+import Types as T (LT(..), Type(..), Tens, LFun, RealN, empty, (++), lConst, lPlus)
 
 instance LT () where
     zero      = ()
@@ -38,11 +31,11 @@ instance (LT a, LT b) => LT (a -> b) where
     inferType = TArrow inferType inferType
 
 instance (LT a, LT b) => LT (Tens a b) where
-    zero                   = Tens []
-    plus (Tens a) (Tens b) = Tens (a ++ b)
-    inferType              = TTens inferType inferType
+    zero      = empty
+    plus      = (T.++)
+    inferType = TTens inferType inferType
 
 instance (LT a, LT b) => LT (LFun a b) where
-    zero                    = LFun $ const zero
-    plus (LFun f) (LFun g)  = LFun $ \x -> plus (f x) (g x)
-    inferType               = TLinFun inferType inferType
+    zero      = lConst zero
+    plus      = lPlus
+    inferType = TLinFun inferType inferType
