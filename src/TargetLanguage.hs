@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 module TargetLanguage where
@@ -51,9 +52,9 @@ data TTerm t where
     -- | Tensor-elimination
     LCur      :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun (Tens b c) d)
     -- Zipping
-    ZipWith :: TTerm (RealN 1 -> LFun (RealN 1) (RealN 1))
-            -> TTerm (RealN n) -> TTerm (RealN n) -> TTerm (RealN n)
-    Zip     :: TTerm (RealN n) -> TTerm (RealN n) -> TTerm (Tens (RealN 1) (RealN 1))
+    ZipWith   :: TTerm (RealN 1 -> LFun (RealN 1) (RealN 1))
+              -> TTerm (RealN n) -> TTerm (RealN n) -> TTerm (RealN n)
+    Zip       :: TTerm (RealN n) -> TTerm (RealN n) -> TTerm (Tens (RealN 1) (RealN 1))
 
 
 -- | Substitute variable for term
@@ -158,7 +159,7 @@ evalTt (Zip x y)         = V.toList $ V.zipWith f (evalTt x) (evalTt y)
 printTt :: TTerm t -> String
 -- Source language extension
 printTt (Var x _)         = x
-printTt (Lambda x t e)    = "\\" ++ x ++ " -> " ++ printTt e
+printTt (Lambda x t e)    = "\\" ++ x ++ " -> (" ++ printTt e ++ ")"
 printTt (App f a)         = printTt f ++ "(" ++ printTt a ++ ")"
 printTt  Unit             = "()"
 printTt (Pair a b)        = "(" ++ printTt a ++ ", " ++ printTt b ++ ")"

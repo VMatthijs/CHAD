@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8c2f1893b62e41c7e83801f0c88b51b0def053bd0325bc3bf4ee1400bba7e910
+-- hash: f0f7930b1ba9172f44467962a735de79e6488bf66d04ce4a35e316cfca55e042
 
 name:           ad-mini-project
 version:        0.1.0.0
@@ -39,6 +39,7 @@ library
       src
   build-depends:
       base >=4.7 && <5
+    , mtl
     , vector-sized
   default-language: Haskell2010
 
@@ -52,6 +53,7 @@ executable ad-mini-project-exe
   build-depends:
       ad-mini-project
     , base >=4.7 && <5
+    , mtl
     , vector-sized
   default-language: Haskell2010
 
@@ -66,5 +68,6 @@ test-suite ad-mini-project-test
   build-depends:
       ad-mini-project
     , base >=4.7 && <5
+    , mtl
     , vector-sized
   default-language: Haskell2010

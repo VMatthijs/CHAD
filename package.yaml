@@ -22,6 +22,7 @@ description:         Please see the README <https://git.science.uu.nl/p.debruin/
 dependencies:
 - base >= 4.7 && < 5
 - vector-sized
+- mtl
 
 library:
   source-dirs: src

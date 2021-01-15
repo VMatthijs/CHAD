@@ -3,6 +3,7 @@
 module Main where
 
 import Prelude hiding (replicate)
+import Control.Monad.State.Lazy
 import Data.Maybe (fromMaybe)
 import Data.Vector.Unboxed.Sized (Unbox, Vector, replicate, fromList)
 
@@ -18,7 +19,6 @@ import GHC.TypeNats
 
 main :: IO ()
 main = undefined
-
 
 
 fromList' :: (KnownNat n, Unbox a) => [a] -> Vector n a
