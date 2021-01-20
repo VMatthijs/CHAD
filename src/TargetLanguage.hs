@@ -174,7 +174,7 @@ printTt (Map f a)         = "map (" ++ printTt f ++ ") " ++ printTt a
 -- Target language extension
 printTt (LOp lop)         = "evalLOp " ++ showLOp lop
 printTt  LId              = "lid"
-printTt (LComp f g)       = printTt g ++ ";;" ++ printTt f
+printTt (LComp f g)       = "(" ++ printTt f ++ ";;" ++ printTt g ++ ")"
 printTt (LApp f a)        = printTt f ++ "(" ++ printTt a ++ ")"
 printTt  LFst             = "lfst"
 printTt  LSnd             = "lsnd"

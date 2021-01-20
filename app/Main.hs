@@ -40,6 +40,10 @@ cX c = SL.Comp (SL.Pair cons SL.Id) (SL.Op EProd)
 xSquared :: SL.STerm (RealN 1) (RealN 1)
 xSquared = SL.Comp (SL.Pair SL.Id SL.Id) (SL.Op EProd)
 
+
+xCubed :: SL.STerm (RealN 1) (RealN 1)
+xCubed = SL.Comp (SL.Pair xSquared SL.Id) (SL.Op EProd)
+
 -- c * x + x^2
 quadratic :: Double -> SL.STerm (RealN 1) (RealN 1)
 quadratic c = SL.Comp (SL.Pair (cX c) xSquared) (SL.Op EAdd)
