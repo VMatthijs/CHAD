@@ -4,11 +4,13 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7c472024467baf75be6493485e836dc46767e2a43bd93f30e4283d1300704679
+-- hash: f1f96e46d5085159fb9d438a825f41c40ea88b8b9973f3ae35a7c32e4e1676ec
 
 name:           ad-on-higher-order-functions
 version:        0.1.0.0
 description:    Please see the README <https://github.com/PhiliPdB/ad-on-higher-order-functions/blob/master/README.md>
+homepage:       https://github.com/PhiliPdB/ad-on-higher-order-functions#readme
+bug-reports:    https://github.com/PhiliPdB/ad-on-higher-order-functions/issues
 author:         Philip de Bruin, Pieter Knops, Danny de Jong
 maintainer:     Philip de Bruin <p.debruin@students.uu.nl>, Pieter Knops <p.d.knops@students.uu.nl>, Danny de Jong <g.j.dejong2@students.uu.nl>
 copyright:      2021 Philip de Bruin, Pieter Knops, Danny de Jong

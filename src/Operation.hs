@@ -1,11 +1,10 @@
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
 module Operation where
 
-import Prelude hiding (sum, map, zipWith, length, replicate)
-import Data.Vector.Unboxed.Sized (map, replicate, singleton, sum, zipWith, index)
+import Prelude hiding (sum, zipWith, replicate)
+import Data.Vector.Unboxed.Sized (replicate, singleton, sum, zipWith)
 import GHC.TypeNats as TN
 
 
@@ -19,34 +18,21 @@ data Operation a b where
     Constant :: KnownNat n => RealN n -> Operation () (RealN n)
     EAdd     :: Operation (RealN n, RealN n) (RealN n)
     EProd    :: Operation (RealN n, RealN n) (RealN n)
-    MProd    :: (KnownNat n, KnownNat m)
-             => Operation (RealN (n TN.* m), RealN m) (RealN n)
     Sum      :: KnownNat n => Operation (RealN n) (RealN 1)
-    Sigmoid  :: Operation (RealN 1) (RealN 1)
 
 
 showOp :: Operation a b -> String
 showOp (Constant c) = "const(" ++ show c ++ ")"
 showOp  EAdd        = "EAdd"
 showOp  EProd       = "EProd"
-showOp  MProd       = "MProd"
 showOp  Sum         = "Sum"
-showOp  Sigmoid     = "Sigmoid"
 
 evalOp :: Operation a b -> a -> b
 evalOp (Constant c) = const c
 evalOp  EAdd        = uncurry $ zipWith (+)
 evalOp  EProd       = uncurry $ zipWith (*)
-evalOp  MProd       = undefined
 evalOp  Sum         = singleton . sum
-evalOp  Sigmoid     = map sigmoid
 
-
-sigmoid :: Double -> Double
-sigmoid x = 1.0 / (1.0 + exp (negate x))
-
-dsigmoid :: Double -> Double
-dsigmoid x = (sigmoid x) * (1 - sigmoid x)
 
 -- | D op and D op^t of the Operators in the source language
 data LinearOperation a b c where

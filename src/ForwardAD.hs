@@ -133,6 +133,4 @@ d2  SL.Map      = do val <- get; put (val + 1)
 d2 (SL.Op (Constant _)) = return $ TL.LOp DConstant
 d2 (SL.Op EAdd   )      = return $ TL.LOp DEAdd
 d2 (SL.Op EProd  )      = return $ TL.LOp DEProd
-d2 (SL.Op MProd  )      = undefined -- undefined
 d2 (SL.Op Sum    )      = return $ TL.LOp DSum
-d2 (SL.Op Sigmoid)      = undefined --TL.Lambda "x" inferType (TL.Op (DSigmoid))
