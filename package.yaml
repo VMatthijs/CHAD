@@ -1,6 +1,6 @@
 name:                ad-on-higher-order-functions
 version:             0.1.0.0
-git:                 "https://github.com/PhiliPdB/ad-on-higher-order-functions"
+github:              "PhiliPdB/ad-on-higher-order-functions"
 license:             BSD3
 author:              "Philip de Bruin, Pieter Knops, Danny de Jong"
 maintainer:          "Philip de Bruin <p.debruin@students.uu.nl>, Pieter Knops <p.d.knops@students.uu.nl>, Danny de Jong <g.j.dejong2@students.uu.nl>"
