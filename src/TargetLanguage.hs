@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 module TargetLanguage where
@@ -158,7 +157,7 @@ evalTt (DMap t)      = plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith' (snd . 
 evalTt (DtMap t)     = lPair (lZip v) (lZipWith' (snd . f) v)
     where (f, v) = evalTt t
 
-
+-- | Pretty print the target language
 printTt :: TTerm t -> String
 -- Source language extension
 printTt (Var x _)         = x
@@ -183,7 +182,7 @@ printTt (Singleton t)     = "[(" ++ printTt t ++ ", -)]"
 printTt  Zero             = "0"
 printTt (Plus a b)        = "(" ++ printTt a ++ ") + (" ++ printTt b ++ ")"
 printTt (LSwap t)         = "lswap(" ++ printTt t ++ ")"
-printTt (LCur  t)         = "lcur⁻¹(" ++ printTt t ++ ")"
+printTt (LCur  t)         = "lcur(" ++ printTt t ++ ")"
 printTt (DMap t)          = "DMap(" ++ printTt t ++ ")"
 printTt (DtMap t)         = "DtMap(" ++ printTt t ++ ")"
 

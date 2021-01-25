@@ -5,7 +5,7 @@ module Operation where
 
 import Prelude hiding (sum, zipWith, replicate)
 import Data.Vector.Unboxed.Sized (replicate, singleton, sum, zipWith)
-import GHC.TypeNats as TN
+import GHC.TypeNats (KnownNat)
 
 
 import Types ( LFun, RealN, lComp, lConst, lDup, lZipWith, lAdd, lUncurry
