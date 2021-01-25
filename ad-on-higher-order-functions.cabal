@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f1f96e46d5085159fb9d438a825f41c40ea88b8b9973f3ae35a7c32e4e1676ec
+-- hash: b74197876394a203655ebf025afbf02f9549f4796ba9a1723f3188460447d2e0
 
 name:           ad-on-higher-order-functions
 version:        0.1.0.0
@@ -19,7 +19,7 @@ license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
-    ChangeLog.md
+    Examples.hs
 
 source-repository head
   type: git

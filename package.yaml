@@ -8,7 +8,7 @@ copyright:           "2021 Philip de Bruin, Pieter Knops, Danny de Jong"
 
 extra-source-files:
 - README.md
-- ChangeLog.md
+- Examples.hs
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
