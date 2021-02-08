@@ -5,7 +5,7 @@ module SourceLanguage where
 
 import Data.Vector.Unboxed.Sized as V (map, singleton, index)
 
-import Lib ((&&&))
+import Helper ((&&&))
 import Types
 import Operation (Operation, evalOp)
 import GHC.TypeNats (KnownNat)

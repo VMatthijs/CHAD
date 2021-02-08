@@ -1,4 +1,3 @@
-{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 module Examples where
@@ -7,15 +6,15 @@ import Prelude hiding (replicate)
 import Data.Maybe (fromMaybe)
 import Data.Vector.Unboxed.Sized (Unbox, Vector, replicate, fromList)
 
-import "ad-on-higher-order-functions" Lib
+import Helper
 import qualified SourceLanguage as SL
 import qualified TargetLanguage as TL
 import qualified ReverseAD as R
 import qualified ForwardAD as F
-import Operation
+import Operation (Operation(..))
 import Types
 import Simplify (simplifyTTerm)
-import GHC.TypeNats
+import GHC.TypeNats (KnownNat)
 
 -- | Helper function to evaluate a derivative
 evalDerivative :: TL.TTerm (a -> LFun b c) -> a -> b -> c

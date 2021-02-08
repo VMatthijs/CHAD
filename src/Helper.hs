@@ -1,4 +1,5 @@
-module Lib where
+-- | Different helper functions used in the library
+module Helper where
 
 import Control.Monad.State.Lazy (State, evalState, get, put)
 

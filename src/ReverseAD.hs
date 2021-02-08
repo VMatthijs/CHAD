@@ -4,7 +4,7 @@ module ReverseAD where
 
 import Control.Monad.State.Lazy (State)
 
-import Lib (gensym)
+import Helper (gensym)
 import qualified SourceLanguage as SL
 import qualified TargetLanguage as TL
 import Types (Dr1, Dr2, LFun, LT(inferType))

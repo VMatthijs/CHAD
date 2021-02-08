@@ -3,7 +3,7 @@ module ForwardAD where
 
 import Control.Monad.State.Lazy (State)
 
-import Lib (gensym)
+import Helper (gensym)
 import qualified SourceLanguage as SL
 import qualified TargetLanguage as TL
 import Types (Df1, Df2, LFun, LT(inferType))
