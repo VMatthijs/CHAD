@@ -14,6 +14,7 @@ import qualified ReverseAD as R
 import qualified ForwardAD as F
 import Operation
 import Types
+import Simplify (simplifyTTerm)
 import GHC.TypeNats
 
 -- | Helper function to evaluate a derivative

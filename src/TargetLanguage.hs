@@ -142,7 +142,7 @@ evalTt (Map f x)         = V.map (flip index 0 . evalTt f . V.singleton) (evalTt
 evalTt (LOp lop)     = evalLOp lop
 evalTt  LId          = lId
 evalTt (LComp f g)   = lComp (evalTt f) (evalTt g)
-evalTt (LApp f a)    = lApp (evalTt f) (evalTt a)
+evalTt (LApp f a)    = lApp  (evalTt f) (evalTt a)
 evalTt  LFst         = lFst
 evalTt  LSnd         = lSnd
 evalTt (LPair a b)   = lPair (evalTt a) (evalTt b)
@@ -161,13 +161,13 @@ evalTt (DtMap t)     = lPair (lZip v) (lZipWith' (snd . f) v)
 printTt :: TTerm t -> String
 -- Source language extension
 printTt (Var x _)         = x
-printTt (Lambda x t e)    = "\\" ++ x ++ " -> (" ++ printTt e ++ ")"
+printTt (Lambda x _ e)    = "\\" ++ x ++ " -> (" ++ printTt e ++ ")"
 printTt (App f a)         = printTt f ++ "(" ++ printTt a ++ ")"
 printTt  Unit             = "()"
 printTt (Pair a b)        = "(" ++ printTt a ++ ", " ++ printTt b ++ ")"
 printTt (Fst p)           = "Fst(" ++ printTt p ++ ")"
 printTt (Snd p)           = "Snd(" ++ printTt p ++ ")"
-printTt (Lift x _)        = undefined
+printTt (Lift _ _)        = error "Can't print lifted value"
 printTt (Op op a)         = "evalOp " ++ showOp op ++ " " ++ printTt a
 printTt (Map f a)         = "map (" ++ printTt f ++ ") " ++ printTt a
 -- Target language extension
