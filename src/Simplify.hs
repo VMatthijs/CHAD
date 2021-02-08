@@ -29,19 +29,20 @@ simplifyTTerm  LSnd          = LSnd
 simplifyTTerm (LPair a b)    = LPair     (simplifyTTerm a) (simplifyTTerm b)
 simplifyTTerm (Singleton t)  = Singleton (simplifyTTerm t)
 simplifyTTerm  Zero          = Zero
-simplifyTTerm (Plus a b)     = Plus      (simplifyTTerm a) (simplifyTTerm b)
-simplifyTTerm (LSwap t)      = LSwap     (simplifyTTerm t)
-simplifyTTerm (LCur  t)      = LCur      (simplifyTTerm t)
+simplifyTTerm (Plus a b)     = simplifyPlus (simplifyTTerm a) (simplifyTTerm b)
+simplifyTTerm (LSwap t)      = LSwap (simplifyTTerm t)
+simplifyTTerm (LCur  t)      = LCur  (simplifyTTerm t)
 simplifyTTerm (LOp lop)      = LOp lop
-simplifyTTerm (DMap  t)      = DMap      (simplifyTTerm t)
-simplifyTTerm (DtMap t)      = DtMap     (simplifyTTerm t)
+simplifyTTerm (DMap  t)      = DMap  (simplifyTTerm t)
+simplifyTTerm (DtMap t)      = DtMap (simplifyTTerm t)
 
 
 -- | Simplify the App TTerm
-simplifyApp :: TTerm (a -> b) -> TTerm a -> TTerm b
+simplifyApp :: (LT a, LT b) => TTerm (a -> b) -> TTerm a -> TTerm b
 simplifyApp (Lambda x t e) v@(Var _ _)           = simplifyTTerm $ substTt x v t e
 simplifyApp (Lambda x t e) a | usesOf x t e <= 1 = simplifyTTerm $ substTt x a t e
                              | otherwise         = App (Lambda x t e) a
+simplifyApp  Zero          _ = Zero
 simplifyApp  f             a = App f a
 
 -- | Simplify the Fst TTerm
@@ -58,19 +59,27 @@ simplifySnd p          = Snd p
 
 
 -- | Simplify the LComp TTerm
-simplifyLComp :: TTerm (LFun a b) -> TTerm (LFun b c) -> TTerm (LFun a c)
+simplifyLComp :: (LT a, LT b, LT c) => TTerm (LFun a b) -> TTerm (LFun b c) -> TTerm (LFun a c)
 simplifyLComp f                     LId  = f
 simplifyLComp LId                   g    = g
+-- Remove redundant LPair
 simplifyLComp (LPair a _)           LFst = a
 simplifyLComp (LPair _ b)           LSnd = b
 simplifyLComp (LComp f (LPair a _)) LFst = LComp f a
 simplifyLComp (LComp f (LPair _ b)) LSnd = LComp f b
-simplifyLComp f                     g    = LComp f g
+simplifyLComp _                     Zero         = Zero
+simplifyLComp f                     g            = LComp f g
 
 -- | Simplify the LApp TTerm
 simplifyLApp :: TTerm (LFun a b) -> TTerm a -> TTerm b
 simplifyLApp LId a = a
 simplifyLApp f   a = LApp f a
+
+-- | Simplify the Plus TTerm
+simplifyPlus :: LT a => TTerm a -> TTerm a -> TTerm a
+simplifyPlus a    Zero = a
+simplifyPlus Zero b    = b
+simplifyPlus a    b    = Plus a b
 
 {-
     Other 'helper' functions

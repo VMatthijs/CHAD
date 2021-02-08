@@ -19,7 +19,7 @@ data TTerm t where
     -- Terms from source language
     Var    :: String -> Type a -> TTerm a
     Lambda :: String -> Type a -> TTerm b -> TTerm (a -> b)
-    App    :: TTerm (a -> b) -> TTerm a -> TTerm b
+    App    :: (LT a, LT b) => TTerm (a -> b) -> TTerm a -> TTerm b
     Unit   :: TTerm ()
     Pair   :: TTerm a -> TTerm b -> TTerm (a, b)
     Fst    :: TTerm (a, b) -> TTerm a
@@ -35,20 +35,20 @@ data TTerm t where
     LOp       :: LinearOperation a b c -> TTerm (a -> LFun b c)
 
     -- Linear functions
-    LId       :: TTerm (LFun b b)
-    LComp     :: TTerm (LFun b c) -> TTerm (LFun c d) -> TTerm (LFun b d)
-    LApp      :: TTerm (LFun b c) -> TTerm b -> TTerm c
+    LId       :: TTerm (LFun a a)
+    LComp     :: (LT a, LT b, LT c) => TTerm (LFun a b) -> TTerm (LFun b c) -> TTerm (LFun a c)
+    LApp      :: TTerm (LFun a b) -> TTerm a -> TTerm b
     LEval     :: TTerm b -> TTerm (LFun (b -> c) c)
     -- Tuples
-    LFst      :: TTerm (LFun (b, c) b)
-    LSnd      :: TTerm (LFun (b, c) c)
-    LPair     :: TTerm (LFun b c) -> TTerm (LFun b d) -> TTerm (LFun b (c, d))
+    LFst      :: TTerm (LFun (a, b) a)
+    LSnd      :: TTerm (LFun (a, b) b)
+    LPair     :: TTerm (LFun a b) -> TTerm (LFun a c) -> TTerm (LFun a (b, c))
     -- | Singleton
     Singleton :: TTerm b -> TTerm (LFun c (Tens b c))
     -- Zero
-    Zero      :: LT b => TTerm b
+    Zero      :: LT a => TTerm a
     -- Plus
-    Plus      :: LT b => TTerm b -> TTerm b -> TTerm b
+    Plus      :: LT a => TTerm a -> TTerm a -> TTerm a
     -- Swap
     LSwap     :: TTerm (b -> LFun c d) -> TTerm (LFun c (b -> d))
     -- | Tensor-elimination

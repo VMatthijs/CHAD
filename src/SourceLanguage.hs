@@ -20,6 +20,7 @@ data STerm a b where
     --   Read as: f; g
     Comp  :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
              , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
+             , LT c, LT (Dr1 c), LT (Dr2 c), LT (Df1 c), LT (Df2 c)
              )
           => STerm a b -> STerm b c -> STerm a c
     -- Product tuples
