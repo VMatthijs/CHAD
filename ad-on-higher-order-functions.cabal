@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: cc68681209ecfec8163ffc806920a79fe696ab7e2ded83c169a60e40239a3e38
+-- hash: f497702fc5d2be0a833d5ab139245a74024d00a58dff6a1b76e2b9c8cef72b97
 
 name:           ad-on-higher-order-functions
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      Complicate
       ForwardAD
       Helper
       LanguageTypes
@@ -36,6 +37,8 @@ library
       SourceLanguage
       TargetLanguage
       Types
+      Complicate
+      NanoParsec
   other-modules:
       Paths_ad_on_higher_order_functions
   hs-source-dirs:
