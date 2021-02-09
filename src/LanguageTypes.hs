@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+-- | Definitions of the types supported by the language
 module LanguageTypes where
 
 import Prelude hiding (zipWith, replicate)

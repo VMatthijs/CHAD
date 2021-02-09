@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
+-- | Definition of the different supported operators
 module Operation where
 
 import Prelude hiding (sum, zipWith, replicate)
@@ -27,6 +28,7 @@ showOp  EAdd        = "EAdd"
 showOp  EProd       = "EProd"
 showOp  Sum         = "Sum"
 
+-- | Evaluate an operator
 evalOp :: Operation a b -> a -> b
 evalOp (Constant c) = const c
 evalOp  EAdd        = uncurry $ zipWith (+)
@@ -51,12 +53,12 @@ data LinearOperation a b c where
 showLOp :: LinearOperation a b c -> String
 showLOp DConstant   = "DConstant"
 showLOp DConstantT  = "DConstantT"
-showLOp DEAdd       = "DEadd"
-showLOp DEAddT      = "DEaddT"
+showLOp DEAdd       = "DEAdd"
+showLOp DEAddT      = "DEAddT"
 showLOp DEProd      = "DEProd"
 showLOp DEProdT     = "DEProdT"
 
-
+-- | Evaluate the linear operators
 evalLOp :: LinearOperation a b c -> a -> LFun b c
 evalLOp DConstant  ()       = lConst $ replicate 0
 evalLOp DConstantT ()       = lConst ()

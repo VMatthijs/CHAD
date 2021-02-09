@@ -39,7 +39,7 @@ simplifyTTerm (DtMap t)      = DtMap (simplifyTTerm t)
 
 -- | Simplify the App TTerm
 simplifyApp :: (LT a, LT b) => TTerm (a -> b) -> TTerm a -> TTerm b
-simplifyApp (Lambda x t e) v@(Var _ _)           = simplifyTTerm $ substTt x v t e
+simplifyApp (Lambda x t e) v@(Var _ _)           = substTt x v t e
 simplifyApp (Lambda x t e) a | usesOf x t e <= 1 = simplifyTTerm $ substTt x a t e
                              | otherwise         = App (Lambda x t e) a
 simplifyApp  Zero          _ = Zero
@@ -60,6 +60,7 @@ simplifySnd p          = Snd p
 
 -- | Simplify the LComp TTerm
 simplifyLComp :: (LT a, LT b, LT c) => TTerm (LFun a b) -> TTerm (LFun b c) -> TTerm (LFun a c)
+-- Remove LId
 simplifyLComp f                     LId  = f
 simplifyLComp LId                   g    = g
 -- Remove redundant LPair
@@ -67,8 +68,9 @@ simplifyLComp (LPair a _)           LFst = a
 simplifyLComp (LPair _ b)           LSnd = b
 simplifyLComp (LComp f (LPair a _)) LFst = LComp f a
 simplifyLComp (LComp f (LPair _ b)) LSnd = LComp f b
-simplifyLComp _                     Zero         = Zero
-simplifyLComp f                     g            = LComp f g
+simplifyLComp _                     Zero = Zero
+-- Base case
+simplifyLComp f                     g    = LComp f g
 
 -- | Simplify the LApp TTerm
 simplifyLApp :: TTerm (LFun a b) -> TTerm a -> TTerm b
@@ -85,6 +87,7 @@ simplifyPlus a    b    = Plus a b
     Other 'helper' functions
 -}
 
+-- | Count the uses of a variable in an expression
 usesOf :: String -> Type a -> TTerm b -> Integer
 usesOf x _ (Var y _)      | x == y    = 1
                           | otherwise = 0

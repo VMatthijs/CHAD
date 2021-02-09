@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
+-- | Different type definitions used in the language
 module Types (
     RealN,
     LFun, lId, lConst, lDup, lComp, lApp, lUncurry, lZipWith, lZipWith', lPair,

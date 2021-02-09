@@ -1,12 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
+-- | Definition of the source language
 module SourceLanguage where
 
 import Data.Vector.Unboxed.Sized as V (map, singleton, index)
 
 import Helper ((&&&))
-import Types
+import Types (LT, RealN, Df1, Dr1, Df2, Dr2)
 import Operation (Operation, evalOp)
 import GHC.TypeNats (KnownNat)
 

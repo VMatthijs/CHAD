@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+-- | Forward-AD Functions
 module ForwardAD where
 
 import Control.Monad.State.Lazy (State)
