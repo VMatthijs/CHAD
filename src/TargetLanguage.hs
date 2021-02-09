@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+-- | Definition of the target language
 module TargetLanguage where
 
 import Data.Vector.Unboxed.Sized as V (map, index, singleton)

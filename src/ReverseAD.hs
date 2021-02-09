@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+-- | Reverse-AD functions
 module ReverseAD where
 
 import Control.Monad.State.Lazy (State)
