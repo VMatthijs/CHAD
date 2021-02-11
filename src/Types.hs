@@ -5,7 +5,7 @@
 -- | Different type definitions used in the language
 module Types (
     RealN,
-    LFun, lId, lConst, lDup, lComp, lApp, lUncurry, lZipWith, lZipWith', lPair,
+    LFun, lId, lConst, lDup, lComp, lApp, lEval, lUncurry, lZipWith, lZipWith', lPair,
           lMapTuple, lAdd, lProd, lSum, lExpand, lPlus, lFst, lSnd,
           lSwap, lCur, lZip, lMap,
     Tens, empty, (Types.++), tensFoldr, singleton,
@@ -61,6 +61,9 @@ lComp (LFun f) (LFun g) = LFun $ g . f
 
 lApp :: LFun a b -> a -> b
 lApp (LFun f) = f
+
+lEval :: a -> LFun (a -> b) b
+lEval x = LFun (\f -> f x)
 
 -- | Linear uncurry
 lUncurry :: (a -> LFun b c) -> LFun (a, b) c

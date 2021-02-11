@@ -57,6 +57,8 @@ showLOp DEAdd       = "DEAdd"
 showLOp DEAddT      = "DEAddT"
 showLOp DEProd      = "DEProd"
 showLOp DEProdT     = "DEProdT"
+showLOp DSum        = "DSum"
+showLOp DSumT       = "DSumT"
 
 -- | Evaluate the linear operators
 evalLOp :: LinearOperation a b c -> a -> LFun b c

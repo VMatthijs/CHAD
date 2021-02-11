@@ -5,7 +5,7 @@ module TargetLanguage where
 
 import Data.Vector.Unboxed.Sized as V (map, index, singleton)
 
-import Types as T ( Type, LFun, Tens, LT(..), RealN
+import Types as T (lEval,  Type, LFun, Tens, LT(..), RealN
              , eqTy, lComp, lApp, lId, lFst, lSnd, lMap
              , lSwap, singleton, lPair, lCur, lZipWith', lZip
              )
@@ -39,7 +39,7 @@ data TTerm t where
     LId       :: TTerm (LFun a a)
     LComp     :: (LT a, LT b, LT c) => TTerm (LFun a b) -> TTerm (LFun b c) -> TTerm (LFun a c)
     LApp      :: TTerm (LFun a b) -> TTerm a -> TTerm b
-    LEval     :: TTerm b -> TTerm (LFun (b -> c) c)
+    LEval     :: TTerm a -> TTerm (LFun (a -> b) b)
     -- Tuples
     LFst      :: TTerm (LFun (a, b) a)
     LSnd      :: TTerm (LFun (a, b) b)
@@ -81,6 +81,7 @@ subst x v u (Map f y)                   = Map (subst x v u f) (subst x v u y)
 subst _ _ _  LId                        = LId
 subst x v u (LComp f g)                 = LComp (subst x v u f) (subst x v u g)
 subst x v u (LApp f a)                  = LApp (subst x v u f) (subst x v u a)
+subst x v u (LEval t)                   = LEval (subst x v u t)
 subst _ _ _  LFst                       = LFst
 subst _ _ _  LSnd                       = LSnd
 subst x v u (LPair a b)                 = LPair (subst x v u a) (subst x v u b)
@@ -113,6 +114,7 @@ substTt x v u (Map f y)                   = Map (substTt x v u f) (substTt x v u
 substTt _ _ _  LId                        = LId
 substTt x v u (LComp f g)                 = LComp (substTt x v u f) (substTt x v u g)
 substTt x v u (LApp f a)                  = LApp (substTt x v u f) (substTt x v u a)
+substTt x v u (LEval t)                   = LEval (substTt x v u t)
 substTt _ _ _  LFst                       = LFst
 substTt _ _ _  LSnd                       = LSnd
 substTt x v u (LPair a b)                 = LPair (substTt x v u a) (substTt x v u b)
@@ -143,6 +145,7 @@ evalTt (Map f x)         = V.map (flip index 0 . evalTt f . V.singleton) (evalTt
 evalTt (LOp lop)     = evalLOp lop
 evalTt  LId          = lId
 evalTt (LComp f g)   = lComp (evalTt f) (evalTt g)
+evalTt (LEval t)     = lEval (evalTt t)
 evalTt (LApp f a)    = lApp  (evalTt f) (evalTt a)
 evalTt  LFst         = lFst
 evalTt  LSnd         = lSnd
@@ -175,6 +178,7 @@ printTt (Map f a)         = "map (" ++ printTt f ++ ") " ++ printTt a
 printTt (LOp lop)         = "evalLOp " ++ showLOp lop
 printTt  LId              = "lid"
 printTt (LComp f g)       = "(" ++ printTt f ++ ";;" ++ printTt g ++ ")"
+printTt (LEval e)         = "leval(" ++ printTt e ++ ")"
 printTt (LApp f a)        = printTt f ++ "(" ++ printTt a ++ ")"
 printTt  LFst             = "lfst"
 printTt  LSnd             = "lsnd"
