@@ -24,5 +24,8 @@ dependencies:
 - vector-sized
 - mtl
 
+ghc-options:
+- -Wall
+
 library:
   source-dirs: src
