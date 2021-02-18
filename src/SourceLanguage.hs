@@ -61,6 +61,9 @@ data STerm a b where
     -- | Map
     Map   :: KnownNat n
           => STerm (RealN 1 -> RealN 1, RealN n) (RealN n)
+    Rec   :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
+             , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b))
+          => STerm (a, b) b -> STerm a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 -- | Evaluate the source language
 evalSt :: STerm a b -> a -> b
@@ -74,3 +77,5 @@ evalSt  Ev        = uncurry ($)
 evalSt (Curry a)  = curry $ evalSt a
 evalSt (Op op)    = evalOp op
 evalSt  Map       = \(f, v) -> V.map (flip index 0 . f . V.singleton) v
+evalSt (Rec t)    = fix (evalSt t)
+      where fix f a = f (a, fix f a)

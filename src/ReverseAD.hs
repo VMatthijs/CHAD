@@ -65,6 +65,8 @@ d1  SL.Map       = do xVar <- gensym
                       return $ TL.Lambda xVar xType $ TL.Map f v
     where xType = inferType
           yType = inferType
+d1 (SL.Rec t)    = do d1t <- d1 t -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+                      return $ TL.Rec d1t
 
 
 d2 :: SL.STerm a b -> State Integer (TL.TTerm (Dr1 a -> LFun (Dr2 b) (Dr2 a)))
@@ -115,3 +117,10 @@ d2 (SL.Op (Constant _)) = return $ TL.LOp DConstantT
 d2 (SL.Op EAdd   )      = return $ TL.LOp DEAddT
 d2 (SL.Op EProd  )      = return $ TL.LOp DEProdT
 d2 (SL.Op Sum    )      = return $ TL.LOp DSumT -- [1, 1, 1, 1, ...]
+d2 (SL.Rec t)           = do -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+    d1t <- d1 t 
+    d2t <- d2 t 
+    x <- gensym
+    let body = d2t `TL.App` TL.Pair (TL.Var x xType) ((TL.Rec d1t) `TL.App` (TL.Var x xType))
+    return $ TL.Lambda x xType $ TL.LIt $ body
+    where xType = inferType

@@ -8,6 +8,7 @@ import Data.Vector.Unboxed.Sized as V (map, index, singleton)
 import Types as T (lEval,  Type, LFun, Tens, LT(..), RealN
              , eqTy, lComp, lApp, lId, lFst, lSnd, lMap
              , lSwap, singleton, lPair, lCur, lZipWith', lZip
+             , lRec, lIt
              )
 import LanguageTypes ()
 import Operation (Operation, LinearOperation, evalOp, evalLOp, showOp, showLOp)
@@ -59,6 +60,9 @@ data TTerm t where
               -> TTerm (LFun (RealN 1 -> RealN 1, RealN n) (RealN n))
     DtMap     :: TTerm (RealN 1 -> (RealN 1, LFun (RealN 1) (RealN 1)), RealN n)
               -> TTerm (LFun (RealN n) (Tens (RealN 1) (RealN 1), RealN n))
+    Rec       :: TTerm ((a, b) -> b) -> TTerm (a -> b) -- EXPERIMENTAL SUPPORT FOR RECURSION (Should we work with a representation that is variable binding instead?)
+    LRec      :: TTerm (LFun (a, b) b) -> TTerm (LFun a b) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+    LIt       :: LT a => TTerm (LFun b (a, b)) -> TTerm (LFun b a) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 
 -- | Substitute variable for term
@@ -93,6 +97,9 @@ subst x v u (LCur t)                    = LCur (subst x v u t)
 subst _ _ _ (LOp lop)                   = LOp lop
 subst x v u (DMap t)                    = DMap (subst x v u t)
 subst x v u (DtMap t)                   = DtMap (subst x v u t)
+subst x v u (Rec t)                     = Rec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+subst x v u (LRec t)                    = LRec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+subst x v u (LIt t)                     = LIt (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 -- | Substitute variable for a TTerm
 substTt :: String -> TTerm u -> Type u -> TTerm t -> TTerm t
@@ -126,6 +133,10 @@ substTt x v u (LCur t)                    = LCur (substTt x v u t)
 substTt _ _ _ (LOp lop)                   = LOp lop
 substTt x v u (DMap t)                    = DMap (substTt x v u t)
 substTt x v u (DtMap t)                   = DtMap (substTt x v u t)
+substTt x v u (Rec t)                     = Rec (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+substTt x v u (LRec t)                    = LRec (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+substTt x v u (LIt t)                     = LIt (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+
 
 
 -- | Evaluate the target language
@@ -160,6 +171,10 @@ evalTt (DMap t)      = plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith' (snd . 
     where (f, v) = evalTt t
 evalTt (DtMap t)     = lPair (lZip v) (lZipWith' (snd . f) v)
     where (f, v) = evalTt t
+evalTt (Rec t)       = fix (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+    where fix f a = f (a, fix f a)
+evalTt (LRec t)      = lRec (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+evalTt (LIt t)       = lIt (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 -- | Pretty print the target language
 printTt :: TTerm t -> String
@@ -190,4 +205,7 @@ printTt (LSwap t)         = "lswap(" ++ printTt t ++ ")"
 printTt (LCur  t)         = "lcur(" ++ printTt t ++ ")"
 printTt (DMap t)          = "DMap(" ++ printTt t ++ ")"
 printTt (DtMap t)         = "DtMap(" ++ printTt t ++ ")"
+printTt (Rec t)           = "rec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+printTt (LRec t)          = "lrec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+printTt (LIt t)           = "lit(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 

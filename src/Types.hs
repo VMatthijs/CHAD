@@ -7,7 +7,7 @@ module Types (
     RealN,
     LFun, lId, lConst, lDup, lComp, lApp, lEval, lUncurry, lZipWith, lZipWith', lPair,
           lMapTuple, lAdd, lProd, lSum, lExpand, lPlus, lFst, lSnd,
-          lSwap, lCur, lZip, lMap,
+          lSwap, lCur, lZip, lMap, lRec, lIt,
     Tens, empty, (Types.++), tensFoldr, singleton,
     Df1, Df2, Dr1, Dr2,
     Type(..), eqTy,
@@ -118,6 +118,14 @@ lCur f = MkLFun $ tensFoldr f zero
 lMap :: KnownNat n => RealN n -> LFun (RealN 1 -> RealN 1) (RealN n)
 lMap x = MkLFun $ \g -> V.map (flip V.index 0 . g . V.singleton) x
 
+lRec :: LFun (a, b) b -> LFun a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+lRec (MkLFun g) = MkLFun $ lrec g where 
+    lrec f a = f (a, lrec f a)
+
+lIt :: LT a => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+lIt (MkLFun g) = MkLFun $ lit g where 
+    lit f b = let (a, b') = f b in plus a (lit f b) --- AARGH. THIS IS PROBLEMATIC AS IT'LL NEVER TERMINATE, SEEING THAT plus IS STRICT IN BOTH ARGUMENTS
+-- CAN WE MAKE THIS THING TERMINATE UNDER ANY CIRCUMSTANCES? E.G. FIRST ORDER a, b SO WE CAN CHECK WHETHER THEY ARE 0?
 
 -- Forward mode AD type families
 
