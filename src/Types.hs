@@ -26,97 +26,97 @@ import GHC.TypeNats (KnownNat, sameNat)
 type RealN n = V.Vector n Double
 
 -- | Tensor products
-newtype Tens a b = Tens [(a, b)]
+newtype Tens a b = MkTens [(a, b)]
 -- | Linear function
-newtype LFun a b = LFun (a -> b)
+newtype LFun a b = MkLFun (a -> b)
 
 -- Methods for tensor products
 
 -- | Empty tensor product
 empty :: Tens a b
-empty = Tens []
+empty = MkTens []
 
 (++) :: Tens a b -> Tens a b -> Tens a b
-(Tens x) ++ (Tens y) = Tens (x Prelude.++ y)
+(MkTens x) ++ (MkTens y) = MkTens (x Prelude.++ y)
 
 tensFoldr :: ((a, b) -> c -> c) -> c -> Tens a b -> c
-tensFoldr f d (Tens xs) = foldr f d xs
+tensFoldr f d (MkTens xs) = foldr f d xs
 
 singleton :: a -> LFun b (Tens a b)
-singleton t = LFun $ \x -> Tens [(t, x)]
+singleton t = MkLFun $ \x -> MkTens [(t, x)]
 
 -- Methods for linear functions
 
 lId :: LFun a a
-lId = LFun id
+lId = MkLFun id
 
 lConst :: b -> LFun a b
-lConst x = LFun $ const x
+lConst x = MkLFun $ const x
 
 lDup :: LFun a (a, a)
-lDup = LFun $ \a -> (a, a)
+lDup = MkLFun $ \a -> (a, a)
 
 lComp :: LFun a b -> LFun b c -> LFun a c
-lComp (LFun f) (LFun g) = LFun $ g . f
+lComp (MkLFun f) (MkLFun g) = MkLFun $ g . f
 
 lApp :: LFun a b -> a -> b
-lApp (LFun f) = f
+lApp (MkLFun f) = f
 
 lEval :: a -> LFun (a -> b) b
-lEval x = LFun (\f -> f x)
+lEval x = MkLFun (\f -> f x)
 
 -- | Linear uncurry
 lUncurry :: (a -> LFun b c) -> LFun (a, b) c
-lUncurry f = LFun $ uncurry (lApp . f)
+lUncurry f = MkLFun $ uncurry (lApp . f)
 
 -- | Linear zipWith
 lZipWith :: (Double -> LFun Double Double) -> RealN n -> LFun (RealN n) (RealN n)
-lZipWith f a = LFun $ V.zipWith (lApp . f) a
+lZipWith f a = MkLFun $ V.zipWith (lApp . f) a
 
 lZipWith' :: (RealN 1 -> LFun (RealN 1) (RealN 1)) -> RealN n -> LFun (RealN n) (RealN n)
-lZipWith' f a = LFun $ V.zipWith f' a
+lZipWith' f a = MkLFun $ V.zipWith f' a
     where f' x y = V.index (lApp (f (V.singleton x)) (V.singleton y)) 0
 
 lZip :: RealN n -> LFun (RealN n) (Tens (RealN 1) (RealN 1))
-lZip x = LFun $ \y -> Tens $ V.toList $ V.zipWith f x y
+lZip x = MkLFun $ \y -> MkTens $ V.toList $ V.zipWith f x y
     where f a b = (V.singleton a, V.singleton b)
 
 -- | Pair two functions
 lPair :: LFun a b -> LFun a c -> LFun a (b, c)
-lPair a b = LFun $ \x -> (lApp a x, lApp b x)
+lPair a b = MkLFun $ \x -> (lApp a x, lApp b x)
 
 -- | Map a tuple
 lMapTuple :: LFun a a' -> LFun b b' -> LFun (a, b) (a', b')
-lMapTuple f g = LFun $ \(a, b) -> (lApp f a, lApp g b)
+lMapTuple f g = MkLFun $ \(a, b) -> (lApp f a, lApp g b)
 
 -- | Addition linear in second argument
 lAdd :: Num a => (a -> LFun a a)
-lAdd x = LFun $ \y -> x + y
+lAdd x = MkLFun $ \y -> x + y
 
 -- | Multiplication linear in second argument
 lProd :: Num a => (a -> LFun a a)
-lProd x = LFun $ \y -> x * y
+lProd x = MkLFun $ \y -> x * y
 
 lSum :: LFun (RealN n) (RealN 1)
-lSum = LFun $ V.singleton . V.sum
+lSum = MkLFun $ V.singleton . V.sum
 
 lExpand :: KnownNat n => LFun (RealN 1) (RealN n)
-lExpand = LFun $ \a -> V.replicate $ V.index a 0
+lExpand = MkLFun $ \a -> V.replicate $ V.index a 0
 
 lFst :: LFun (a, b) a
-lFst = LFun fst
+lFst = MkLFun fst
 
 lSnd :: LFun (a, b) b
-lSnd = LFun snd
+lSnd = MkLFun snd
 
 lSwap :: (a -> LFun b c) -> LFun b (a -> c)
-lSwap t = LFun $ \x y -> lApp (t y) x
+lSwap t = MkLFun $ \x y -> lApp (t y) x
 
 lCur :: (LT b, LT c) => ((a, b) -> c -> c) -> LFun (Tens a b) c
-lCur f = LFun $ tensFoldr f zero
+lCur f = MkLFun $ tensFoldr f zero
 
 lMap :: KnownNat n => RealN n -> LFun (RealN 1 -> RealN 1) (RealN n)
-lMap x = LFun $ \g -> V.map (flip V.index 0 . g . V.singleton) x
+lMap x = MkLFun $ \g -> V.map (flip V.index 0 . g . V.singleton) x
 
 
 -- Forward mode AD type families
@@ -188,4 +188,4 @@ class LT a where
     inferType :: Type a
 
 lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
-lPlus (LFun f) (LFun g) = LFun $ \x -> plus (f x) (g x)
+lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
