@@ -78,6 +78,8 @@ d1  SL.Map       = do xVar <- gensym
           yType = inferType
 d1 (SL.Rec t)    = do d1t <- d1 t -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
                       return $ TL.Rec d1t
+d1 (SL.It t)     = do d1t <- d1 t -- EXPERIMENTAL SUPPORT FOR ITERATION
+                      return $ TL.It d1t
 
 
 d2 :: SL.STerm a b -> State Integer (TL.TTerm (Dr1 a -> LFun (Dr2 b) (Dr2 a)))
@@ -148,10 +150,13 @@ d2 (SL.Op (Constant _)) = return $ TL.LOp DConstantT
 d2 (SL.Op EAdd   )      = return $ TL.LOp DEAddT
 d2 (SL.Op EProd  )      = return $ TL.LOp DEProdT
 d2 (SL.Op Sum    )      = return $ TL.LOp DSumT -- [1, 1, 1, 1, ...]
-d2 (SL.Rec t)           = do -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+d2 (SL.Rec t)           = do -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
     d1t <- d1 t 
     d2t <- d2 t 
     x <- gensym
+    _ <- error "This is still wrong! Do something more similar to foldr to work with all of the primals."
     let body = d2t `TL.App` TL.Pair (TL.Var x xType) ((TL.Rec d1t) `TL.App` (TL.Var x xType))
     return $ TL.Lambda x xType $ TL.LIt $ body
     where xType = inferType
+d2 (SL.It _)            = do -- EXPERIMENTAL SUPPORT FOR ITERATION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
+                          error "This is still wrong! Do something more similar to foldr to work with all of the primals."

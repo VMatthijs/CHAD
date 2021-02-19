@@ -28,6 +28,8 @@ data TTerm t where
     Inl    :: (LT a, LT b) => TTerm a -> TTerm (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
     Inr    :: (LT a, LT b) => TTerm b -> TTerm (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
     Case   :: (LT a, LT b, LT c) => TTerm (Either a b) -> TTerm (a -> c) -> TTerm (b -> c) -> TTerm c  -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    It     :: TTerm ((a, b) -> Either c b) -> TTerm ((a, b) -> c) -- EXPERIMENTAL SUPPORT FOR ITERATION
+    Rec    :: TTerm ((a, b) -> b) -> TTerm (a -> b) -- EXPERIMENTAL SUPPORT FOR RECURSION (Should we work with a representation that is variable binding instead?)
     Lift   :: a -> Type a -> TTerm a
     -- | Operators
     Op     :: Operation a b -> TTerm a -> TTerm b
@@ -62,7 +64,6 @@ data TTerm t where
               -> TTerm (LFun (RealN 1 -> RealN 1, RealN n) (RealN n))
     DtMap     :: KnownNat n => TTerm (RealN 1 -> (RealN 1, LFun (RealN 1) (RealN 1)), RealN n)
               -> TTerm (LFun (RealN n) (Tens (RealN 1) (RealN 1), RealN n))
-    Rec       :: TTerm ((a, b) -> b) -> TTerm (a -> b) -- EXPERIMENTAL SUPPORT FOR RECURSION (Should we work with a representation that is variable binding instead?)
     LRec      :: TTerm (LFun (a, b) b) -> TTerm (LFun a b) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
     LIt       :: (LT a, LT b) => TTerm (LFun b (a, b)) -> TTerm (LFun b a) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
@@ -87,6 +88,8 @@ subst x v u (Inl t)                     = Inl (subst x v u t) -- EXPERIMENTAL SU
 subst x v u (Inr t)                     = Inr (subst x v u t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 subst x v u (Case t l r)                = Case (subst x v u t) (subst x v u l) (subst x v u r) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 -- Target language extension
+subst x v u (Rec t)                     = Rec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+subst x v u (It t)                      = It (subst x v u t) -- EXPERIMENTAL SUPPORT FOR ITERATION
 subst _ _ _  LId                        = LId
 subst x v u (LComp f g)                 = LComp (subst x v u f) (subst x v u g)
 subst x v u (LApp f a)                  = LApp (subst x v u f) (subst x v u a)
@@ -102,7 +105,6 @@ subst x v u (LCur t)                    = LCur (subst x v u t)
 subst _ _ _ (LOp lop)                   = LOp lop
 subst x v u (DMap t)                    = DMap (subst x v u t)
 subst x v u (DtMap t)                   = DtMap (subst x v u t)
-subst x v u (Rec t)                     = Rec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 subst x v u (LRec t)                    = LRec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 subst x v u (LIt t)                     = LIt (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 -- | Substitute variable for a TTerm
@@ -124,6 +126,8 @@ substTt x v u (Case t l r)                = Case (substTt x v u t) (substTt x v 
 substTt _ _ _ (Lift x t)                  = Lift x t
 substTt x v u (Op op y)                   = Op op (substTt x v u y)
 substTt x v u (Map f y)                   = Map (substTt x v u f) (substTt x v u y)
+substTt x v u (Rec t)                     = Rec (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+substTt x v u (It t)                      = It (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR ITERATION
 -- Target language extension
 substTt _ _ _  LId                        = LId
 substTt x v u (LComp f g)                 = LComp (substTt x v u f) (substTt x v u g)
@@ -140,7 +144,6 @@ substTt x v u (LCur t)                    = LCur (substTt x v u t)
 substTt _ _ _ (LOp lop)                   = LOp lop
 substTt x v u (DMap t)                    = DMap (substTt x v u t)
 substTt x v u (DtMap t)                   = DtMap (substTt x v u t)
-substTt x v u (Rec t)                     = Rec (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 substTt x v u (LRec t)                    = LRec (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 substTt x v u (LIt t)                     = LIt (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
@@ -164,6 +167,12 @@ evalTt (Case p l r)      = case evalTt p of  -- EXPERIMENTAL SUPPORT FOR SUM TYP
 evalTt (Lift x _)        = x
 evalTt (Op op a)         = evalOp op (evalTt a)
 evalTt (Map f x)         = V.map (flip index 0 . evalTt f . V.singleton) (evalTt x)
+evalTt (Rec t)           = fix (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+    where fix f a = f (a, fix f a)
+evalTt (It t)            = fix (evalTt t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+      where fix f (a, b) = case f (a, b) of 
+              Left c -> c
+              Right b' -> fix f (a, b')
 -- Target language extension
 evalTt (LOp lop)     = evalLOp lop
 evalTt  LId          = lId
@@ -183,8 +192,6 @@ evalTt (DMap t)      = plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith' (snd . 
     where (f, v) = evalTt t
 evalTt (DtMap t)     = lPair (lZip v) (lZipWith' (snd . f) v)
     where (f, v) = evalTt t
-evalTt (Rec t)       = fix (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-    where fix f a = f (a, fix f a)
 evalTt (LRec t)      = lRec (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 evalTt (LIt t)       = lIt (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
@@ -204,6 +211,8 @@ printTt (Case p l r)      = "Case(" ++ printTt p ++ ", " ++ printTt l ++ ", " ++
 printTt (Lift _ _)        = error "Can't print lifted value"
 printTt (Op op a)         = "evalOp " ++ showOp op ++ " " ++ printTt a
 printTt (Map f a)         = "map (" ++ printTt f ++ ") " ++ printTt a
+printTt (Rec t)           = "rec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+printTt (It t)           = "it(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
 -- Target language extension
 printTt (LOp lop)         = "evalLOp " ++ showLOp lop
 printTt  LId              = "lid"
@@ -220,6 +229,5 @@ printTt (LSwap t)         = "lswap(" ++ printTt t ++ ")"
 printTt (LCur  t)         = "lcur(" ++ printTt t ++ ")"
 printTt (DMap t)          = "DMap(" ++ printTt t ++ ")"
 printTt (DtMap t)         = "DtMap(" ++ printTt t ++ ")"
-printTt (Rec t)           = "rec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 printTt (LRec t)          = "lrec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 printTt (LIt t)           = "lit(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION

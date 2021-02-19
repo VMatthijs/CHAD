@@ -77,6 +77,11 @@ data STerm a b where
              , LT c, LT (Dr1 c), LT (Dr2 c), LT (Df1 c), LT (Df2 c)
              )
           => STerm b a -> STerm c a -> STerm (Either b c) a -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    It   :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
+             , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
+             , LT c, LT (Dr1 c), LT (Dr2 c), LT (Df1 c), LT (Df2 c)
+             )
+          => STerm (a, b) (Either c b) -> STerm (a, b) c -- EXPERIMENTAL SUPPORT FOR ITERATION
 
 -- | Evaluate the source language
 evalSt :: STerm a b -> a -> b
@@ -95,5 +100,9 @@ evalSt (Rec t)    = fix (evalSt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 evalSt Inl        = Left -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 evalSt Inr        = Right -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 evalSt (CoPair f g) = \x -> case x of -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-      (Left a) -> evalSt f a
-      (Right b) -> evalSt g b
+      Left a -> evalSt f a
+      Right b -> evalSt g b
+evalSt (It t) = fix (evalSt t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+      where fix f (a, b) = case f (a, b) of 
+              Left c -> c
+              Right b' -> fix f (a, b')
