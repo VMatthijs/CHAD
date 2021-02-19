@@ -25,6 +25,9 @@ data TTerm t where
     Pair   :: TTerm a -> TTerm b -> TTerm (a, b)
     Fst    :: TTerm (a, b) -> TTerm a
     Snd    :: TTerm (a, b) -> TTerm b
+    Inl    :: (LT a, LT b) => TTerm a -> TTerm (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    Inr    :: (LT a, LT b) => TTerm b -> TTerm (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    Case   :: (LT a, LT b, LT c) => TTerm (Either a b) -> TTerm (a -> c) -> TTerm (b -> c) -> TTerm c  -- EXPERIMENTAL SUPPORT FOR SUM TYPES
     Lift   :: a -> Type a -> TTerm a
     -- | Operators
     Op     :: Operation a b -> TTerm a -> TTerm b
@@ -80,6 +83,9 @@ subst x v u (Snd p)                     = Snd (subst x v u p)
 subst _ _ _ (Lift x t)                  = Lift x t
 subst x v u (Op op y)                   = Op op (subst x v u y)
 subst x v u (Map f y)                   = Map (subst x v u f) (subst x v u y)
+subst x v u (Inl t)                     = Inl (subst x v u t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+subst x v u (Inr t)                     = Inr (subst x v u t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+subst x v u (Case t l r)                = Case (subst x v u t) (subst x v u l) (subst x v u r) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 -- Target language extension
 subst _ _ _  LId                        = LId
 subst x v u (LComp f g)                 = LComp (subst x v u f) (subst x v u g)
@@ -99,7 +105,6 @@ subst x v u (DtMap t)                   = DtMap (subst x v u t)
 subst x v u (Rec t)                     = Rec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 subst x v u (LRec t)                    = LRec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 subst x v u (LIt t)                     = LIt (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-
 -- | Substitute variable for a TTerm
 substTt :: String -> TTerm u -> Type u -> TTerm t -> TTerm t
 substTt x v u (Var y t)      | x == y     = case eqTy u t of
@@ -113,6 +118,9 @@ substTt _ _ _  Unit                       = Unit
 substTt x v u (Pair a b)                  = Pair (substTt x v u a) (substTt x v u b)
 substTt x v u (Fst p)                     = Fst (substTt x v u p)
 substTt x v u (Snd p)                     = Snd (substTt x v u p)
+substTt x v u (Inl t)                     = Inl (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+substTt x v u (Inr t)                     = Inr (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+substTt x v u (Case t l r)                = Case (substTt x v u t) (substTt x v u l) (substTt x v u r) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 substTt _ _ _ (Lift x t)                  = Lift x t
 substTt x v u (Op op y)                   = Op op (substTt x v u y)
 substTt x v u (Map f y)                   = Map (substTt x v u f) (substTt x v u y)
@@ -148,6 +156,11 @@ evalTt  Unit             = ()
 evalTt (Pair a b)        = (evalTt a, evalTt b)
 evalTt (Fst p)           = fst $ evalTt p
 evalTt (Snd p)           = snd $ evalTt p
+evalTt (Inl p)           = Left $ evalTt p -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+evalTt (Inr p)           = Right $ evalTt p -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+evalTt (Case p l r)      = case evalTt p of  -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    Left q -> evalTt l q
+    Right q -> evalTt r q
 evalTt (Lift x _)        = x
 evalTt (Op op a)         = evalOp op (evalTt a)
 evalTt (Map f x)         = V.map (flip index 0 . evalTt f . V.singleton) (evalTt x)
@@ -185,6 +198,9 @@ printTt  Unit             = "()"
 printTt (Pair a b)        = "(" ++ printTt a ++ ", " ++ printTt b ++ ")"
 printTt (Fst p)           = "Fst(" ++ printTt p ++ ")"
 printTt (Snd p)           = "Snd(" ++ printTt p ++ ")"
+printTt (Inl p)           = "Inl(" ++ printTt p ++ ")" -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+printTt (Inr p)           = "Inr(" ++ printTt p ++ ")" -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+printTt (Case p l r)      = "Case(" ++ printTt p ++ ", " ++ printTt l ++ ", " ++ printTt r ++ ")" -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 printTt (Lift _ _)        = error "Can't print lifted value"
 printTt (Op op a)         = "evalOp " ++ showOp op ++ " " ++ printTt a
 printTt (Map f a)         = "map (" ++ printTt f ++ ") " ++ printTt a
@@ -207,4 +223,3 @@ printTt (DtMap t)         = "DtMap(" ++ printTt t ++ ")"
 printTt (Rec t)           = "rec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 printTt (LRec t)          = "lrec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 printTt (LIt t)           = "lit(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-

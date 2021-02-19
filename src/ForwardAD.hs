@@ -53,6 +53,17 @@ d1 (SL.Curry t)  = do xVar <- gensym
                       return $ TL.Lambda xVar xType $ TL.Lambda yVar yType $ TL.Pair d1tTt sndPair
     where xType   = inferType
           yType   = inferType
+d1  SL.Inl       = do xVar <- gensym
+                      return $ TL.Lambda xVar t $ TL.Inl (TL.Var xVar t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    where t = inferType
+d1  SL.Inr       = do xVar <- gensym
+                      return $ TL.Lambda xVar t $ TL.Inr (TL.Var xVar t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    where t = inferType
+d1  (SL.CoPair s t) = do yVar <- gensym
+                         d1t  <- d1 t
+                         d1s  <- d1 s
+                         return $ TL.Lambda yVar yType $ TL.Case (TL.Var yVar yType) d1s d1t -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    where  yType = inferType
 d1 (SL.Op op)    = do xVar <- gensym
                       return $ TL.Lambda xVar t $ TL.Op op (TL.Var xVar t)
     where t = inferType
@@ -105,6 +116,26 @@ d2 (SL.Curry t)  = do xVar <- gensym
                              $ TL.LComp (TL.LPair TL.LId TL.Zero) d2tTt
     where xType = inferType
           yType = inferType
+d2 SL.Inl       = do  -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    xVar <- gensym 
+    return $ TL.Lambda xVar xType (TL.LPair TL.LId TL.Zero)
+    where xType = inferType
+d2 SL.Inr       = do  -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    xVar <- gensym 
+    return $ TL.Lambda xVar xType (TL.LPair TL.Zero TL.LId)
+    where xType = inferType
+d2 (SL.CoPair f g) = do -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    xVar <- gensym
+    yVar <- gensym
+    zVar <- gensym
+    d2f <- d2 f
+    d2g <- d2 g
+    return $ TL.Lambda xVar xType (TL.Case (TL.Var xVar xType)
+                                           (TL.Lambda yVar yType $ TL.LFst `TL.LComp` (d2f `TL.App` TL.Var yVar yType) )
+                                           (TL.Lambda zVar zType $ TL.LSnd `TL.LComp` (d2g `TL.App` TL.Var zVar zType) ))   -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    where xType = inferType
+          yType = inferType
+          zType = inferType
 -- Map
 -- x := (f, v)
 -- y := (g, w)

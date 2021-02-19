@@ -17,6 +17,9 @@ simplifyTTerm  Unit          = Unit
 simplifyTTerm (Pair a b)     = Pair        (simplifyTTerm a) (simplifyTTerm b)
 simplifyTTerm (Fst p)        = simplifyFst (simplifyTTerm p)
 simplifyTTerm (Snd p)        = simplifySnd (simplifyTTerm p)
+simplifyTTerm (Inl p)        = Inl (simplifyTTerm p) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+simplifyTTerm (Inr p)        = Inr (simplifyTTerm p) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+simplifyTTerm (Case p f g)   = simplifyTTerm (simplifyCase p f g) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 simplifyTTerm (Lift x t)     = Lift x t
 simplifyTTerm (Op op a)      = Op op (simplifyTTerm a)
 simplifyTTerm (Map f a)      = Map   (simplifyTTerm f) (simplifyTTerm a)
@@ -62,6 +65,10 @@ simplifySnd :: TTerm (a, b) -> TTerm b
 simplifySnd (Pair _ s) = s
 simplifySnd p          = Snd p
 
+simplifyCase :: (LT a, LT b, LT c) => TTerm (Either a b) -> TTerm (a -> c) -> TTerm (b -> c) -> TTerm c -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+simplifyCase (Inl p) f _ = App f p 
+simplifyCase (Inr p) _ g = App g p 
+simplifyCase x f g = Case x f g
 
 -- | Simplify the LComp TTerm
 simplifyLComp :: (LT a, LT b, LT c) => TTerm (LFun a b) -> TTerm (LFun b c) -> TTerm (LFun a c)
@@ -103,6 +110,9 @@ usesOf _ _  Unit                      = 0
 usesOf x t (Pair a b)                 = usesOf x t a + usesOf x t b
 usesOf x t (Fst p)                    = usesOf x t p
 usesOf x t (Snd p)                    = usesOf x t p
+usesOf x t (Inl p)                    = usesOf x t p -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+usesOf x t (Inr p)                    = usesOf x t p -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+usesOf x t (Case p f g)               = usesOf x t p + usesOf x t f + usesOf x t g -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 usesOf _ _ (Lift _ _)                 = 0
 usesOf x t (Op _ a)                   = usesOf x t a
 usesOf x t (Map f y)                  = usesOf x t f + usesOf x t y

@@ -53,6 +53,17 @@ d1 (SL.Curry t)  = do xVar <- gensym
                              $ TL.Pair d1tTt (TL.LComp d2tTt TL.LSnd)
     where xType  = inferType
           yType  = inferType
+d1  SL.Inl       = do xVar <- gensym
+                      return $ TL.Lambda xVar t $ TL.Inl (TL.Var xVar t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    where t = inferType
+d1  SL.Inr       = do xVar <- gensym
+                      return $ TL.Lambda xVar t $ TL.Inr (TL.Var xVar t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    where t = inferType
+d1  (SL.CoPair s t) = do yVar <- gensym
+                         d1t  <- d1 t
+                         d1s  <- d1 s
+                         return $ TL.Lambda yVar yType $ TL.Case (TL.Var yVar yType) d1s d1t -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    where  yType = inferType
 d1 (SL.Op op)    = do xVar <- gensym
                       return $ TL.Lambda xVar t $ TL.Op op (TL.Var xVar t)
     where t = inferType
@@ -108,6 +119,26 @@ d2 (SL.Curry t)  = do xVar <- gensym
                       return $ TL.Lambda xVar xType $ TL.LComp cur TL.LFst
     where xType = inferType
           yType = inferType
+d2 SL.Inl = do
+    xVar <- gensym 
+    return $ TL.Lambda xVar xType TL.LFst
+    where xType = inferType -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+d2 SL.Inr = do
+    xVar <- gensym 
+    return $ TL.Lambda xVar xType TL.LSnd
+    where xType = inferType  -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+d2 (SL.CoPair f g) = do
+    xVar <- gensym
+    yVar <- gensym
+    zVar <- gensym
+    d2f <- d2 f
+    d2g <- d2 g
+    return $ TL.Lambda xVar xType (TL.Case (TL.Var xVar xType)
+                                           (TL.Lambda yVar yType $ (d2f `TL.App` TL.Var yVar yType) `TL.LComp` (TL.LPair TL.LId TL.Zero))
+                                           (TL.Lambda zVar zType $ (d2g `TL.App` TL.Var zVar zType) `TL.LComp` (TL.LPair TL.Zero TL.LId)))   -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    where xType = inferType
+          yType = inferType
+          zType = inferType -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 -- Map
 d2  SL.Map       = do xVar <- gensym
                       return $ TL.Lambda xVar xType $ TL.DtMap $ TL.Var xVar xType

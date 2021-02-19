@@ -151,31 +151,35 @@ lIt (MkLFun g) = MkLFun $ lit g where
 
 -- Forward mode AD type families
 
-type family Df1 a = r | r -> a where
+type family Df1 a where
     Df1 (RealN n) = RealN n
     Df1 (a -> b)  = Df1 a -> (Df1 b, LFun (Df2 a) (Df2 b))
     Df1 (a, b)    = (Df1 a, Df1 b)
     Df1 ()        = ()
+    Df1 (Either a b) = Either (Df1 a) (Df1 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
-type family Df2 a = r | r -> a where
+type family Df2 a where
     Df2 (RealN n) = RealN n
     Df2 (a -> b)  = Df1 a -> Df2 b
     Df2 (a, b)    = (Df2 a, Df2 b)
     Df2 ()        = ()
+    Df2 (Either a b) = (Df2 a, Df2 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
 -- Reverse mode AD type families
 
-type family Dr1 a = r | r -> a where
+type family Dr1 a where
     Dr1 (RealN n) = RealN n
     Dr1 (a -> b)  = Dr1 a -> (Dr1 b, LFun (Dr2 b) (Dr2 a))
     Dr1 (a, b)    = (Dr1 a, Dr1 b)
     Dr1 ()        = ()
+    Dr1 (Either a b) = Either (Dr1 a) (Dr1 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
-type family Dr2 a = r | r -> a where
+type family Dr2 a where
     Dr2 (RealN n) = RealN n
     Dr2 (a -> b)  = Tens (Dr1 a) (Dr2 b)
     Dr2 (a, b)    = (Dr2 a, Dr2 b)
     Dr2 ()        = ()
+    Dr2 (Either a b) = (Dr2 a, Dr2 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
 data Type a where
     TDouble :: Type Double
@@ -183,6 +187,7 @@ data Type a where
     TArrow  :: Type a -> Type b -> Type (a -> b)
     TPair   :: Type a -> Type b -> Type (a, b)
     TUnit   :: Type ()
+    TEither :: Type a -> Type b -> Type (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
     TLinFun :: Type a -> Type b -> Type (LFun a b)
     TTens   :: Type a -> Type b -> Type (Tens a b)
@@ -231,6 +236,12 @@ instance (LT a, LT b) => LT (a, b) where
     inferType     = TPair inferType inferType
     isZero (a, b) = isZero a && isZero b
 
+instance (LT a, LT b) => LT (Either a b) where -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    zero      = error "This should never be used." -- This doesn't make sense.
+    plus      = error "This should never be used." -- This doesn't make sense.
+    inferType = TEither inferType inferType
+    isZero    = error "This should never be used." -- This doesn't make sense.
+
 instance LT Double where
     zero      = 0
     plus      = (+)
@@ -247,7 +258,7 @@ instance (LT a, LT b) => LT (a -> b) where
     zero      = const zero
     plus f g  = \x -> plus (f x) (g x)
     inferType = TArrow inferType inferType
-    isZero    = const False -- undecidable
+    isZero    =  error "This should never be used." -- undecidable
 
 instance (LT a, LT b) => LT (Tens a b) where
     zero      = empty
@@ -260,4 +271,4 @@ instance (LT a, LT b) => LT (LFun a b) where
     zero      = lConst zero
     plus      = lPlus
     inferType = TLinFun inferType inferType
-    isZero    = const False -- undecidable
+    isZero    =  error "This should never be used."-- undecidable

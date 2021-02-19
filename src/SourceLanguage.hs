@@ -64,6 +64,19 @@ data STerm a b where
     Rec   :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
              , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b))
           => STerm (a, b) b -> STerm a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+    Inl   :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
+             , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
+             )
+          => STerm a (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    Inr   :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
+             , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
+             )
+          => STerm b (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+    CoPair  :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
+             , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b)
+             , LT c, LT (Dr1 c), LT (Dr2 c), LT (Df1 c), LT (Df2 c)
+             )
+          => STerm b a -> STerm c a -> STerm (Either b c) a -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
 -- | Evaluate the source language
 evalSt :: STerm a b -> a -> b
@@ -79,3 +92,8 @@ evalSt (Op op)    = evalOp op
 evalSt  Map       = \(f, v) -> V.map (flip index 0 . f . V.singleton) v
 evalSt (Rec t)    = fix (evalSt t)
       where fix f a = f (a, fix f a)
+evalSt Inl        = Left 
+evalSt Inr        = Right 
+evalSt (CoPair f g) = \x -> case x of
+      (Left a) -> evalSt f a
+      (Right b) -> evalSt g b
