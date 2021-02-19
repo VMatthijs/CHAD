@@ -90,10 +90,10 @@ evalSt  Ev        = uncurry ($)
 evalSt (Curry a)  = curry $ evalSt a
 evalSt (Op op)    = evalOp op
 evalSt  Map       = \(f, v) -> V.map (flip index 0 . f . V.singleton) v
-evalSt (Rec t)    = fix (evalSt t)
+evalSt (Rec t)    = fix (evalSt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
       where fix f a = f (a, fix f a)
-evalSt Inl        = Left 
-evalSt Inr        = Right 
-evalSt (CoPair f g) = \x -> case x of
+evalSt Inl        = Left -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+evalSt Inr        = Right -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+evalSt (CoPair f g) = \x -> case x of -- EXPERIMENTAL SUPPORT FOR SUM TYPES
       (Left a) -> evalSt f a
       (Right b) -> evalSt g b
