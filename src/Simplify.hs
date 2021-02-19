@@ -36,6 +36,10 @@ simplifyTTerm (LCur  t)      = LCur  (simplifyTTerm t)
 simplifyTTerm (LOp lop)      = LOp lop
 simplifyTTerm (DMap  t)      = DMap  (simplifyTTerm t)
 simplifyTTerm (DtMap t)      = DtMap (simplifyTTerm t)
+simplifyTTerm (Rec t)        = Rec (simplifyTTerm t)
+simplifyTTerm (LRec t)       = LRec (simplifyTTerm t)
+simplifyTTerm (LIt t)        = LIt (simplifyTTerm t)
+
 
 
 -- | Simplify the App TTerm
@@ -117,3 +121,6 @@ usesOf x t (LCur s)                   = usesOf x t s
 usesOf _ _ (LOp _)                    = 0
 usesOf x t (DMap s)                   = usesOf x t s
 usesOf x t (DtMap s)                  = usesOf x t s
+usesOf x t (Rec s)                    = usesOf x t s
+usesOf x t (LRec s)                   = usesOf x t s
+usesOf x t (LIt s)                    = usesOf x t s

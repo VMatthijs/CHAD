@@ -125,7 +125,16 @@ lRec (MkLFun g) = MkLFun $ lrec g where
 lIt :: LT a => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 lIt (MkLFun g) = MkLFun $ lit g where 
     lit f b = let (a, b') = f b in plus a (lit f b') --- AARGH. THIS IS PROBLEMATIC AS IT'LL NEVER TERMINATE, SEEING THAT plus IS STRICT IN BOTH ARGUMENTS
--- CAN WE MAKE THIS THING TERMINATE UNDER ANY CIRCUMSTANCES? E.G. FIRST ORDER a, b SO WE CAN CHECK WHETHER THEY ARE 0?
+-- CAN WE MAKE THIS THING TERMINATE UNDER ANY CIRCUMSTANCES? E.G. FIRST ORDER b SO WE CAN CHECK WHETHER THEY ARE 0? (IMPLEMENT TYPE CLASS FOR THIS)
+-- SIMILAR IDEA: CAN WE IMPLEMENT ONE FOR ALL TYPES IN THE HIERARCHY? THEN, WE CAN ALSO CHECK WHETHER LINEAR FUNCTIONS ARE ZERO.
+-- YES, SO WE SHOULD JUST CHECK WHETHER b' IS 0 AND THEN JUST RETURN a.
+-- THE REAL PROBLEM IS THAT + IS STRICT IN BOTH ARGUMENTS, SO THE CONDITIONS FOR DEFINING ITERATION AS A FIXPOINT ARE PROBABLY NOT MET.
+-- UNLESS THAT FIXPOINT IS BOT
+-- AH! What we really need is to enforce in some way that linear function application is really linear in the sense that 
+-- f(0) = 0 even if f=bot. 
+-- So linear function application is going to be lazy in the function argument.
+-- Of course,this will be a bit hard to achieve at arbitrary types, as we cannot compare for equality.
+-- However, perhaps we can do it for all the types that we will need for reverse AD, using some type class? Yes!
 
 -- Forward mode AD type families
 
