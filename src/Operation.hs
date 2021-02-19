@@ -17,8 +17,8 @@ import Types ( LFun, RealN, lComp, lConst, lDup, lZipWith, lAdd, lUncurry
 -- | Possible operators in the source language
 data Operation a b where
     Constant :: KnownNat n => RealN n -> Operation () (RealN n)
-    EAdd     :: Operation (RealN n, RealN n) (RealN n)
-    EProd    :: Operation (RealN n, RealN n) (RealN n)
+    EAdd     :: KnownNat n => Operation (RealN n, RealN n) (RealN n)
+    EProd    :: KnownNat n => Operation (RealN n, RealN n) (RealN n)
     Sum      :: KnownNat n => Operation (RealN n) (RealN 1)
 
 
@@ -41,11 +41,11 @@ data LinearOperation a b c where
     DConstant  :: KnownNat n
                => LinearOperation ()                 ()                  (RealN n)
     DConstantT :: LinearOperation ()                 (RealN n)           ()
-    DEAdd      :: LinearOperation (RealN n, RealN n) (RealN n, RealN n)  (RealN n)
-    DEAddT     :: LinearOperation (RealN n, RealN n) (RealN n)           (RealN n, RealN n)
-    DEProd     :: LinearOperation (RealN n, RealN n) (RealN n, RealN n)  (RealN n)
-    DEProdT    :: LinearOperation (RealN n, RealN n) (RealN n)           (RealN n, RealN n)
-    DSum       :: LinearOperation (RealN n)          (RealN n)           (RealN 1)
+    DEAdd      :: KnownNat n => LinearOperation (RealN n, RealN n) (RealN n, RealN n)  (RealN n)
+    DEAddT     :: KnownNat n => LinearOperation (RealN n, RealN n) (RealN n)           (RealN n, RealN n)
+    DEProd     :: KnownNat n => LinearOperation (RealN n, RealN n) (RealN n, RealN n)  (RealN n)
+    DEProdT    :: KnownNat n => LinearOperation (RealN n, RealN n) (RealN n)           (RealN n, RealN n)
+    DSum       :: KnownNat n => LinearOperation (RealN n)          (RealN n)           (RealN 1)
     DSumT      :: KnownNat n
                => LinearOperation (RealN n)          (RealN 1)           (RealN n)
 

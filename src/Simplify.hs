@@ -78,7 +78,7 @@ simplifyLComp _                     Zero = Zero
 simplifyLComp f                     g    = LComp f g
 
 -- | Simplify the LApp TTerm
-simplifyLApp :: TTerm (LFun a b) -> TTerm a -> TTerm b
+simplifyLApp :: (LT a, LT b) => TTerm (LFun a b) -> TTerm a -> TTerm b
 simplifyLApp LId a = a
 simplifyLApp f   a = LApp f a
 

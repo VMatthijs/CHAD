@@ -10,7 +10,6 @@ import Types as T (lEval,  Type, LFun, Tens, LT(..), RealN
              , lSwap, singleton, lPair, lCur, lZipWith', lZip
              , lRec, lIt
              )
-import LanguageTypes ()
 import Operation (Operation, LinearOperation, evalOp, evalLOp, showOp, showLOp)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.TypeNats (KnownNat)
@@ -39,12 +38,12 @@ data TTerm t where
     -- Linear functions
     LId       :: TTerm (LFun a a)
     LComp     :: (LT a, LT b, LT c) => TTerm (LFun a b) -> TTerm (LFun b c) -> TTerm (LFun a c)
-    LApp      :: TTerm (LFun a b) -> TTerm a -> TTerm b
+    LApp      :: (LT a, LT b) => TTerm (LFun a b) -> TTerm a -> TTerm b
     LEval     :: TTerm a -> TTerm (LFun (a -> b) b)
     -- Tuples
     LFst      :: TTerm (LFun (a, b) a)
     LSnd      :: TTerm (LFun (a, b) b)
-    LPair     :: TTerm (LFun a b) -> TTerm (LFun a c) -> TTerm (LFun a (b, c))
+    LPair     :: (LT a, LT b, LT c) => TTerm (LFun a b) -> TTerm (LFun a c) -> TTerm (LFun a (b, c))
     -- | Singleton
     Singleton :: TTerm b -> TTerm (LFun c (Tens b c))
     -- Zero
@@ -52,17 +51,17 @@ data TTerm t where
     -- Plus
     Plus      :: LT a => TTerm a -> TTerm a -> TTerm a
     -- Swap
-    LSwap     :: TTerm (b -> LFun c d) -> TTerm (LFun c (b -> d))
+    LSwap     :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun c (b -> d))
     -- | Tensor-elimination
     LCur      :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun (Tens b c) d)
     -- Map derivatives
     DMap      :: KnownNat n => TTerm (RealN 1 -> (RealN 1, LFun (RealN 1) (RealN 1)), RealN n)
               -> TTerm (LFun (RealN 1 -> RealN 1, RealN n) (RealN n))
-    DtMap     :: TTerm (RealN 1 -> (RealN 1, LFun (RealN 1) (RealN 1)), RealN n)
+    DtMap     :: KnownNat n => TTerm (RealN 1 -> (RealN 1, LFun (RealN 1) (RealN 1)), RealN n)
               -> TTerm (LFun (RealN n) (Tens (RealN 1) (RealN 1), RealN n))
     Rec       :: TTerm ((a, b) -> b) -> TTerm (a -> b) -- EXPERIMENTAL SUPPORT FOR RECURSION (Should we work with a representation that is variable binding instead?)
     LRec      :: TTerm (LFun (a, b) b) -> TTerm (LFun a b) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-    LIt       :: LT a => TTerm (LFun b (a, b)) -> TTerm (LFun b a) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+    LIt       :: (LT a, LT b) => TTerm (LFun b (a, b)) -> TTerm (LFun b a) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 
 -- | Substitute variable for term

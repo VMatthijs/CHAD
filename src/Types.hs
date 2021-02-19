@@ -2,25 +2,30 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+
 -- | Different type definitions used in the language
 module Types (
     RealN,
     LFun, lId, lConst, lDup, lComp, lApp, lEval, lUncurry, lZipWith, lZipWith', lPair,
           lMapTuple, lAdd, lProd, lSum, lExpand, lPlus, lFst, lSnd,
           lSwap, lCur, lZip, lMap, lRec, lIt,
-    Tens, empty, (Types.++), tensFoldr, singleton,
+    Tens, empty, (Types.++), tensFoldr, singleton, isZeroTens,
     Df1, Df2, Dr1, Dr2,
     Type(..), eqTy,
     LT(..),
 ) where
 
 
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy, Proxy(Proxy))
 import Data.Type.Equality ((:~:)(Refl), (:~:))
 import qualified Data.Vector.Unboxed.Sized as V (
     Vector, zipWith, sum, singleton, replicate, index, toList, map
     )
 import GHC.TypeNats (KnownNat, sameNat)
+
 
 -- | Vector of size n containing real values
 type RealN n = V.Vector n Double
@@ -45,6 +50,10 @@ tensFoldr f d (MkTens xs) = foldr f d xs
 singleton :: a -> LFun b (Tens a b)
 singleton t = MkLFun $ \x -> MkTens [(t, x)]
 
+isZeroTens :: Tens a b -> Bool
+isZeroTens (MkTens []) = True
+isZeroTens _           = False
+
 -- Methods for linear functions
 
 lId :: LFun a a
@@ -59,14 +68,15 @@ lDup = MkLFun $ \a -> (a, a)
 lComp :: LFun a b -> LFun b c -> LFun a c
 lComp (MkLFun f) (MkLFun g) = MkLFun $ g . f
 
-lApp :: LFun a b -> a -> b
-lApp (MkLFun f) = f
+lApp :: (LT a, LT b) => LFun a b -> a -> b
+lApp (MkLFun f) a | isZero a = zero 
+                  | otherwise = f a
 
 lEval :: a -> LFun (a -> b) b
 lEval x = MkLFun (\f -> f x)
 
 -- | Linear uncurry
-lUncurry :: (a -> LFun b c) -> LFun (a, b) c
+lUncurry :: (LT a, LT b, LT c) => (a -> LFun b c) -> LFun (a, b) c
 lUncurry f = MkLFun $ uncurry (lApp . f)
 
 -- | Linear zipWith
@@ -82,11 +92,11 @@ lZip x = MkLFun $ \y -> MkTens $ V.toList $ V.zipWith f x y
     where f a b = (V.singleton a, V.singleton b)
 
 -- | Pair two functions
-lPair :: LFun a b -> LFun a c -> LFun a (b, c)
+lPair :: (LT a, LT b, LT c) => LFun a b -> LFun a c -> LFun a (b, c)
 lPair a b = MkLFun $ \x -> (lApp a x, lApp b x)
 
 -- | Map a tuple
-lMapTuple :: LFun a a' -> LFun b b' -> LFun (a, b) (a', b')
+lMapTuple :: (LT a, LT a', LT b, LT b') => LFun a a' -> LFun b b' -> LFun (a, b) (a', b')
 lMapTuple f g = MkLFun $ \(a, b) -> (lApp f a, lApp g b)
 
 -- | Addition linear in second argument
@@ -109,11 +119,14 @@ lFst = MkLFun fst
 lSnd :: LFun (a, b) b
 lSnd = MkLFun snd
 
-lSwap :: (a -> LFun b c) -> LFun b (a -> c)
+lSwap :: (LT a, LT b, LT c) => (a -> LFun b c) -> LFun b (a -> c)
 lSwap t = MkLFun $ \x y -> lApp (t y) x
 
 lCur :: (LT b, LT c) => ((a, b) -> c -> c) -> LFun (Tens a b) c
 lCur f = MkLFun $ tensFoldr f zero
+
+lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
+lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
 
 lMap :: KnownNat n => RealN n -> LFun (RealN 1 -> RealN 1) (RealN n)
 lMap x = MkLFun $ \g -> V.map (flip V.index 0 . g . V.singleton) x
@@ -122,9 +135,9 @@ lRec :: LFun (a, b) b -> LFun a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 lRec (MkLFun g) = MkLFun $ lrec g where 
     lrec f a = f (a, lrec f a)
 
-lIt :: LT a => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+lIt :: (LT a, LT b) => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 lIt (MkLFun g) = MkLFun $ lit g where 
-    lit f b = let (a, b') = f b in plus a (lit f b') --- AARGH. THIS IS PROBLEMATIC AS IT'LL NEVER TERMINATE, SEEING THAT plus IS STRICT IN BOTH ARGUMENTS
+    lit f b = let (a, b') = f b in plus a (MkLFun (lit f) `lApp` b') --- AARGH. THIS IS PROBLEMATIC AS IT'LL NEVER TERMINATE, SEEING THAT plus IS STRICT IN BOTH ARGUMENTS
 -- CAN WE MAKE THIS THING TERMINATE UNDER ANY CIRCUMSTANCES? E.G. FIRST ORDER b SO WE CAN CHECK WHETHER THEY ARE 0? (IMPLEMENT TYPE CLASS FOR THIS)
 -- SIMILAR IDEA: CAN WE IMPLEMENT ONE FOR ALL TYPES IN THE HIERARCHY? THEN, WE CAN ALSO CHECK WHETHER LINEAR FUNCTIONS ARE ZERO.
 -- YES, SO WE SHOULD JUST CHECK WHETHER b' IS 0 AND THEN JUST RETURN a.
@@ -165,6 +178,7 @@ type family Dr2 a = r | r -> a where
     Dr2 ()        = ()
 
 data Type a where
+    TDouble :: Type Double
     TRealN  :: KnownNat n => Proxy n -> Type (RealN n)
     TArrow  :: Type a -> Type b -> Type (a -> b)
     TPair   :: Type a -> Type b -> Type (a, b)
@@ -203,6 +217,47 @@ class LT a where
     zero      :: a
     plus      :: a -> a -> a
     inferType :: Type a
+    isZero    :: a -> Bool
 
-lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
-lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
+instance LT () where
+    zero      = ()
+    plus _ _  = ()
+    inferType = TUnit
+    isZero    = const True
+
+instance (LT a, LT b) => LT (a, b) where
+    zero          = (zero, zero)
+    plus a b      = (fst a `plus` fst b, snd a `plus` snd b)
+    inferType     = TPair inferType inferType
+    isZero (a, b) = isZero a && isZero b
+
+instance LT Double where
+    zero      = 0
+    plus      = (+)
+    inferType = TDouble
+    isZero    = (== 0)
+
+instance KnownNat n => LT (RealN n) where
+    zero      = V.replicate 0
+    plus      = V.zipWith (+)
+    inferType = TRealN (Proxy @n)
+    isZero    = (== zero)
+
+instance (LT a, LT b) => LT (a -> b) where
+    zero      = const zero
+    plus f g  = \x -> plus (f x) (g x)
+    inferType = TArrow inferType inferType
+    isZero    = const False -- undecidable
+
+instance (LT a, LT b) => LT (Tens a b) where
+    zero      = empty
+    plus      = (Types.++)
+    inferType = TTens inferType inferType
+    isZero    = isZeroTens
+
+
+instance (LT a, LT b) => LT (LFun a b) where
+    zero      = lConst zero
+    plus      = lPlus
+    inferType = TLinFun inferType inferType
+    isZero    = const False -- undecidable
