@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 016d0d863682ed520cdd6e20bda730d5b90a3dc7c5f0a517b1ebcc8bffba175c
+-- hash: 394fb10043ff616996abd2a48091e5b3c507e71ebc98f1de2eac8dd2624fcd7f
 
 name:           ad-on-higher-order-functions
 version:        0.1.0.0
@@ -42,6 +42,7 @@ library
   ghc-options: -Wall
   build-depends:
       base >=4.7 && <5
+    , ghc-typelits-natnormalise
     , mtl
     , vector-sized
   default-language: Haskell2010

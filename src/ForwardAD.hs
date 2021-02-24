@@ -75,6 +75,12 @@ d1  SL.Map       = do xVar <- gensym
                       return $ TL.Lambda xVar xType $ TL.Map f v
     where xType = inferType
           yType = inferType
+d1 SL.Foldr      = do 
+    xVar <- gensym 
+    yVar <- gensym 
+    let xType = inferType 
+    let yType = inferType
+    return $ TL.Lambda xVar xType (TL.Foldr `TL.App` TL.Pair (TL.Pair (TL.Lambda yVar yType $ TL.Fst (TL.Fst (TL.Fst (TL.Var xVar xType)) `TL.App` (TL.Var yVar yType))) (TL.Snd (TL.Fst (TL.Var xVar xType))) ) (TL.Snd (TL.Var xVar xType)))
 d1 (SL.Rec t)    = do d1t <- d1 t -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
                       return $ TL.Rec d1t
 d1 (SL.It t)     = do d1t <- d1 t -- EXPERIMENTAL SUPPORT FOR ITERATION
@@ -144,10 +150,13 @@ d2 (SL.CoPair f g) = do -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 d2  SL.Map      = do xVar <- gensym
                      return $ TL.Lambda xVar xType $ TL.DMap $ TL.Var xVar xType
     where xType = inferType
+d2 SL.Foldr = return TL.DFoldr
 -- Dop
 d2 (SL.Op (Constant _)) = return $ TL.LOp DConstant
 d2 (SL.Op EAdd   )      = return $ TL.LOp DEAdd
 d2 (SL.Op EProd  )      = return $ TL.LOp DEProd
+d2 (SL.Op EScalAdd   )  = return $ TL.LOp DEScalAdd
+d2 (SL.Op EScalProd  )  = return $ TL.LOp DEScalProd
 d2 (SL.Op Sum    )      = return $ TL.LOp DSum
 d2 (SL.Rec t)           = do -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
     d1t <- d1 t 
@@ -159,43 +168,3 @@ d2 (SL.Rec t)           = do -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- TH
     where xType = inferType
 d2 (SL.It _)            = do -- EXPERIMENTAL SUPPORT FOR ITERATION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
                           error "This is still wrong! Do something more similar to foldr to work with all of the primals."
-
-
-iter :: ((c, a) -> Either b a) -> (c, a) -> b
-iter f (c, a) = case f (c, a) of
-    Left b -> b
-    Right a' -> iter f (c, a')
-
-iterScan :: ((c, a) -> Either b a) -> (c, a) -> ([a], b)
-iterScan f (c, a) = case f (c, a) of
-    Left b -> ([a], b)
-    Right a' -> let (as, b) = iterScan f (c, a') in (a : as, b)
-
-iterS :: (a -> Either b a) -> a -> b
-iterS f a = case f a of
-    Left b -> b
-    Right a' -> iterS f a'
-
-iterSScan :: (a -> Either b a) -> a -> ([a], b)
-iterSScan f a = case f a of
-    Left b -> ([a], b)
-    Right a' -> let (as, b) = iterSScan f a' in (a : as, b)
-
-fac :: Int -> Int 
-fac n = iterS (\(k, i) -> if k > 0 then Right (k - 1, k * i) else Left i) (n, 1)
-
-facScan :: Int -> ([(Int, Int)], Int)
-facScan n = iterSScan (\(k, i) -> if k > 0 then Right (k - 1, k * i) else Left i) (n, 1)
-
-recurse :: ((a, b) -> b) -> (a -> b)
-recurse phi a = phi (a, recurse phi a)
-
-recurseScan :: ((a, b) -> b) -> (a -> [b])
-recurseScan phi a = phi (a, head $ recurseScan phi a) : recurseScan phi a
-
-fac1 :: Int -> Int 
-fac1 = recurse (\ (r, g) -> \n -> if n > 0 then n * g (n - 1) else r) 1
-
-facScan1 = recurseScan (\ (r, g) -> \n -> if n > 0 then n * g (n - 1) else r) 1
-
-facScan1' n = zipWith (\f x -> f x) facScan1 [0..n]

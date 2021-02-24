@@ -52,7 +52,9 @@ data LinearOperation a b c where
     DEProd     :: KnownNat n => LinearOperation (Vect n, Vect n) (Vect n, Vect n)  (Vect n)
     DEProdT    :: KnownNat n => LinearOperation (Vect n, Vect n) (Vect n)           (Vect n, Vect n)
     DEScalAdd  :: LinearOperation (Scal, Scal) (Scal, Scal) Scal 
+    DEScalAddT :: LinearOperation (Scal, Scal) Scal (Scal, Scal) 
     DEScalProd :: LinearOperation (Scal, Scal) (Scal, Scal) Scal 
+    DEScalProdT :: LinearOperation (Scal, Scal) Scal (Scal, Scal)
     DSum       :: KnownNat n => LinearOperation (Vect n)          (Vect n)           Scal
     DSumT      :: KnownNat n
                => LinearOperation (Vect n)          Scal           (Vect n)
@@ -66,7 +68,9 @@ showLOp DEAddT      = "DEAddT"
 showLOp DEProd      = "DEProd"
 showLOp DEProdT     = "DEProdT"
 showLOp DEScalAdd   = "DEScalAdd"
+showLOp DEScalAddT  = "DEScalAddT"
 showLOp DEScalProd  = "DEScalProd"
+showLOp DEScalProdT = "DEScalProdT"
 showLOp DSum        = "DSum"
 showLOp DSumT       = "DSumT"
 
@@ -83,7 +87,11 @@ evalLOp DEProdT    ( x,  y) = lPair xDeriv yDeriv
     where xDeriv = lZipWith lProd y
           yDeriv = lZipWith lProd x
 evalLOp DEScalAdd (_, _)    = lUncurry lAdd
+evalLOp DEScalAddT (_, _)   = lDup
 evalLOp DEScalProd (x, y)   = lComp (lMapTuple xDeriv yDeriv) (lUncurry lAdd)
+    where xDeriv = lProd y
+          yDeriv = lProd x
+evalLOp DEScalProdT ( x,  y) = lPair xDeriv yDeriv
     where xDeriv = lProd y
           yDeriv = lProd x
 -- Jacobian: 1xn [1, 1, 1, ...]

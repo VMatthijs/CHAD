@@ -5,6 +5,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 
 -- | Different type definitions used in the language
 module Types (
@@ -12,7 +13,7 @@ module Types (
     Scal,
     LFun, lId, lConst, lDup, lComp, lApp, lEval, lUncurry, lZipWith, lZipWith', lPair,
           lMapTuple, lAdd, lProd, lSum, lExpand, lPlus, lFst, lSnd,
-          lSwap, lCur, lZip, lMap, lRec, lIt,
+          lSwap, lCur, lZip, lMap, lRec, lIt, dFoldr, dtFoldr,
     Tens, empty, (Types.++), tensFoldr, singleton, isZeroTens,
     Df1, Df2, Dr1, Dr2,
     Type(..), eqTy,
@@ -23,9 +24,11 @@ module Types (
 import Data.Proxy (Proxy, Proxy(Proxy))
 import Data.Type.Equality ((:~:)(Refl), (:~:))
 import qualified Data.Vector.Unboxed.Sized as V (
-    Vector, zipWith, sum, replicate, toList, map
+    Vector, zipWith, sum, replicate, toList, map, prescanr, zip, scanl, foldr, init, last,
+    Unbox
     )
 import GHC.TypeNats (KnownNat, sameNat)
+
 
 -- | Real numbers
 type Scal = Double
@@ -36,7 +39,7 @@ type Vect n = V.Vector n Double
 -- | Tensor products
 newtype Tens a b = MkTens [(a, b)]
 -- | Linear function
-newtype LFun a b = MkLFun (a -> b)
+newtype LFun a b = MkLFun {getFun :: a -> b}
 
 -- Methods for tensor products
 
@@ -133,6 +136,21 @@ lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
 
 lMap :: KnownNat n => Vect n -> LFun (Scal -> Scal) (Vect n)
 lMap x = MkLFun $ \g -> V.map g x
+
+dFoldr :: (KnownNat n, V.Unbox a, V.Unbox b, LT b) => (((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n) -> LFun (((Scal, a) -> b, b), Vect n) b
+dFoldr ((f, i), v) = MkLFun $ \((f', i'), v') -> 
+    let s = V.prescanr (curry (fst . f)) i v
+        vvps = V.zip v (V.zip v' s)
+        g (vi, (vpi, si)) acc = getFun (snd (f (vi, si))) (vpi, f' (vi, si) `plus` acc) in
+        V.foldr g i' vvps
+
+dtFoldr :: (V.Unbox a, V.Unbox b) => (((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n) -> LFun b ((Tens (Scal, a) b, b),  Vect n)
+dtFoldr ((f, i), v) = MkLFun $ \w ->
+    let s = V.prescanr (curry (fst . f)) i v
+        vs = V.zip v s
+        svs = V.scanl (flip $ curry (snd . uncurry (getFun . snd . f))) w vs
+        vssvs = V.zip vs (V.init svs) in
+        ((MkTens (V.toList vssvs), V.last svs), V.map (fst . uncurry (getFun . snd . f)) vssvs)
 
 lRec :: LFun (a, b) b -> LFun a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 lRec (MkLFun g) = MkLFun $ lrec g where 

@@ -4,7 +4,7 @@
 -- | Definition of the source language
 module SourceLanguage where
 
-import Data.Vector.Unboxed.Sized as V (map, foldr)
+import Data.Vector.Unboxed.Sized as V (map, foldr, Unbox)
 
 import Helper ((&&&))
 import Types (LT, Vect, Scal, Df1, Dr1, Df2, Dr2)
@@ -62,7 +62,7 @@ data STerm a b where
     Map   :: KnownNat n
           => STerm (Scal -> Scal, Vect n) (Vect n)
 --     -- | Foldr
-    Foldr :: (LT a, KnownNat n)
+    Foldr :: (LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a), V.Unbox (Df1 a), V.Unbox (Df2 a), KnownNat n)
           => STerm (((Scal, a) -> a, a), Vect n) a
     Rec   :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
              , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b))

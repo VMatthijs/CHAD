@@ -76,6 +76,12 @@ d1  SL.Map       = do xVar <- gensym
                       return $ TL.Lambda xVar xType $ TL.Map f v
     where xType = inferType
           yType = inferType
+d1 SL.Foldr      = do 
+    xVar <- gensym 
+    yVar <- gensym 
+    let xType = inferType 
+    let yType = inferType
+    return $ TL.Lambda xVar xType (TL.Foldr `TL.App` TL.Pair (TL.Pair (TL.Lambda yVar yType $ TL.Fst (TL.Fst (TL.Fst (TL.Var xVar xType)) `TL.App` (TL.Var yVar yType))) (TL.Snd (TL.Fst (TL.Var xVar xType))) ) (TL.Snd (TL.Var xVar xType)))
 d1 (SL.Rec t)    = do d1t <- d1 t -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
                       return $ TL.Rec d1t
 d1 (SL.It t)     = do d1t <- d1 t -- EXPERIMENTAL SUPPORT FOR ITERATION
@@ -145,10 +151,13 @@ d2 (SL.CoPair f g) = do
 d2  SL.Map       = do xVar <- gensym
                       return $ TL.Lambda xVar xType $ TL.DtMap $ TL.Var xVar xType
     where xType = inferType
+d2 SL.Foldr = return TL.DtFoldr
 -- Dop^t
 d2 (SL.Op (Constant _)) = return $ TL.LOp DConstantT
 d2 (SL.Op EAdd   )      = return $ TL.LOp DEAddT
 d2 (SL.Op EProd  )      = return $ TL.LOp DEProdT
+d2 (SL.Op EScalAdd   )  = return $ TL.LOp DEScalAddT
+d2 (SL.Op EScalProd  )  = return $ TL.LOp DEScalProdT
 d2 (SL.Op Sum    )      = return $ TL.LOp DSumT -- [1, 1, 1, 1, ...]
 d2 (SL.Rec t)           = do -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
     d1t <- d1 t 

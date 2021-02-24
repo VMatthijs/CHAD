@@ -3,12 +3,12 @@
 -- | Definition of the target language
 module TargetLanguage where
 
-import Data.Vector.Unboxed.Sized as V (map, foldr, scanr, zip, scanl, tail)
+import Data.Vector.Unboxed.Sized as V (map, foldr, Unbox)
 
 import Types as T (lEval,  Type, LFun, Tens, LT(..), Vect, Scal
              , eqTy, lComp, lApp, lId, lFst, lSnd, lMap
              , lSwap, singleton, lPair, lCur, lZipWith', lZip
-             , lRec, lIt
+             , dFoldr, dtFoldr, lRec, lIt
              )
 import Operation (Operation, LinearOperation, evalOp, evalLOp, showOp, showLOp)
 import Data.Type.Equality ((:~:)(Refl))
@@ -64,7 +64,7 @@ data TTerm t where
               -> TTerm (LFun (Scal -> Scal, Vect n) (Vect n))
     DtMap     :: KnownNat n => TTerm (Scal -> (Scal, LFun (Scal) (Scal)), Vect n)
               -> TTerm (LFun (Vect n) (Tens (Scal) (Scal), Vect n))
-    DFoldr    :: KnownNat n => TTerm ((((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n) -> LFun (((Scal, a) -> b, b), Vect n) b)
+    DFoldr    :: (KnownNat n, V.Unbox a, V.Unbox b) => TTerm ((((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n) -> LFun (((Scal, a) -> b, b), Vect n) b)
     DtFoldr   ::KnownNat n => TTerm ((((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n) -> LFun b ((Tens (Scal, a) b, b),  Vect n))
     LRec      :: TTerm (LFun (a, b) b) -> TTerm (LFun a b) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
     LIt       :: (LT a, LT b) => TTerm (LFun b (a, b)) -> TTerm (LFun b a) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
@@ -86,6 +86,7 @@ subst x v u (Snd p)                     = Snd (subst x v u p)
 subst _ _ _ (Lift x t)                  = Lift x t
 subst x v u (Op op y)                   = Op op (subst x v u y)
 subst x v u (Map f y)                   = Map (subst x v u f) (subst x v u y)
+subst _ _ _ Foldr                       = Foldr
 subst x v u (Inl t)                     = Inl (subst x v u t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 subst x v u (Inr t)                     = Inr (subst x v u t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 subst x v u (Case t l r)                = Case (subst x v u t) (subst x v u l) (subst x v u r) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
@@ -107,6 +108,8 @@ subst x v u (LCur t)                    = LCur (subst x v u t)
 subst _ _ _ (LOp lop)                   = LOp lop
 subst x v u (DMap t)                    = DMap (subst x v u t)
 subst x v u (DtMap t)                   = DtMap (subst x v u t)
+subst _ _ _ DFoldr                      = DFoldr
+subst _ _ _ DtFoldr                     = DtFoldr
 subst x v u (LRec t)                    = LRec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 subst x v u (LIt t)                     = LIt (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 -- | Substitute variable for a TTerm
@@ -128,6 +131,7 @@ substTt x v u (Case t l r)                = Case (substTt x v u t) (substTt x v 
 substTt _ _ _ (Lift x t)                  = Lift x t
 substTt x v u (Op op y)                   = Op op (substTt x v u y)
 substTt x v u (Map f y)                   = Map (substTt x v u f) (substTt x v u y)
+substTt _ _ _ Foldr                       = Foldr
 substTt x v u (Rec t)                     = Rec (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 substTt x v u (It t)                      = It (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR ITERATION
 -- Target language extension
@@ -146,6 +150,8 @@ substTt x v u (LCur t)                    = LCur (substTt x v u t)
 substTt _ _ _ (LOp lop)                   = LOp lop
 substTt x v u (DMap t)                    = DMap (substTt x v u t)
 substTt x v u (DtMap t)                   = DtMap (substTt x v u t)
+substTt _ _ _ DFoldr                      = DFoldr
+substTt _ _ _ DtFoldr                     = DtFoldr
 substTt x v u (LRec t)                    = LRec (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 substTt x v u (LIt t)                     = LIt (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
@@ -195,7 +201,8 @@ evalTt (DMap t)      = plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith' (snd . 
     where (f, v) = evalTt t
 evalTt (DtMap t)     = lPair (lZip v) (lZipWith' (snd . f) v)
     where (f, v) = evalTt t
--- evalTt DFoldr        = \((f, i), v) -> let s = V.scanr (curry (fst . f)) i (V.tail v) in undefined  
+evalTt DFoldr        = dFoldr
+evalTt DtFoldr       = dtFoldr
 evalTt (LRec t)      = lRec (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 evalTt (LIt t)       = lIt (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
@@ -215,6 +222,7 @@ printTt (Case p l r)      = "Case(" ++ printTt p ++ ", " ++ printTt l ++ ", " ++
 printTt (Lift _ _)        = error "Can't print lifted value"
 printTt (Op op a)         = "evalOp " ++ showOp op ++ " " ++ printTt a
 printTt (Map f a)         = "map (" ++ printTt f ++ ") " ++ printTt a
+printTt Foldr             = "foldr"
 printTt (Rec t)           = "rec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 printTt (It t)           = "it(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
 -- Target language extension
@@ -232,6 +240,8 @@ printTt (Plus a b)        = "(" ++ printTt a ++ ") + (" ++ printTt b ++ ")"
 printTt (LSwap t)         = "lswap(" ++ printTt t ++ ")"
 printTt (LCur  t)         = "lcur(" ++ printTt t ++ ")"
 printTt (DMap t)          = "DMap(" ++ printTt t ++ ")"
+printTt DFoldr            = "DFoldr"
+printTt DtFoldr           = "DtFoldr"
 printTt (DtMap t)         = "DtMap(" ++ printTt t ++ ")"
 printTt (LRec t)          = "lrec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 printTt (LIt t)           = "lit(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
