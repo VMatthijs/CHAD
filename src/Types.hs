@@ -34,9 +34,10 @@ module Types
   , lCur
   , lZip
   , lMap
-  , lIt
   , dFoldr
   , dtFoldr
+  , dIt
+  , dtIt
   , Tens
   , empty
   , (Types.++)
@@ -195,12 +196,45 @@ dtFoldr ((f, i), v) =
      in ( (MkTens (V.toList vssvs), V.last svs)
         , V.map (fst . uncurry (getFun . snd . f)) vssvs)
 
-lIt :: (LT a, LT b) => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-lIt (MkLFun g) = MkLFun $ lit g
-  where
-    lit f b =
-      let (a, b') = f b
-       in plus a (MkLFun (lit f) `lApp` b') --- AARGH. THIS IS PROBLEMATIC AS IT'LL NEVER TERMINATE, SEEING THAT plus IS STRICT IN BOTH ARGUMENTS
+dIt ::
+     (LT d2a, LT d2b, LT d2c)
+  => ((d1a, d1b) -> Either d1c d1b)
+  -> ((d1a, d1b) -> LFun (d2a, d2b) (d2c, d2b))
+  -> ((d1a, d1b) -> LFun (d2a, d2b) d2c) -- EXPERIMENTAL SUPPORT FOR ITERATION
+dIt d1t d2t (d1a, d1b) =
+  MkLFun $ \(d2a, d2b) ->
+    let d1bs = scanIt d1t (d1a, d1b)
+     in fst
+          (d2t (d1a, head d1bs) `lApp`
+           ( d2a
+           , foldl
+               (\acc d1b' -> snd (d2t (d1a, d1b') `lApp` (d2a, acc)))
+               d2b
+               (tail d1bs)))
+
+dtIt ::
+     (LT d2a, LT d2b, LT d2c)
+  => ((d1a, d1b) -> Either d1c d1b)
+  -> ((d1a, d1b) -> LFun (d2c, d2b) (d2a, d2b))
+  -> ((d1a, d1b) -> LFun d2c (d2a, d2b)) -- EXPERIMENTAL SUPPORT FOR ITERATION
+dtIt d1t d2t (d1a, d1b) =
+  MkLFun $ \d2c ->
+    let d1bs = scanIt d1t (d1a, d1b)
+        d2ad2b = d2t (d1a, last d1bs) `lApp` (d2c, zero)
+        d2ad2bs =
+          scanr
+            (\d1b' acc -> d2t (d1a, d1b') `lApp` (zero, snd acc))
+            d2ad2b
+            (init d1bs)
+     in (foldr plus zero (map fst d2ad2bs), snd (head d2ad2bs))
+
+scanIt :: ((c, a) -> Either b a) -> (c, a) -> [a]
+scanIt f (c, a) =
+  case f (c, a) of
+    Left _ -> [a]
+    Right a' ->
+      let as = scanIt f (c, a')
+       in a : as
 
 -- CAN WE MAKE THIS THING TERMINATE UNDER ANY CIRCUMSTANCES? E.G. FIRST ORDER b SO WE CAN CHECK WHETHER THEY ARE 0? (IMPLEMENT TYPE CLASS FOR THIS)
 -- SIMILAR IDEA: CAN WE IMPLEMENT ONE FOR ALL TYPES IN THE HIERARCHY? THEN, WE CAN ALSO CHECK WHETHER LINEAR FUNCTIONS ARE ZERO.

@@ -196,8 +196,7 @@ d2 (SL.CoPair f g) = do
          (TL.Lambda yVar yType $
           (d2f `TL.App` TL.Var yVar yType) `TL.LComp` (TL.LPair TL.LId TL.Zero))
          (TL.Lambda zVar zType $
-          (d2g `TL.App` TL.Var zVar zType) `TL.LComp` (TL.LPair TL.Zero TL.LId)) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-       )
+          (d2g `TL.App` TL.Var zVar zType) `TL.LComp` (TL.LPair TL.Zero TL.LId)))
   where
     xType = inferType
     yType = inferType
@@ -218,7 +217,8 @@ d2 (SL.Op EScalProd) = return $ TL.LOp DEScalProdT
 d2 (SL.Op Sum) = return $ TL.LOp DSumT -- [1, 1, 1, 1, ...]
 d2 (SL.Rec _) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
  = error "This is not yet implemented."
-d2 (SL.It _) -- EXPERIMENTAL SUPPORT FOR ITERATION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
+d2 (SL.It t) -- EXPERIMENTAL SUPPORT FOR ITERATION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
  = do
-  error
-    "This is still wrong! Do something more similar to foldr to work with all of the primals."
+  d1t <- d1 t
+  d2t <- d2 t
+  return $ TL.DtIt d1t d2t

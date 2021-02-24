@@ -196,10 +196,9 @@ d2 (SL.CoPair f g) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
       (TL.Case
          (TL.Var xVar xType)
          (TL.Lambda yVar yType $
-          TL.LFst `TL.LComp` (d2f `TL.App` TL.Var yVar yType)) -- Note, we could make this more type safe by doing a dynamic check in TL.LFst to make sure the second component is 0. Similar for TL.LSnd below.
+          TL.LFst `TL.LComp` (d2f `TL.App` TL.Var yVar yType))
          (TL.Lambda zVar zType $
-          TL.LSnd `TL.LComp` (d2g `TL.App` TL.Var zVar zType)) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-       )
+          TL.LSnd `TL.LComp` (d2g `TL.App` TL.Var zVar zType)))
   where
     xType = inferType
     yType = inferType
@@ -222,7 +221,8 @@ d2 (SL.Op EScalProd) = return $ TL.LOp DEScalProd
 d2 (SL.Op Sum) = return $ TL.LOp DSum
 d2 (SL.Rec _) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
  = error "This is not yet implemented."
-d2 (SL.It _) -- EXPERIMENTAL SUPPORT FOR ITERATION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
+d2 (SL.It t) -- EXPERIMENTAL SUPPORT FOR ITERATION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
  = do
-  error
-    "This is still wrong! Do something more similar to foldr to work with all of the primals."
+  d1t <- d1 t
+  d2t <- d2 t
+  return $ TL.DIt d1t d2t

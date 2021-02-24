@@ -47,7 +47,8 @@ simplifyTTerm (DMap t) = DMap (simplifyTTerm t)
 simplifyTTerm (DtMap t) = DtMap (simplifyTTerm t)
 simplifyTTerm DFoldr = DFoldr
 simplifyTTerm DtFoldr = DtFoldr
-simplifyTTerm (LIt t) = LIt (simplifyTTerm t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+simplifyTTerm (DIt d1t d2t) = DIt (simplifyTTerm d1t) (simplifyTTerm d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+simplifyTTerm (DtIt d1t d2t) = DtIt (simplifyTTerm d1t) (simplifyTTerm d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
 
 -- | Simplify the App TTerm
 simplifyApp :: (LT a, LT b) => TTerm (a -> b) -> TTerm a -> TTerm b
@@ -151,4 +152,5 @@ usesOf x t (DMap s) = usesOf x t s
 usesOf x t (DtMap s) = usesOf x t s
 usesOf _ _ DFoldr = 0
 usesOf _ _ DtFoldr = 0
-usesOf x t (LIt s) = usesOf x t s -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+usesOf x t (DIt d1t d2t) = usesOf x t d1t + usesOf x t d2t -- EXPERIMENTAL SUPPORT FOR ITERATION
+usesOf x t (DtIt d1t d2t) = usesOf x t d1t + usesOf x t d2t -- EXPERIMENTAL SUPPORT FOR ITERATION

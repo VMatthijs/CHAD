@@ -11,10 +11,10 @@ import           GHC.TypeNats              (KnownNat)
 import           Operation                 (LinearOperation, Operation, evalLOp,
                                             evalOp, showLOp, showOp)
 import           Types                     as T (LFun, LT (..), Scal, Tens,
-                                                 Type, Vect, dFoldr, dtFoldr,
-                                                 eqTy, lApp, lComp, lCur, lEval,
-                                                 lFst, lId, lIt, lMap, lPair,
-                                                 lSnd, lSwap, lZip,
+                                                 Type, Vect, dFoldr, dIt,
+                                                 dtFoldr, dtIt, eqTy, lApp,
+                                                 lComp, lCur, lEval, lFst, lId,
+                                                 lMap, lPair, lSnd, lSwap, lZip,
                                                  lZipWith', singleton)
 
 -- | Terms of the target language
@@ -78,12 +78,12 @@ data TTerm t
     -- Map derivatives
   DMap
     :: KnownNat n
-    => TTerm (Scal -> (Scal, LFun (Scal) (Scal)), Vect n)
+    => TTerm (Scal -> (Scal, LFun Scal Scal), Vect n)
     -> TTerm (LFun (Scal -> Scal, Vect n) (Vect n))
   DtMap
     :: KnownNat n
-    => TTerm (Scal -> (Scal, LFun (Scal) (Scal)), Vect n)
-    -> TTerm (LFun (Vect n) (Tens (Scal) (Scal), Vect n))
+    => TTerm (Scal -> (Scal, LFun Scal Scal), Vect n)
+    -> TTerm (LFun (Vect n) (Tens Scal Scal, Vect n))
   DFoldr
     :: (KnownNat n, V.Unbox a, V.Unbox b, LT b)
     => TTerm ((((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n) -> LFun ( ( ( Scal
@@ -96,7 +96,16 @@ data TTerm t
                                                                                    , a) b
                                                                             , b)
                                                                           , Vect n))
-  LIt :: (LT a, LT b) => TTerm (LFun b (a, b)) -> TTerm (LFun b a) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+  DIt
+    :: (LT d2a, LT d2b, LT d2c)
+    => TTerm ((d1a, d1b) -> Either d1c d1b)
+    -> TTerm ((d1a, d1b) -> LFun (d2a, d2b) (d2c, d2b))
+    -> TTerm ((d1a, d1b) -> LFun (d2a, d2b) d2c) -- EXPERIMENTAL SUPPORT FOR ITERATION
+  DtIt
+    :: (LT d2a, LT d2b, LT d2c)
+    => TTerm ((d1a, d1b) -> Either d1c d1b)
+    -> TTerm ((d1a, d1b) -> LFun (d2c, d2b) (d2a, d2b))
+    -> TTerm ((d1a, d1b) -> LFun d2c (d2a, d2b)) -- EXPERIMENTAL SUPPORT FOR ITERATION
 
 -- | Substitute variable for term
 subst :: String -> u -> Type u -> TTerm t -> TTerm t
@@ -141,7 +150,8 @@ subst x v u (DMap t) = DMap (subst x v u t)
 subst x v u (DtMap t) = DtMap (subst x v u t)
 subst _ _ _ DFoldr = DFoldr
 subst _ _ _ DtFoldr = DtFoldr
-subst x v u (LIt t) = LIt (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+subst x v u (DIt d1t d2t) = DIt (subst x v u d1t) (subst x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+subst x v u (DtIt d1t d2t) = DtIt (subst x v u d1t) (subst x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
 
 -- | Substitute variable for a TTerm
 substTt :: String -> TTerm u -> Type u -> TTerm t -> TTerm t
@@ -187,7 +197,8 @@ substTt x v u (DMap t) = DMap (substTt x v u t)
 substTt x v u (DtMap t) = DtMap (substTt x v u t)
 substTt _ _ _ DFoldr = DFoldr
 substTt _ _ _ DtFoldr = DtFoldr
-substTt x v u (LIt t) = LIt (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+substTt x v u (DIt d1t d2t) = DIt (substTt x v u d1t) (substTt x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+substTt x v u (DtIt d1t d2t) = DtIt (substTt x v u d1t) (substTt x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
 
 -- | Evaluate the target language
 evalTt :: TTerm t -> t
@@ -244,7 +255,8 @@ evalTt (DtMap t) = lPair (lZip v) (lZipWith' (snd . f) v)
     (f, v) = evalTt t
 evalTt DFoldr = dFoldr
 evalTt DtFoldr = dtFoldr
-evalTt (LIt t) = lIt (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+evalTt (DIt d1t d2t) = dIt (evalTt d1t) (evalTt d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+evalTt (DtIt d1t d2t) = dtIt (evalTt d1t) (evalTt d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
 
 -- | Pretty print the target language
 printTt :: TTerm t -> String
@@ -284,4 +296,5 @@ printTt (DMap t) = "DMap(" ++ printTt t ++ ")"
 printTt DFoldr = "DFoldr"
 printTt DtFoldr = "DtFoldr"
 printTt (DtMap t) = "DtMap(" ++ printTt t ++ ")"
-printTt (LIt t) = "lit(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+printTt (DIt d1t d2t) = "DIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
+printTt (DtIt d1t d2t) = "DtIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
