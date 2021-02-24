@@ -64,8 +64,8 @@ data TTerm t where
               -> TTerm (LFun (Scal -> Scal, Vect n) (Vect n))
     DtMap     :: KnownNat n => TTerm (Scal -> (Scal, LFun (Scal) (Scal)), Vect n)
               -> TTerm (LFun (Vect n) (Tens (Scal) (Scal), Vect n))
-    DFoldr    :: (KnownNat n, V.Unbox a, V.Unbox b) => TTerm ((((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n) -> LFun (((Scal, a) -> b, b), Vect n) b)
-    DtFoldr   ::KnownNat n => TTerm ((((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n) -> LFun b ((Tens (Scal, a) b, b),  Vect n))
+    DFoldr    :: (KnownNat n, V.Unbox a, V.Unbox b, LT b) => TTerm ((((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n) -> LFun (((Scal, a) -> b, b), Vect n) b)
+    DtFoldr   :: (KnownNat n, V.Unbox a, V.Unbox b) => TTerm ((((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n) -> LFun b ((Tens (Scal, a) b, b),  Vect n))
     LRec      :: TTerm (LFun (a, b) b) -> TTerm (LFun a b) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
     LIt       :: (LT a, LT b) => TTerm (LFun b (a, b)) -> TTerm (LFun b a) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 

@@ -14,7 +14,7 @@ module Types (
     LFun, lId, lConst, lDup, lComp, lApp, lEval, lUncurry, lZipWith, lZipWith', lPair,
           lMapTuple, lAdd, lProd, lSum, lExpand, lPlus, lFst, lSnd,
           lSwap, lCur, lZip, lMap, lRec, lIt, dFoldr, dtFoldr,
-    Tens, empty, (Types.++), tensFoldr, singleton, isZeroTens,
+    Tens, empty, (Types.++), tensFoldr, singleton,
     Df1, Df2, Dr1, Dr2,
     Type(..), eqTy,
     LT(..),
@@ -56,10 +56,6 @@ tensFoldr f d (MkTens xs) = foldr f d xs
 singleton :: a -> LFun b (Tens a b)
 singleton t = MkLFun $ \x -> MkTens [(t, x)]
 
-isZeroTens :: Tens a b -> Bool
-isZeroTens (MkTens []) = True
-isZeroTens _           = False
-
 -- Methods for linear functions
 
 lId :: LFun a a
@@ -75,8 +71,7 @@ lComp :: LFun a b -> LFun b c -> LFun a c
 lComp (MkLFun f) (MkLFun g) = MkLFun $ g . f
 
 lApp :: (LT a, LT b) => LFun a b -> a -> b
-lApp (MkLFun f) a | isZero a = zero 
-                  | otherwise = f a
+lApp (MkLFun f) = f
 
 lEval :: a -> LFun (a -> b) b
 lEval x = MkLFun (\f -> f x)
@@ -247,53 +242,44 @@ class LT a where
     zero      :: a
     plus      :: a -> a -> a
     inferType :: Type a
-    isZero    :: a -> Bool
 
 instance LT () where
     zero      = ()
     plus _ _  = ()
     inferType = TUnit
-    isZero    = const True
 
 instance (LT a, LT b) => LT (a, b) where
     zero          = (zero, zero)
     plus a b      = (fst a `plus` fst b, snd a `plus` snd b)
     inferType     = TPair inferType inferType
-    isZero (a, b) = isZero a && isZero b
 
 instance (LT a, LT b) => LT (Either a b) where -- EXPERIMENTAL SUPPORT FOR SUM TYPES
     zero      = error "This should never be used." -- This doesn't make sense.
     plus      = error "This should never be used." -- This doesn't make sense.
     inferType = TEither inferType inferType
-    isZero    = error "This should never be used." -- This doesn't make sense.
 
 instance LT Scal where
     zero      = 0
     plus      = (+)
     inferType = TScal
-    isZero    = (== 0)
 
 instance KnownNat n => LT (Vect n) where
     zero      = V.replicate 0
     plus      = V.zipWith (+)
     inferType = TVect (Proxy @n)
-    isZero    = (== zero)
 
 instance (LT a, LT b) => LT (a -> b) where
     zero      = const zero
     plus f g  = \x -> plus (f x) (g x)
     inferType = TArrow inferType inferType
-    isZero    =  error "This should never be used." -- undecidable
 
 instance (LT a, LT b) => LT (Tens a b) where
     zero      = empty
     plus      = (Types.++)
     inferType = TTens inferType inferType
-    isZero    = isZeroTens
 
 
 instance (LT a, LT b) => LT (LFun a b) where
     zero      = lConst zero
     plus      = lPlus
     inferType = TLinFun inferType inferType
-    isZero    =  error "This should never be used."-- undecidable
