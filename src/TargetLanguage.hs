@@ -14,7 +14,7 @@ import           Types                     as T (LFun, LT (..), Scal, Tens,
                                                  Type, Vect, dFoldr, dtFoldr,
                                                  eqTy, lApp, lComp, lCur, lEval,
                                                  lFst, lId, lIt, lMap, lPair,
-                                                 lRec, lSnd, lSwap, lZip,
+                                                 lSnd, lSwap, lZip,
                                                  lZipWith', singleton)
 
 -- | Terms of the target language
@@ -96,7 +96,6 @@ data TTerm t
                                                                                    , a) b
                                                                             , b)
                                                                           , Vect n))
-  LRec :: TTerm (LFun (a, b) b) -> TTerm (LFun a b) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
   LIt :: (LT a, LT b) => TTerm (LFun b (a, b)) -> TTerm (LFun b a) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 -- | Substitute variable for term
@@ -142,7 +141,6 @@ subst x v u (DMap t) = DMap (subst x v u t)
 subst x v u (DtMap t) = DtMap (subst x v u t)
 subst _ _ _ DFoldr = DFoldr
 subst _ _ _ DtFoldr = DtFoldr
-subst x v u (LRec t) = LRec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 subst x v u (LIt t) = LIt (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 -- | Substitute variable for a TTerm
@@ -189,7 +187,6 @@ substTt x v u (DMap t) = DMap (substTt x v u t)
 substTt x v u (DtMap t) = DtMap (substTt x v u t)
 substTt _ _ _ DFoldr = DFoldr
 substTt _ _ _ DtFoldr = DtFoldr
-substTt x v u (LRec t) = LRec (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 substTt x v u (LIt t) = LIt (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 -- | Evaluate the target language
@@ -247,7 +244,6 @@ evalTt (DtMap t) = lPair (lZip v) (lZipWith' (snd . f) v)
     (f, v) = evalTt t
 evalTt DFoldr = dFoldr
 evalTt DtFoldr = dtFoldr
-evalTt (LRec t) = lRec (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 evalTt (LIt t) = lIt (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 -- | Pretty print the target language
@@ -288,5 +284,4 @@ printTt (DMap t) = "DMap(" ++ printTt t ++ ")"
 printTt DFoldr = "DFoldr"
 printTt DtFoldr = "DtFoldr"
 printTt (DtMap t) = "DtMap(" ++ printTt t ++ ")"
-printTt (LRec t) = "lrec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 printTt (LIt t) = "lit(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION

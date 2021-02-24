@@ -47,7 +47,6 @@ simplifyTTerm (DMap t) = DMap (simplifyTTerm t)
 simplifyTTerm (DtMap t) = DtMap (simplifyTTerm t)
 simplifyTTerm DFoldr = DFoldr
 simplifyTTerm DtFoldr = DtFoldr
-simplifyTTerm (LRec t) = LRec (simplifyTTerm t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 simplifyTTerm (LIt t) = LIt (simplifyTTerm t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 -- | Simplify the App TTerm
@@ -152,5 +151,4 @@ usesOf x t (DMap s) = usesOf x t s
 usesOf x t (DtMap s) = usesOf x t s
 usesOf _ _ DFoldr = 0
 usesOf _ _ DtFoldr = 0
-usesOf x t (LRec s) = usesOf x t s -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 usesOf x t (LIt s) = usesOf x t s -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION

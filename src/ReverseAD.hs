@@ -216,20 +216,8 @@ d2 (SL.Op EProd) = return $ TL.LOp DEProdT
 d2 (SL.Op EScalAdd) = return $ TL.LOp DEScalAddT
 d2 (SL.Op EScalProd) = return $ TL.LOp DEScalProdT
 d2 (SL.Op Sum) = return $ TL.LOp DSumT -- [1, 1, 1, 1, ...]
-d2 (SL.Rec t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
- = do
-  d1t <- d1 t
-  d2t <- d2 t
-  x <- gensym
-  _ <-
-    error
-      "This is still wrong! Do something more similar to foldr to work with all of the primals."
-  let body =
-        d2t `TL.App`
-        TL.Pair (TL.Var x xType) ((TL.Rec d1t) `TL.App` (TL.Var x xType))
-  return $ TL.Lambda x xType $ TL.LIt $ body
-  where
-    xType = inferType
+d2 (SL.Rec _) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
+ = error "This is not yet implemented."
 d2 (SL.It _) -- EXPERIMENTAL SUPPORT FOR ITERATION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
  = do
   error

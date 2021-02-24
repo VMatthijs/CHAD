@@ -34,7 +34,6 @@ module Types
   , lCur
   , lZip
   , lMap
-  , lRec
   , lIt
   , dFoldr
   , dtFoldr
@@ -195,11 +194,6 @@ dtFoldr ((f, i), v) =
         vssvs = V.zip vs (V.init svs)
      in ( (MkTens (V.toList vssvs), V.last svs)
         , V.map (fst . uncurry (getFun . snd . f)) vssvs)
-
-lRec :: LFun (a, b) b -> LFun a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-lRec (MkLFun g) = MkLFun $ lrec g
-  where
-    lrec f a = f (a, lrec f a)
 
 lIt :: (LT a, LT b) => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 lIt (MkLFun g) = MkLFun $ lit g
