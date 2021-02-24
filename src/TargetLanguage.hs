@@ -91,7 +91,7 @@ data TTerm t
                                                                           , b)
                                                                         , Vect n) b)
   DtFoldr
-    :: (KnownNat n, V.Unbox a, V.Unbox b)
+    :: (KnownNat n, V.Unbox a, V.Unbox b, LT b)
     => TTerm ((((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n) -> LFun b ( ( Tens ( Scal
                                                                                    , a) b
                                                                             , b)

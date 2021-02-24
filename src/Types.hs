@@ -72,9 +72,7 @@ newtype Tens a b =
 
 -- | Linear function
 newtype LFun a b =
-  MkLFun
-    { getFun :: a -> b
-    }
+  MkLFun (a -> b)
 
 -- Methods for tensor products
 -- | Empty tensor product
@@ -180,21 +178,21 @@ dFoldr ((f, i), v) =
     let s = V.prescanr (curry (fst . f)) i v
         vvps = V.zip v (V.zip v' s)
         g (vi, (vpi, si)) acc =
-          getFun (snd (f (vi, si))) (vpi, f' (vi, si) `plus` acc)
+          lApp (snd (f (vi, si))) (vpi, f' (vi, si) `plus` acc)
      in V.foldr g i' vvps
 
 dtFoldr ::
-     (V.Unbox a, V.Unbox b)
+     (V.Unbox a, V.Unbox b, LT b)
   => (((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n)
   -> LFun b ((Tens (Scal, a) b, b), Vect n)
 dtFoldr ((f, i), v) =
   MkLFun $ \w ->
     let s = V.prescanr (curry (fst . f)) i v
         vs = V.zip v s
-        svs = V.scanl (flip $ curry (snd . uncurry (getFun . snd . f))) w vs
+        svs = V.scanl (flip $ curry (snd . uncurry (lApp . snd . f))) w vs
         vssvs = V.zip vs (V.init svs)
      in ( (MkTens (V.toList vssvs), V.last svs)
-        , V.map (fst . uncurry (getFun . snd . f)) vssvs)
+        , V.map (fst . uncurry (lApp . snd . f)) vssvs)
 
 dIt ::
      (LT d2a, LT d2b, LT d2c)
