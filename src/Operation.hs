@@ -27,7 +27,7 @@ showOp :: Operation a b -> String
 showOp (Constant c) = "const(" ++ show c ++ ")"
 showOp EAdd         = "EAdd"
 showOp EProd        = "EProd"
-showOp EScalAdd     = "EAScaldd"
+showOp EScalAdd     = "EScalAdd"
 showOp EScalProd    = "EScalProd"
 showOp Sum          = "Sum"
 
