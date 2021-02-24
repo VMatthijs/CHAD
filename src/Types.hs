@@ -8,7 +8,8 @@
 
 -- | Different type definitions used in the language
 module Types (
-    RealN,
+    Vect,
+    Scal,
     LFun, lId, lConst, lDup, lComp, lApp, lEval, lUncurry, lZipWith, lZipWith', lPair,
           lMapTuple, lAdd, lProd, lSum, lExpand, lPlus, lFst, lSnd,
           lSwap, lCur, lZip, lMap, lRec, lIt,
@@ -22,13 +23,15 @@ module Types (
 import Data.Proxy (Proxy, Proxy(Proxy))
 import Data.Type.Equality ((:~:)(Refl), (:~:))
 import qualified Data.Vector.Unboxed.Sized as V (
-    Vector, zipWith, sum, singleton, replicate, index, toList, map
+    Vector, zipWith, sum, replicate, toList, map
     )
 import GHC.TypeNats (KnownNat, sameNat)
 
+-- | Real numbers
+type Scal = Double
 
 -- | Vector of size n containing real values
-type RealN n = V.Vector n Double
+type Vect n = V.Vector n Double
 
 -- | Tensor products
 newtype Tens a b = MkTens [(a, b)]
@@ -80,16 +83,16 @@ lUncurry :: (LT a, LT b, LT c) => (a -> LFun b c) -> LFun (a, b) c
 lUncurry f = MkLFun $ uncurry (lApp . f)
 
 -- | Linear zipWith
-lZipWith :: (Double -> LFun Double Double) -> RealN n -> LFun (RealN n) (RealN n)
+lZipWith :: (Double -> LFun Double Double) -> Vect n -> LFun (Vect n) (Vect n)
 lZipWith f a = MkLFun $ V.zipWith (lApp . f) a
 
-lZipWith' :: (RealN 1 -> LFun (RealN 1) (RealN 1)) -> RealN n -> LFun (RealN n) (RealN n)
+lZipWith' :: (Scal -> LFun Scal Scal) -> Vect n -> LFun (Vect n) (Vect n)
 lZipWith' f a = MkLFun $ V.zipWith f' a
-    where f' x y = V.index (lApp (f (V.singleton x)) (V.singleton y)) 0
+    where f' x y = lApp (f x) y
 
-lZip :: RealN n -> LFun (RealN n) (Tens (RealN 1) (RealN 1))
+lZip :: Vect n -> LFun (Vect n) (Tens (Scal) (Scal))
 lZip x = MkLFun $ \y -> MkTens $ V.toList $ V.zipWith f x y
-    where f a b = (V.singleton a, V.singleton b)
+    where f a b = (a, b)
 
 -- | Pair two functions
 lPair :: (LT a, LT b, LT c) => LFun a b -> LFun a c -> LFun a (b, c)
@@ -107,11 +110,11 @@ lAdd x = MkLFun $ \y -> x + y
 lProd :: Num a => (a -> LFun a a)
 lProd x = MkLFun $ \y -> x * y
 
-lSum :: LFun (RealN n) (RealN 1)
-lSum = MkLFun $ V.singleton . V.sum
+lSum :: LFun (Vect n) (Scal)
+lSum = MkLFun V.sum
 
-lExpand :: KnownNat n => LFun (RealN 1) (RealN n)
-lExpand = MkLFun $ \a -> V.replicate $ V.index a 0
+lExpand :: KnownNat n => LFun (Scal) (Vect n)
+lExpand = MkLFun $ \a -> V.replicate a
 
 lFst :: LFun (a, b) a
 lFst = MkLFun fst
@@ -128,8 +131,8 @@ lCur f = MkLFun $ tensFoldr f zero
 lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
 lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
 
-lMap :: KnownNat n => RealN n -> LFun (RealN 1 -> RealN 1) (RealN n)
-lMap x = MkLFun $ \g -> V.map (flip V.index 0 . g . V.singleton) x
+lMap :: KnownNat n => Vect n -> LFun (Scal -> Scal) (Vect n)
+lMap x = MkLFun $ \g -> V.map g x
 
 lRec :: LFun (a, b) b -> LFun a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 lRec (MkLFun g) = MkLFun $ lrec g where 
@@ -152,14 +155,16 @@ lIt (MkLFun g) = MkLFun $ lit g where
 -- Forward mode AD type families
 
 type family Df1 a where
-    Df1 (RealN n) = RealN n
+    Df1 Scal      = Scal
+    Df1 (Vect n)  = Vect n
     Df1 (a -> b)  = Df1 a -> (Df1 b, LFun (Df2 a) (Df2 b))
     Df1 (a, b)    = (Df1 a, Df1 b)
     Df1 ()        = ()
     Df1 (Either a b) = Either (Df1 a) (Df1 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
 type family Df2 a where
-    Df2 (RealN n) = RealN n
+    Df2 Scal      = Scal
+    Df2 (Vect n)  = Vect n
     Df2 (a -> b)  = Df1 a -> Df2 b
     Df2 (a, b)    = (Df2 a, Df2 b)
     Df2 ()        = ()
@@ -168,22 +173,24 @@ type family Df2 a where
 -- Reverse mode AD type families
 
 type family Dr1 a where
-    Dr1 (RealN n) = RealN n
+    Dr1 Scal      = Scal
+    Dr1 (Vect n)  = Vect n
     Dr1 (a -> b)  = Dr1 a -> (Dr1 b, LFun (Dr2 b) (Dr2 a))
     Dr1 (a, b)    = (Dr1 a, Dr1 b)
     Dr1 ()        = ()
     Dr1 (Either a b) = Either (Dr1 a) (Dr1 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
 type family Dr2 a where
-    Dr2 (RealN n) = RealN n
+    Dr2 Scal      = Scal
+    Dr2 (Vect n)  = Vect n
     Dr2 (a -> b)  = Tens (Dr1 a) (Dr2 b)
     Dr2 (a, b)    = (Dr2 a, Dr2 b)
     Dr2 ()        = ()
     Dr2 (Either a b) = (Dr2 a, Dr2 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
 data Type a where
-    TDouble :: Type Double
-    TRealN  :: KnownNat n => Proxy n -> Type (RealN n)
+    TScal   :: Type Scal
+    TVect   :: KnownNat n => Proxy n -> Type (Vect n)
     TArrow  :: Type a -> Type b -> Type (a -> b)
     TPair   :: Type a -> Type b -> Type (a, b)
     TUnit   :: Type ()
@@ -194,7 +201,7 @@ data Type a where
 
 
 eqTy :: Type u -> Type v -> Maybe (u :~: v)
-eqTy (TRealN n) (TRealN m) = case sameNat n m of
+eqTy (TVect n) (TVect m) = case sameNat n m of
     Just Refl -> Just Refl
     Nothing   -> Nothing
 eqTy TUnit   TUnit  = Just Refl
@@ -242,16 +249,16 @@ instance (LT a, LT b) => LT (Either a b) where -- EXPERIMENTAL SUPPORT FOR SUM T
     inferType = TEither inferType inferType
     isZero    = error "This should never be used." -- This doesn't make sense.
 
-instance LT Double where
+instance LT Scal where
     zero      = 0
     plus      = (+)
-    inferType = TDouble
+    inferType = TScal
     isZero    = (== 0)
 
-instance KnownNat n => LT (RealN n) where
+instance KnownNat n => LT (Vect n) where
     zero      = V.replicate 0
     plus      = V.zipWith (+)
-    inferType = TRealN (Proxy @n)
+    inferType = TVect (Proxy @n)
     isZero    = (== zero)
 
 instance (LT a, LT b) => LT (a -> b) where

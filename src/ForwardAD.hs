@@ -133,7 +133,7 @@ d2 (SL.CoPair f g) = do -- EXPERIMENTAL SUPPORT FOR SUM TYPES
     d2f <- d2 f
     d2g <- d2 g
     return $ TL.Lambda xVar xType (TL.Case (TL.Var xVar xType)
-                                           (TL.Lambda yVar yType $ TL.LFst `TL.LComp` (d2f `TL.App` TL.Var yVar yType) )
+                                           (TL.Lambda yVar yType $ TL.LFst `TL.LComp` (d2f `TL.App` TL.Var yVar yType) ) -- Note, we could make this more type safe by doing a dynamic check in TL.LFst to make sure the second component is 0. Similar for TL.LSnd below.
                                            (TL.Lambda zVar zType $ TL.LSnd `TL.LComp` (d2g `TL.App` TL.Var zVar zType) ))   -- EXPERIMENTAL SUPPORT FOR SUM TYPES
     where xType = inferType
           yType = inferType
@@ -159,3 +159,43 @@ d2 (SL.Rec t)           = do -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- TH
     where xType = inferType
 d2 (SL.It _)            = do -- EXPERIMENTAL SUPPORT FOR ITERATION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
                           error "This is still wrong! Do something more similar to foldr to work with all of the primals."
+
+
+iter :: ((c, a) -> Either b a) -> (c, a) -> b
+iter f (c, a) = case f (c, a) of
+    Left b -> b
+    Right a' -> iter f (c, a')
+
+iterScan :: ((c, a) -> Either b a) -> (c, a) -> ([a], b)
+iterScan f (c, a) = case f (c, a) of
+    Left b -> ([a], b)
+    Right a' -> let (as, b) = iterScan f (c, a') in (a : as, b)
+
+iterS :: (a -> Either b a) -> a -> b
+iterS f a = case f a of
+    Left b -> b
+    Right a' -> iterS f a'
+
+iterSScan :: (a -> Either b a) -> a -> ([a], b)
+iterSScan f a = case f a of
+    Left b -> ([a], b)
+    Right a' -> let (as, b) = iterSScan f a' in (a : as, b)
+
+fac :: Int -> Int 
+fac n = iterS (\(k, i) -> if k > 0 then Right (k - 1, k * i) else Left i) (n, 1)
+
+facScan :: Int -> ([(Int, Int)], Int)
+facScan n = iterSScan (\(k, i) -> if k > 0 then Right (k - 1, k * i) else Left i) (n, 1)
+
+recurse :: ((a, b) -> b) -> (a -> b)
+recurse phi a = phi (a, recurse phi a)
+
+recurseScan :: ((a, b) -> b) -> (a -> [b])
+recurseScan phi a = phi (a, head $ recurseScan phi a) : recurseScan phi a
+
+fac1 :: Int -> Int 
+fac1 = recurse (\ (r, g) -> \n -> if n > 0 then n * g (n - 1) else r) 1
+
+facScan1 = recurseScan (\ (r, g) -> \n -> if n > 0 then n * g (n - 1) else r) 1
+
+facScan1' n = zipWith (\f x -> f x) facScan1 [0..n]

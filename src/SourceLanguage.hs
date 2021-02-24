@@ -4,10 +4,10 @@
 -- | Definition of the source language
 module SourceLanguage where
 
-import Data.Vector.Unboxed.Sized as V (map, singleton, index)
+import Data.Vector.Unboxed.Sized as V (map, foldr)
 
 import Helper ((&&&))
-import Types (LT, RealN, Df1, Dr1, Df2, Dr2)
+import Types (LT, Vect, Scal, Df1, Dr1, Df2, Dr2)
 import Operation (Operation, evalOp)
 import GHC.TypeNats (KnownNat)
 
@@ -60,7 +60,10 @@ data STerm a b where
           => Operation a b -> STerm a b
     -- | Map
     Map   :: KnownNat n
-          => STerm (RealN 1 -> RealN 1, RealN n) (RealN n)
+          => STerm (Scal -> Scal, Vect n) (Vect n)
+--     -- | Foldr
+    Foldr :: (LT a, KnownNat n)
+          => STerm (((Scal, a) -> a, a), Vect n) a
     Rec   :: ( LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)
              , LT b, LT (Dr1 b), LT (Dr2 b), LT (Df1 b), LT (Df2 b))
           => STerm (a, b) b -> STerm a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
@@ -94,7 +97,8 @@ evalSt  Snd       = snd
 evalSt  Ev        = uncurry ($)
 evalSt (Curry a)  = curry $ evalSt a
 evalSt (Op op)    = evalOp op
-evalSt  Map       = \(f, v) -> V.map (flip index 0 . f . V.singleton) v
+evalSt Map        = \(f, v) -> V.map f v
+evalSt Foldr      = \((f, v), xs) -> V.foldr (\r a -> f (r, a)) v xs
 evalSt (Rec t)    = fix (evalSt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
       where fix f a = f (a, fix f a)
 evalSt Inl        = Left -- EXPERIMENTAL SUPPORT FOR SUM TYPES

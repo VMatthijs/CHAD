@@ -123,11 +123,11 @@ d2 (SL.Curry t)  = do xVar <- gensym
           yType = inferType
 d2 SL.Inl = do
     xVar <- gensym 
-    return $ TL.Lambda xVar xType TL.LFst
+    return $ TL.Lambda xVar xType TL.LFst-- Note, we could make this more type safe by doing a dynamic check in TL.LFst to make sure the second component is 0.
     where xType = inferType -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 d2 SL.Inr = do
     xVar <- gensym 
-    return $ TL.Lambda xVar xType TL.LSnd
+    return $ TL.Lambda xVar xType TL.LSnd-- Note, we could make this more type safe by doing a dynamic check in TL.LSnd to make sure the first component is 0.
     where xType = inferType  -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 d2 (SL.CoPair f g) = do
     xVar <- gensym

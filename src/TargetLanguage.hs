@@ -3,9 +3,9 @@
 -- | Definition of the target language
 module TargetLanguage where
 
-import Data.Vector.Unboxed.Sized as V (map, index, singleton)
+import Data.Vector.Unboxed.Sized as V (map, foldr, scanr, zip, scanl, tail)
 
-import Types as T (lEval,  Type, LFun, Tens, LT(..), RealN
+import Types as T (lEval,  Type, LFun, Tens, LT(..), Vect, Scal
              , eqTy, lComp, lApp, lId, lFst, lSnd, lMap
              , lSwap, singleton, lPair, lCur, lZipWith', lZip
              , lRec, lIt
@@ -33,10 +33,10 @@ data TTerm t where
     Lift   :: a -> Type a -> TTerm a
     -- | Operators
     Op     :: Operation a b -> TTerm a -> TTerm b
-    Map    :: TTerm (RealN 1 -> RealN 1) -> TTerm (RealN n) -> TTerm (RealN n)
+    Map    :: TTerm (Scal -> Scal) -> TTerm (Vect n) -> TTerm (Vect n)
+    Foldr :: (LT a, KnownNat n) => TTerm ((((Scal, a) -> a, a), Vect n) -> a)
 
     -- Target language extension
-
     -- | Linear operation
     LOp       :: LinearOperation a b c -> TTerm (a -> LFun b c)
 
@@ -60,10 +60,12 @@ data TTerm t where
     -- | Tensor-elimination
     LCur      :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun (Tens b c) d)
     -- Map derivatives
-    DMap      :: KnownNat n => TTerm (RealN 1 -> (RealN 1, LFun (RealN 1) (RealN 1)), RealN n)
-              -> TTerm (LFun (RealN 1 -> RealN 1, RealN n) (RealN n))
-    DtMap     :: KnownNat n => TTerm (RealN 1 -> (RealN 1, LFun (RealN 1) (RealN 1)), RealN n)
-              -> TTerm (LFun (RealN n) (Tens (RealN 1) (RealN 1), RealN n))
+    DMap      :: KnownNat n => TTerm (Scal -> (Scal, LFun (Scal) (Scal)), Vect n)
+              -> TTerm (LFun (Scal -> Scal, Vect n) (Vect n))
+    DtMap     :: KnownNat n => TTerm (Scal -> (Scal, LFun (Scal) (Scal)), Vect n)
+              -> TTerm (LFun (Vect n) (Tens (Scal) (Scal), Vect n))
+    DFoldr    :: KnownNat n => TTerm ((((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n) -> LFun (((Scal, a) -> b, b), Vect n) b)
+    DtFoldr   ::KnownNat n => TTerm ((((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n) -> LFun b ((Tens (Scal, a) b, b),  Vect n))
     LRec      :: TTerm (LFun (a, b) b) -> TTerm (LFun a b) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
     LIt       :: (LT a, LT b) => TTerm (LFun b (a, b)) -> TTerm (LFun b a) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
@@ -166,7 +168,8 @@ evalTt (Case p l r)      = case evalTt p of  -- EXPERIMENTAL SUPPORT FOR SUM TYP
     Right q -> evalTt r q
 evalTt (Lift x _)        = x
 evalTt (Op op a)         = evalOp op (evalTt a)
-evalTt (Map f x)         = V.map (flip index 0 . evalTt f . V.singleton) (evalTt x)
+evalTt (Map f x)         = V.map (evalTt f) (evalTt x)
+evalTt Foldr             = \((f, v), xs) -> V.foldr (\r a -> f (r, a)) v xs
 evalTt (Rec t)           = fix (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
     where fix f a = f (a, fix f a)
 evalTt (It t)            = fix (evalTt t) -- EXPERIMENTAL SUPPORT FOR ITERATION
@@ -192,6 +195,7 @@ evalTt (DMap t)      = plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith' (snd . 
     where (f, v) = evalTt t
 evalTt (DtMap t)     = lPair (lZip v) (lZipWith' (snd . f) v)
     where (f, v) = evalTt t
+-- evalTt DFoldr        = \((f, i), v) -> let s = V.scanr (curry (fst . f)) i (V.tail v) in undefined  
 evalTt (LRec t)      = lRec (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 evalTt (LIt t)       = lIt (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 

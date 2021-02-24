@@ -5,27 +5,31 @@
 module Operation where
 
 import Prelude hiding (sum, zipWith, replicate)
-import Data.Vector.Unboxed.Sized (replicate, singleton, sum, zipWith)
+import Data.Vector.Unboxed.Sized (replicate, sum, zipWith)
 import GHC.TypeNats (KnownNat)
 
 
-import Types ( LFun, RealN, lComp, lConst, lDup, lZipWith, lAdd, lUncurry
+import Types ( LFun, Vect, Scal, lComp, lConst, lDup, lZipWith, lAdd, lUncurry
              , lProd, lMapTuple, lPair, lSum, lExpand
              )
 
 
 -- | Possible operators in the source language
 data Operation a b where
-    Constant :: KnownNat n => RealN n -> Operation () (RealN n)
-    EAdd     :: KnownNat n => Operation (RealN n, RealN n) (RealN n)
-    EProd    :: KnownNat n => Operation (RealN n, RealN n) (RealN n)
-    Sum      :: KnownNat n => Operation (RealN n) (RealN 1)
+    Constant :: KnownNat n => Vect n -> Operation () (Vect n)
+    EAdd     :: KnownNat n => Operation (Vect n, Vect n) (Vect n)
+    EProd    :: KnownNat n => Operation (Vect n, Vect n) (Vect n)
+    EScalAdd :: Operation (Scal, Scal) Scal
+    EScalProd :: Operation (Scal, Scal) Scal
+    Sum      :: KnownNat n => Operation (Vect n) Scal
 
 
 showOp :: Operation a b -> String
 showOp (Constant c) = "const(" ++ show c ++ ")"
 showOp  EAdd        = "EAdd"
 showOp  EProd       = "EProd"
+showOp  EScalAdd    = "EAScaldd"
+showOp  EScalProd   = "EScalProd"
 showOp  Sum         = "Sum"
 
 -- | Evaluate an operator
@@ -33,21 +37,25 @@ evalOp :: Operation a b -> a -> b
 evalOp (Constant c) = const c
 evalOp  EAdd        = uncurry $ zipWith (+)
 evalOp  EProd       = uncurry $ zipWith (*)
-evalOp  Sum         = singleton . sum
+evalOp  EScalAdd    = uncurry (+)
+evalOp  EScalProd   = uncurry (*)
+evalOp  Sum         = sum
 
 
 -- | D op and D op^t of the Operators in the source language
 data LinearOperation a b c where
     DConstant  :: KnownNat n
-               => LinearOperation ()                 ()                  (RealN n)
-    DConstantT :: LinearOperation ()                 (RealN n)           ()
-    DEAdd      :: KnownNat n => LinearOperation (RealN n, RealN n) (RealN n, RealN n)  (RealN n)
-    DEAddT     :: KnownNat n => LinearOperation (RealN n, RealN n) (RealN n)           (RealN n, RealN n)
-    DEProd     :: KnownNat n => LinearOperation (RealN n, RealN n) (RealN n, RealN n)  (RealN n)
-    DEProdT    :: KnownNat n => LinearOperation (RealN n, RealN n) (RealN n)           (RealN n, RealN n)
-    DSum       :: KnownNat n => LinearOperation (RealN n)          (RealN n)           (RealN 1)
+               => LinearOperation ()                 ()                  (Vect n)
+    DConstantT :: LinearOperation ()                 (Vect n)           ()
+    DEAdd      :: KnownNat n => LinearOperation (Vect n, Vect n) (Vect n, Vect n)  (Vect n)
+    DEAddT     :: KnownNat n => LinearOperation (Vect n, Vect n) (Vect n)           (Vect n, Vect n)
+    DEProd     :: KnownNat n => LinearOperation (Vect n, Vect n) (Vect n, Vect n)  (Vect n)
+    DEProdT    :: KnownNat n => LinearOperation (Vect n, Vect n) (Vect n)           (Vect n, Vect n)
+    DEScalAdd  :: LinearOperation (Scal, Scal) (Scal, Scal) Scal 
+    DEScalProd :: LinearOperation (Scal, Scal) (Scal, Scal) Scal 
+    DSum       :: KnownNat n => LinearOperation (Vect n)          (Vect n)           Scal
     DSumT      :: KnownNat n
-               => LinearOperation (RealN n)          (RealN 1)           (RealN n)
+               => LinearOperation (Vect n)          Scal           (Vect n)
 
 
 showLOp :: LinearOperation a b c -> String
@@ -57,6 +65,8 @@ showLOp DEAdd       = "DEAdd"
 showLOp DEAddT      = "DEAddT"
 showLOp DEProd      = "DEProd"
 showLOp DEProdT     = "DEProdT"
+showLOp DEScalAdd   = "DEScalAdd"
+showLOp DEScalProd  = "DEScalProd"
 showLOp DSum        = "DSum"
 showLOp DSumT       = "DSumT"
 
@@ -72,6 +82,10 @@ evalLOp DEProd     ( x,  y) = lComp (lMapTuple xDeriv yDeriv) (lUncurry (lZipWit
 evalLOp DEProdT    ( x,  y) = lPair xDeriv yDeriv
     where xDeriv = lZipWith lProd y
           yDeriv = lZipWith lProd x
+evalLOp DEScalAdd (_, _)    = lUncurry lAdd
+evalLOp DEScalProd (x, y)   = lComp (lMapTuple xDeriv yDeriv) (lUncurry lAdd)
+    where xDeriv = lProd y
+          yDeriv = lProd x
 -- Jacobian: 1xn [1, 1, 1, ...]
 evalLOp DSum        _x      = lSum
 evalLOp DSumT       _x      = lExpand
