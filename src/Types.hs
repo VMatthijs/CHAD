@@ -1,34 +1,64 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators          #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 
 -- | Different type definitions used in the language
-module Types (
-    Vect,
-    Scal,
-    LFun, lId, lConst, lDup, lComp, lApp, lEval, lUncurry, lZipWith, lZipWith', lPair,
-          lMapTuple, lAdd, lProd, lSum, lExpand, lPlus, lFst, lSnd,
-          lSwap, lCur, lZip, lMap, lRec, lIt, dFoldr, dtFoldr,
-    Tens, empty, (Types.++), tensFoldr, singleton,
-    Df1, Df2, Dr1, Dr2,
-    Type(..), eqTy,
-    LT(..),
-) where
+module Types
+  ( Vect
+  , Scal
+  , LFun
+  , lId
+  , lConst
+  , lDup
+  , lComp
+  , lApp
+  , lEval
+  , lUncurry
+  , lZipWith
+  , lZipWith'
+  , lPair
+  , lMapTuple
+  , lAdd
+  , lProd
+  , lSum
+  , lExpand
+  , lPlus
+  , lFst
+  , lSnd
+  , lSwap
+  , lCur
+  , lZip
+  , lMap
+  , lRec
+  , lIt
+  , dFoldr
+  , dtFoldr
+  , Tens
+  , empty
+  , (Types.++)
+  , tensFoldr
+  , singleton
+  , Df1
+  , Df2
+  , Dr1
+  , Dr2
+  , Type(..)
+  , eqTy
+  , LT(..)
+  ) where
 
-
-import Data.Proxy (Proxy, Proxy(Proxy))
-import Data.Type.Equality ((:~:)(Refl), (:~:))
-import qualified Data.Vector.Unboxed.Sized as V (
-    Vector, zipWith, sum, replicate, toList, map, prescanr, zip, scanl, foldr, init, last,
-    Unbox
-    )
-import GHC.TypeNats (KnownNat, sameNat)
-
+import           Data.Proxy                (Proxy (Proxy))
+import           Data.Type.Equality        ((:~:) (Refl))
+import qualified Data.Vector.Unboxed.Sized as V (Unbox, Vector, foldr, init,
+                                                 last, map, prescanr, replicate,
+                                                 scanl, sum, toList, zip,
+                                                 zipWith)
+import           GHC.TypeNats              (KnownNat, sameNat)
 
 -- | Real numbers
 type Scal = Double
@@ -37,12 +67,16 @@ type Scal = Double
 type Vect n = V.Vector n Double
 
 -- | Tensor products
-newtype Tens a b = MkTens [(a, b)]
+newtype Tens a b =
+  MkTens [(a, b)]
+
 -- | Linear function
-newtype LFun a b = MkLFun {getFun :: a -> b}
+newtype LFun a b =
+  MkLFun
+    { getFun :: a -> b
+    }
 
 -- Methods for tensor products
-
 -- | Empty tensor product
 empty :: Tens a b
 empty = MkTens []
@@ -57,7 +91,6 @@ singleton :: a -> LFun b (Tens a b)
 singleton t = MkLFun $ \x -> MkTens [(t, x)]
 
 -- Methods for linear functions
-
 lId :: LFun a a
 lId = MkLFun id
 
@@ -86,18 +119,24 @@ lZipWith f a = MkLFun $ V.zipWith (lApp . f) a
 
 lZipWith' :: (Scal -> LFun Scal Scal) -> Vect n -> LFun (Vect n) (Vect n)
 lZipWith' f a = MkLFun $ V.zipWith f' a
-    where f' x y = lApp (f x) y
+  where
+    f' x y = lApp (f x) y
 
 lZip :: Vect n -> LFun (Vect n) (Tens (Scal) (Scal))
 lZip x = MkLFun $ \y -> MkTens $ V.toList $ V.zipWith f x y
-    where f a b = (a, b)
+  where
+    f a b = (a, b)
 
 -- | Pair two functions
 lPair :: (LT a, LT b, LT c) => LFun a b -> LFun a c -> LFun a (b, c)
 lPair a b = MkLFun $ \x -> (lApp a x, lApp b x)
 
 -- | Map a tuple
-lMapTuple :: (LT a, LT a', LT b, LT b') => LFun a a' -> LFun b b' -> LFun (a, b) (a', b')
+lMapTuple ::
+     (LT a, LT a', LT b, LT b')
+  => LFun a a'
+  -> LFun b b'
+  -> LFun (a, b) (a', b')
 lMapTuple f g = MkLFun $ \(a, b) -> (lApp f a, lApp g b)
 
 -- | Addition linear in second argument
@@ -132,154 +171,164 @@ lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
 lMap :: KnownNat n => Vect n -> LFun (Scal -> Scal) (Vect n)
 lMap x = MkLFun $ \g -> V.map g x
 
-dFoldr :: (KnownNat n, V.Unbox a, V.Unbox b, LT b) => (((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n) -> LFun (((Scal, a) -> b, b), Vect n) b
-dFoldr ((f, i), v) = MkLFun $ \((f', i'), v') -> 
+dFoldr ::
+     (KnownNat n, V.Unbox a, V.Unbox b, LT b)
+  => (((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n)
+  -> LFun (((Scal, a) -> b, b), Vect n) b
+dFoldr ((f, i), v) =
+  MkLFun $ \((f', i'), v') ->
     let s = V.prescanr (curry (fst . f)) i v
         vvps = V.zip v (V.zip v' s)
-        g (vi, (vpi, si)) acc = getFun (snd (f (vi, si))) (vpi, f' (vi, si) `plus` acc) in
-        V.foldr g i' vvps
+        g (vi, (vpi, si)) acc =
+          getFun (snd (f (vi, si))) (vpi, f' (vi, si) `plus` acc)
+     in V.foldr g i' vvps
 
-dtFoldr :: (V.Unbox a, V.Unbox b) => (((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n) -> LFun b ((Tens (Scal, a) b, b),  Vect n)
-dtFoldr ((f, i), v) = MkLFun $ \w ->
+dtFoldr ::
+     (V.Unbox a, V.Unbox b)
+  => (((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n)
+  -> LFun b ((Tens (Scal, a) b, b), Vect n)
+dtFoldr ((f, i), v) =
+  MkLFun $ \w ->
     let s = V.prescanr (curry (fst . f)) i v
         vs = V.zip v s
         svs = V.scanl (flip $ curry (snd . uncurry (getFun . snd . f))) w vs
-        vssvs = V.zip vs (V.init svs) in
-        ((MkTens (V.toList vssvs), V.last svs), V.map (fst . uncurry (getFun . snd . f)) vssvs)
+        vssvs = V.zip vs (V.init svs)
+     in ( (MkTens (V.toList vssvs), V.last svs)
+        , V.map (fst . uncurry (getFun . snd . f)) vssvs)
 
 lRec :: LFun (a, b) b -> LFun a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-lRec (MkLFun g) = MkLFun $ lrec g where 
+lRec (MkLFun g) = MkLFun $ lrec g
+  where
     lrec f a = f (a, lrec f a)
 
 lIt :: (LT a, LT b) => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-lIt (MkLFun g) = MkLFun $ lit g where 
-    lit f b = let (a, b') = f b in plus a (MkLFun (lit f) `lApp` b') --- AARGH. THIS IS PROBLEMATIC AS IT'LL NEVER TERMINATE, SEEING THAT plus IS STRICT IN BOTH ARGUMENTS
+lIt (MkLFun g) = MkLFun $ lit g
+  where
+    lit f b =
+      let (a, b') = f b
+       in plus a (MkLFun (lit f) `lApp` b') --- AARGH. THIS IS PROBLEMATIC AS IT'LL NEVER TERMINATE, SEEING THAT plus IS STRICT IN BOTH ARGUMENTS
+
 -- CAN WE MAKE THIS THING TERMINATE UNDER ANY CIRCUMSTANCES? E.G. FIRST ORDER b SO WE CAN CHECK WHETHER THEY ARE 0? (IMPLEMENT TYPE CLASS FOR THIS)
 -- SIMILAR IDEA: CAN WE IMPLEMENT ONE FOR ALL TYPES IN THE HIERARCHY? THEN, WE CAN ALSO CHECK WHETHER LINEAR FUNCTIONS ARE ZERO.
 -- YES, SO WE SHOULD JUST CHECK WHETHER b' IS 0 AND THEN JUST RETURN a.
 -- THE REAL PROBLEM IS THAT + IS STRICT IN BOTH ARGUMENTS, SO THE CONDITIONS FOR DEFINING ITERATION AS A FIXPOINT ARE PROBABLY NOT MET.
 -- UNLESS THAT FIXPOINT IS BOT
--- AH! What we really need is to enforce in some way that linear function application is really linear in the sense that 
--- f(0) = 0 even if f=bot. 
+-- AH! What we really need is to enforce in some way that linear function application is really linear in the sense that
+-- f(0) = 0 even if f=bot.
 -- So linear function application is going to be lazy in the function argument.
 -- Of course,this will be a bit hard to achieve at arbitrary types, as we cannot compare for equality.
 -- However, perhaps we can do it for all the types that we will need for reverse AD, using some type class? Yes!
-
 -- Forward mode AD type families
-
 type family Df1 a where
-    Df1 Scal      = Scal
-    Df1 (Vect n)  = Vect n
-    Df1 (a -> b)  = Df1 a -> (Df1 b, LFun (Df2 a) (Df2 b))
-    Df1 (a, b)    = (Df1 a, Df1 b)
-    Df1 ()        = ()
-    Df1 (Either a b) = Either (Df1 a) (Df1 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  Df1 Scal = Scal
+  Df1 (Vect n) = Vect n
+  Df1 (a -> b) = Df1 a -> (Df1 b, LFun (Df2 a) (Df2 b))
+  Df1 (a, b) = (Df1 a, Df1 b)
+  Df1 () = ()
+  Df1 (Either a b) = Either (Df1 a) (Df1 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
 type family Df2 a where
-    Df2 Scal      = Scal
-    Df2 (Vect n)  = Vect n
-    Df2 (a -> b)  = Df1 a -> Df2 b
-    Df2 (a, b)    = (Df2 a, Df2 b)
-    Df2 ()        = ()
-    Df2 (Either a b) = (Df2 a, Df2 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  Df2 Scal = Scal
+  Df2 (Vect n) = Vect n
+  Df2 (a -> b) = Df1 a -> Df2 b
+  Df2 (a, b) = (Df2 a, Df2 b)
+  Df2 () = ()
+  Df2 (Either a b) = (Df2 a, Df2 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
 -- Reverse mode AD type families
-
 type family Dr1 a where
-    Dr1 Scal      = Scal
-    Dr1 (Vect n)  = Vect n
-    Dr1 (a -> b)  = Dr1 a -> (Dr1 b, LFun (Dr2 b) (Dr2 a))
-    Dr1 (a, b)    = (Dr1 a, Dr1 b)
-    Dr1 ()        = ()
-    Dr1 (Either a b) = Either (Dr1 a) (Dr1 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  Dr1 Scal = Scal
+  Dr1 (Vect n) = Vect n
+  Dr1 (a -> b) = Dr1 a -> (Dr1 b, LFun (Dr2 b) (Dr2 a))
+  Dr1 (a, b) = (Dr1 a, Dr1 b)
+  Dr1 () = ()
+  Dr1 (Either a b) = Either (Dr1 a) (Dr1 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
 type family Dr2 a where
-    Dr2 Scal      = Scal
-    Dr2 (Vect n)  = Vect n
-    Dr2 (a -> b)  = Tens (Dr1 a) (Dr2 b)
-    Dr2 (a, b)    = (Dr2 a, Dr2 b)
-    Dr2 ()        = ()
-    Dr2 (Either a b) = (Dr2 a, Dr2 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  Dr2 Scal = Scal
+  Dr2 (Vect n) = Vect n
+  Dr2 (a -> b) = Tens (Dr1 a) (Dr2 b)
+  Dr2 (a, b) = (Dr2 a, Dr2 b)
+  Dr2 () = ()
+  Dr2 (Either a b) = (Dr2 a, Dr2 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
 
 data Type a where
-    TScal   :: Type Scal
-    TVect   :: KnownNat n => Proxy n -> Type (Vect n)
-    TArrow  :: Type a -> Type b -> Type (a -> b)
-    TPair   :: Type a -> Type b -> Type (a, b)
-    TUnit   :: Type ()
-    TEither :: Type a -> Type b -> Type (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-
-    TLinFun :: Type a -> Type b -> Type (LFun a b)
-    TTens   :: Type a -> Type b -> Type (Tens a b)
-
+  TScal :: Type Scal
+  TVect :: KnownNat n => Proxy n -> Type (Vect n)
+  TArrow :: Type a -> Type b -> Type (a -> b)
+  TPair :: Type a -> Type b -> Type (a, b)
+  TUnit :: Type ()
+  TEither :: Type a -> Type b -> Type (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  TLinFun :: Type a -> Type b -> Type (LFun a b)
+  TTens :: Type a -> Type b -> Type (Tens a b)
 
 eqTy :: Type u -> Type v -> Maybe (u :~: v)
-eqTy (TVect n) (TVect m) = case sameNat n m of
+eqTy (TVect n) (TVect m) =
+  case sameNat n m of
     Just Refl -> Just Refl
     Nothing   -> Nothing
-eqTy TUnit   TUnit  = Just Refl
-eqTy (TArrow  u1 u2) (TArrow  v1 v2) =
-    do Refl <- eqTy u1 v1
-       Refl <- eqTy u2 v2
-       return Refl
-eqTy (TPair   u1 u2) (TPair   v1 v2) =
-    do Refl <- eqTy u1 v1
-       Refl <- eqTy u2 v2
-       return Refl
-eqTy (TLinFun u1 u2) (TLinFun v1 v2) =
-    do Refl <- eqTy u1 v1
-       Refl <- eqTy u2 v2
-       return Refl
-eqTy (TTens u1 u2) (TTens v1 v2) =
-    do Refl <- eqTy u1 v1
-       Refl <- eqTy u2 v2
-       return Refl
+eqTy TUnit TUnit = Just Refl
+eqTy (TArrow u1 u2) (TArrow v1 v2) = do
+  Refl <- eqTy u1 v1
+  Refl <- eqTy u2 v2
+  return Refl
+eqTy (TPair u1 u2) (TPair v1 v2) = do
+  Refl <- eqTy u1 v1
+  Refl <- eqTy u2 v2
+  return Refl
+eqTy (TLinFun u1 u2) (TLinFun v1 v2) = do
+  Refl <- eqTy u1 v1
+  Refl <- eqTy u2 v2
+  return Refl
+eqTy (TTens u1 u2) (TTens v1 v2) = do
+  Refl <- eqTy u1 v1
+  Refl <- eqTy u2 v2
+  return Refl
 eqTy _ _ = Nothing
-
 
 -- | Operators defined over multiple language types
 class LT a where
-    zero      :: a
-    plus      :: a -> a -> a
-    inferType :: Type a
+  zero :: a
+  plus :: a -> a -> a
+  inferType :: Type a
 
 instance LT () where
-    zero      = ()
-    plus _ _  = ()
-    inferType = TUnit
+  zero = ()
+  plus _ _ = ()
+  inferType = TUnit
 
 instance (LT a, LT b) => LT (a, b) where
-    zero          = (zero, zero)
-    plus a b      = (fst a `plus` fst b, snd a `plus` snd b)
-    inferType     = TPair inferType inferType
+  zero = (zero, zero)
+  plus a b = (fst a `plus` fst b, snd a `plus` snd b)
+  inferType = TPair inferType inferType
 
-instance (LT a, LT b) => LT (Either a b) where -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-    zero      = error "This should never be used." -- This doesn't make sense.
-    plus      = error "This should never be used." -- This doesn't make sense.
-    inferType = TEither inferType inferType
+instance (LT a, LT b) => LT (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+                                                                               where
+  zero = error "This should never be used." -- This doesn't make sense.
+  plus = error "This should never be used." -- This doesn't make sense.
+  inferType = TEither inferType inferType
 
 instance LT Scal where
-    zero      = 0
-    plus      = (+)
-    inferType = TScal
+  zero = 0
+  plus = (+)
+  inferType = TScal
 
 instance KnownNat n => LT (Vect n) where
-    zero      = V.replicate 0
-    plus      = V.zipWith (+)
-    inferType = TVect (Proxy @n)
+  zero = V.replicate 0
+  plus = V.zipWith (+)
+  inferType = TVect (Proxy @n)
 
 instance (LT a, LT b) => LT (a -> b) where
-    zero      = const zero
-    plus f g  = \x -> plus (f x) (g x)
-    inferType = TArrow inferType inferType
+  zero = const zero
+  plus f g = \x -> plus (f x) (g x)
+  inferType = TArrow inferType inferType
 
 instance (LT a, LT b) => LT (Tens a b) where
-    zero      = empty
-    plus      = (Types.++)
-    inferType = TTens inferType inferType
-
+  zero = empty
+  plus = (Types.++)
+  inferType = TTens inferType inferType
 
 instance (LT a, LT b) => LT (LFun a b) where
-    zero      = lConst zero
-    plus      = lPlus
-    inferType = TLinFun inferType inferType
+  zero = lConst zero
+  plus = lPlus
+  inferType = TLinFun inferType inferType
