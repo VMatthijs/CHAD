@@ -38,6 +38,7 @@ data TTerm t
     -> TTerm c -- EXPERIMENTAL SUPPORT FOR SUM TYPES
   It :: TTerm ((a, b) -> Either c b) -> TTerm ((a, b) -> c) -- EXPERIMENTAL SUPPORT FOR ITERATION
   Rec :: TTerm ((a, b) -> b) -> TTerm (a -> b) -- EXPERIMENTAL SUPPORT FOR RECURSION (Should we work with a representation that is variable binding instead?)
+  Sign :: TTerm Scal -> TTerm (Either () ())
   Lift :: a -> Type a -> TTerm a
     -- | Operators
   Op :: Operation a b -> TTerm a -> TTerm b
@@ -113,7 +114,10 @@ subst x v u (Var y t)
   | x == y =
     case eqTy u t of
       Just Refl -> Lift v u
-      Nothing   -> error ("Ill-typed substitution. Tried to match type " ++ show u ++ " with " ++ show t)
+      Nothing ->
+        error
+          ("Ill-typed substitution. Tried to match type " ++
+           show u ++ " with " ++ show t)
   | otherwise = Var y t
 subst x v u (Lambda y t e)
   | x == y = Lambda y t e
@@ -133,6 +137,7 @@ subst x v u (Case t l r) = Case (subst x v u t) (subst x v u l) (subst x v u r) 
 -- Target language extension
 subst x v u (Rec t) = Rec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 subst x v u (It t) = It (subst x v u t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+subst x v u (Sign t) = Sign (subst x v u t)
 subst _ _ _ LId = LId
 subst x v u (LComp f g) = LComp (subst x v u f) (subst x v u g)
 subst x v u (LApp f a) = LApp (subst x v u f) (subst x v u a)
@@ -159,7 +164,10 @@ substTt x v u (Var y t)
   | x == y =
     case eqTy u t of
       Just Refl -> v
-      Nothing   -> error ("Ill-typed substitution. Tried to match type " ++ show u ++ " with " ++ show t)
+      Nothing ->
+        error
+          ("Ill-typed substitution. Tried to match type " ++
+           show u ++ " with " ++ show t)
   | otherwise = Var y t
 substTt x v u (Lambda y t e)
   | x == y = Lambda y t e
@@ -179,6 +187,7 @@ substTt x v u (Map f y) = Map (substTt x v u f) (substTt x v u y)
 substTt _ _ _ Foldr = Foldr
 substTt x v u (Rec t) = Rec (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 substTt x v u (It t) = It (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+substTt x v u (Sign t) = Sign (substTt x v u t)
 -- Target language extension
 substTt _ _ _ LId = LId
 substTt x v u (LComp f g) = LComp (substTt x v u f) (substTt x v u g)
@@ -230,6 +239,13 @@ evalTt (It t) = fix (evalTt t) -- EXPERIMENTAL SUPPORT FOR ITERATION
       case f (a, b) of
         Left c   -> c
         Right b' -> fix f (a, b')
+evalTt (Sign t) =
+  let r = evalTt t
+   in if r < 0
+        then Left ()
+        else if r > 0
+               then Right ()
+               else undefined
 -- Target language extension
 evalTt (LOp lop) = evalLOp lop
 evalTt LId = lId
@@ -278,6 +294,7 @@ printTt (Map f a) = "map (" ++ printTt f ++ ") " ++ printTt a
 printTt Foldr = "foldr"
 printTt (Rec t) = "rec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 printTt (It t) = "it(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
+printTt (Sign t) = "sign(" ++ printTt t ++ ")"
 -- Target language extension
 printTt (LOp lop) = "evalLOp " ++ showLOp lop
 printTt LId = "lid"
@@ -299,5 +316,5 @@ printTt (DtMap t) = "DtMap(" ++ printTt t ++ ")"
 printTt (DIt d1t d2t) = "DIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
 printTt (DtIt d1t d2t) = "DtIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
 
-instance Show (TTerm a) where 
+instance Show (TTerm a) where
   show = printTt

@@ -10,9 +10,10 @@ import           GHC.TypeNats              (KnownNat)
 import           Prelude                   hiding (sum, zipWith)
 
 import           Types                     (LFun, LT, Scal, Vect, lAdd, lComp,
-                                            lConst, lDup, lExpand, lMapTuple,
-                                            lPair, lProd, lSum, lUncurry,
-                                            lZipWith, zero)
+                                            lConst, lDup, lExpand, lId,
+                                            lMapTuple, lNegate, lPair, lProd,
+                                            lSubt, lSum, lUncurry, lZipWith,
+                                            zero)
 
 -- | Possible operators in the source language
 data Operation a b where
@@ -20,6 +21,7 @@ data Operation a b where
   EAdd :: KnownNat n => Operation (Vect n, Vect n) (Vect n)
   EProd :: KnownNat n => Operation (Vect n, Vect n) (Vect n)
   EScalAdd :: Operation (Scal, Scal) Scal
+  EScalSubt :: Operation (Scal, Scal) Scal
   EScalProd :: Operation (Scal, Scal) Scal
   Sum :: KnownNat n => Operation (Vect n) Scal
 
@@ -28,6 +30,7 @@ showOp (Constant c) = "const(" ++ show c ++ ")"
 showOp EAdd         = "EAdd"
 showOp EProd        = "EProd"
 showOp EScalAdd     = "EScalAdd"
+showOp EScalSubt    = "EScalSubt"
 showOp EScalProd    = "EScalProd"
 showOp Sum          = "Sum"
 
@@ -37,6 +40,7 @@ evalOp (Constant c) = const c
 evalOp EAdd         = uncurry $ zipWith (+)
 evalOp EProd        = uncurry $ zipWith (*)
 evalOp EScalAdd     = uncurry (+)
+evalOp EScalSubt    = uncurry (-)
 evalOp EScalProd    = uncurry (*)
 evalOp Sum          = sum
 
@@ -54,6 +58,8 @@ data LinearOperation a b c where
     :: KnownNat n => LinearOperation (Vect n, Vect n) (Vect n) (Vect n, Vect n)
   DEScalAdd :: LinearOperation (Scal, Scal) (Scal, Scal) Scal
   DEScalAddT :: LinearOperation (Scal, Scal) Scal (Scal, Scal)
+  DEScalSubt :: LinearOperation (Scal, Scal) (Scal, Scal) Scal
+  DEScalSubtT :: LinearOperation (Scal, Scal) Scal (Scal, Scal)
   DEScalProd :: LinearOperation (Scal, Scal) (Scal, Scal) Scal
   DEScalProdT :: LinearOperation (Scal, Scal) Scal (Scal, Scal)
   DSum :: KnownNat n => LinearOperation (Vect n) (Vect n) Scal
@@ -68,6 +74,8 @@ showLOp DEProd      = "DEProd"
 showLOp DEProdT     = "DEProdT"
 showLOp DEScalAdd   = "DEScalAdd"
 showLOp DEScalAddT  = "DEScalAddT"
+showLOp DEScalSubt  = "DEScalSubt"
+showLOp DEScalSubtT = "DEScalSubtT"
 showLOp DEScalProd  = "DEScalProd"
 showLOp DEScalProdT = "DEScalProdT"
 showLOp DSum        = "DSum"
@@ -90,6 +98,8 @@ evalLOp DEProdT (x, y) = lPair xDeriv yDeriv
     yDeriv = lZipWith lProd x
 evalLOp DEScalAdd (_, _) = lUncurry lAdd
 evalLOp DEScalAddT (_, _) = lDup
+evalLOp DEScalSubt (_, _) = lUncurry lSubt
+evalLOp DEScalSubtT (_, _) = lPair lId lNegate
 evalLOp DEScalProd (x, y) = lComp (lMapTuple xDeriv yDeriv) (lUncurry lAdd)
   where
     xDeriv = lProd y

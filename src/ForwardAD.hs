@@ -123,6 +123,10 @@ d1 (SL.Rec t) = do
 d1 (SL.It t) = do
   d1t <- d1 t -- EXPERIMENTAL SUPPORT FOR ITERATION
   return $ TL.It d1t
+d1 SL.Sign = do
+  xVar <- gensym
+  let xType = inferType
+  return $ TL.Lambda xVar xType (TL.Sign (TL.Var xVar xType))
 
 d2 :: SL.STerm a b -> State Integer (TL.TTerm (Df1 a -> LFun (Df2 a) (Df2 b)))
 d2 SL.Id = return $ TL.Lambda "_" inferType TL.LId
@@ -217,6 +221,7 @@ d2 (SL.Op (Constant _)) = return $ TL.LOp DConstant
 d2 (SL.Op EAdd) = return $ TL.LOp DEAdd
 d2 (SL.Op EProd) = return $ TL.LOp DEProd
 d2 (SL.Op EScalAdd) = return $ TL.LOp DEScalAdd
+d2 (SL.Op EScalSubt) = return $ TL.LOp DEScalSubt
 d2 (SL.Op EScalProd) = return $ TL.LOp DEScalProd
 d2 (SL.Op Sum) = return $ TL.LOp DSum
 d2 (SL.Rec _) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
@@ -226,3 +231,7 @@ d2 (SL.It t) -- EXPERIMENTAL SUPPORT FOR ITERATION
   d1t <- d1 t
   d2t <- d2 t
   return $ TL.DIt d1t d2t
+d2 SL.Sign = do
+  xVar <- gensym
+  let xType = inferType
+  return $ TL.Lambda xVar xType TL.Zero

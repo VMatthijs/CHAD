@@ -234,6 +234,7 @@ data STerm a b
        )
     => STerm (a, b) (Either c b)
     -> STerm (a, b) c
+  Sign :: STerm Scal (Either () ())
 
 --     -- | Foldr
 -- | Evaluate the source language
@@ -266,3 +267,4 @@ evalSt (It t) = fix (evalSt t) -- EXPERIMENTAL SUPPORT FOR ITERATION
       case f (a, b) of
         Left c   -> c
         Right b' -> fix f (a, b')
+evalSt Sign = \r -> if r < 0 then Left () else if r > 0 then Right () else undefined 

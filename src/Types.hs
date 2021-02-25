@@ -14,6 +14,7 @@ module Types
   , Scal
   , LFun
   , lId
+  , lNegate
   , lConst
   , lDup
   , lComp
@@ -25,6 +26,7 @@ module Types
   , lPair
   , lMapTuple
   , lAdd
+  , lSubt
   , lProd
   , lSum
   , lExpand
@@ -93,6 +95,9 @@ singleton t = MkLFun $ \x -> MkTens [(t, x)]
 lId :: LFun a a
 lId = MkLFun id
 
+lNegate :: LFun Scal Scal
+lNegate = MkLFun (\x -> -x)
+
 lConst :: b -> LFun a b
 lConst x = MkLFun $ const x
 
@@ -141,6 +146,10 @@ lMapTuple f g = MkLFun $ \(a, b) -> (lApp f a, lApp g b)
 -- | Addition linear in second argument
 lAdd :: Num a => (a -> LFun a a)
 lAdd x = MkLFun $ \y -> x + y
+
+-- | Subtraction linear in second argument
+lSubt :: Num a => (a -> LFun a a)
+lSubt x = MkLFun $ \y -> x - y
 
 -- | Multiplication linear in second argument
 lProd :: Num a => (a -> LFun a a)

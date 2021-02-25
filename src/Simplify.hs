@@ -29,6 +29,7 @@ simplifyTTerm (Map f a) = Map (simplifyTTerm f) (simplifyTTerm a)
 simplifyTTerm Foldr = Foldr
 simplifyTTerm (Rec t) = Rec (simplifyTTerm t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 simplifyTTerm (It t) = It (simplifyTTerm t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+simplifyTTerm (Sign t) = Sign (simplifyTTerm t)
 -- Target language extension
 simplifyTTerm LId = LId
 simplifyTTerm (LComp f g) = simplifyLComp (simplifyTTerm f) (simplifyTTerm g)
@@ -135,6 +136,7 @@ usesOf x t (Map f y) = usesOf x t f + usesOf x t y
 usesOf _ _ Foldr = 0
 usesOf x t (Rec s) = usesOf x t s -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 usesOf x t (It s) = usesOf x t s -- EXPERIMENTAL SUPPORT FOR ITERATION
+usesOf x t (Sign s) = usesOf x t s
 usesOf _ _ LId = 0
 usesOf x t (LComp f g) = usesOf x t f + usesOf x t g
 usesOf x t (LApp f a) = usesOf x t f + usesOf x t a
