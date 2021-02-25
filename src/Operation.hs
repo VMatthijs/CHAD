@@ -9,10 +9,10 @@ import           Data.Vector.Unboxed.Sized (sum, zipWith)
 import           GHC.TypeNats              (KnownNat)
 import           Prelude                   hiding (sum, zipWith)
 
-import           Types                     (LFun, Scal, Vect, lAdd, lComp,
+import           Types                     (LFun, LT, Scal, Vect, lAdd, lComp,
                                             lConst, lDup, lExpand, lMapTuple,
                                             lPair, lProd, lSum, lUncurry,
-                                            lZipWith, LT, zero)
+                                            lZipWith, zero)
 
 -- | Possible operators in the source language
 data Operation a b where

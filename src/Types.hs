@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
+{-# LANGUAGE StandaloneDeriving     #-}
 
 -- | Different type definitions used in the language
 module Types
@@ -166,6 +167,15 @@ lCur f = MkLFun $ tensFoldr f zero
 lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
 lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
 
+lMinus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
+lMinus (MkLFun f) (MkLFun g) = MkLFun $ \x -> minus (f x) (g x)
+
+lScalProd :: (LT b) => Scal -> LFun a b -> LFun a b
+lScalProd r (MkLFun g) = MkLFun $ \x -> scalProd r (g x)
+
+lScalDiv :: (LT b) => LFun a b -> Scal -> LFun a b
+lScalDiv (MkLFun g) r = MkLFun $ \x -> scalDiv (g x) r
+
 lMap :: KnownNat n => Vect n -> LFun (Scal -> Scal) (Vect n)
 lMap x = MkLFun $ \g -> V.map g x
 
@@ -288,6 +298,8 @@ data Type a where
   TLinFun :: Type a -> Type b -> Type (LFun a b)
   TTens :: Type a -> Type b -> Type (Tens a b)
 
+deriving instance Show (Type a)
+
 eqTy :: Type u -> Type v -> Maybe (u :~: v)
 eqTy (TVect n) (TVect m) =
   case sameNat n m of
@@ -310,52 +322,83 @@ eqTy (TTens u1 u2) (TTens v1 v2) = do
   Refl <- eqTy u1 v1
   Refl <- eqTy u2 v2
   return Refl
+eqTy TScal TScal = return Refl
+eqTy (TEither u1 u2) (TEither v1 v2) = do
+  Refl <- eqTy u1 v1
+  Refl <- eqTy u2 v2
+  return Refl
 eqTy _ _ = Nothing
 
 -- | Operators defined over multiple language types
 class LT a where
-  zero :: a
-  plus :: a -> a -> a
-  inferType :: Type a
+  zero :: a -- For automatic differentiation
+  plus :: a -> a -> a -- For automatic differentiation
+  inferType :: Type a -- For interpreter of target language
+  scalProd :: Scal -> a -> a -- For finite differencing
+  scalDiv :: a -> Scal -> a -- For finite differencing
+  minus :: a -> a -> a -- For finite differencing
 
 instance LT () where
   zero = ()
   plus _ _ = ()
   inferType = TUnit
+  scalProd _ _ = ()
+  scalDiv _ _ = ()
+  minus _ _ = ()
 
 instance (LT a, LT b) => LT (a, b) where
   zero = (zero, zero)
   plus a b = (fst a `plus` fst b, snd a `plus` snd b)
   inferType = TPair inferType inferType
+  scalProd r a = (scalProd r (fst a), scalProd r (snd a))
+  scalDiv a r = (scalDiv (fst a) r, scalDiv (snd a) r)
+  minus a b = (fst a `minus` fst b, snd a `minus` snd b)
 
 instance (LT a, LT b) => LT (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
                                                                                where
   zero = error "This should never be used." -- This doesn't make sense.
   plus = error "This should never be used." -- This doesn't make sense.
   inferType = TEither inferType inferType
+  scalProd = error "This should never be used." -- This doesn't make sense.
+  scalDiv = error "This should never be used." -- This doesn't make sense.
+  minus = error "This should never be used." -- This doesn't make sense.
 
 instance LT Scal where
   zero = 0
   plus = (+)
   inferType = TScal
+  scalProd = (*)
+  scalDiv = (/)
+  minus = (-)
 
 instance KnownNat n => LT (Vect n) where
   zero = V.replicate 0
   plus = V.zipWith (+)
   inferType = TVect (Proxy @n)
+  scalProd r = V.map (* r)
+  scalDiv v r = V.map (/ r) v
+  minus = V.zipWith (-)
 
 instance (LT a, LT b) => LT (a -> b) where
   zero = const zero
   plus f g = \x -> plus (f x) (g x)
   inferType = TArrow inferType inferType
+  scalProd r f = \x -> scalProd r (f x)
+  scalDiv f r = \x -> scalDiv (f x) r
+  minus f g = \x -> minus (f x) (g x)
 
 instance (LT a, LT b) => LT (Tens a b) where
   zero = empty
   plus = (Types.++)
   inferType = TTens inferType inferType
+  scalProd = error "This should never be used." -- This doesn't make sense.
+  scalDiv = error "This should never be used." -- This doesn't make sense.
+  minus = error "This should never be used." -- This doesn't make sense.
 
 instance (LT a, LT b) => LT (LFun a b) where
   zero = lConst zero
   plus = lPlus
   inferType = TLinFun inferType inferType
-
+  scalProd = lScalProd
+  scalDiv = lScalDiv
+  minus = lMinus

@@ -113,7 +113,7 @@ subst x v u (Var y t)
   | x == y =
     case eqTy u t of
       Just Refl -> Lift v u
-      Nothing   -> error "ill-typed substitution"
+      Nothing   -> error ("Ill-typed substitution. Tried to match type " ++ show u ++ " with " ++ show t)
   | otherwise = Var y t
 subst x v u (Lambda y t e)
   | x == y = Lambda y t e
@@ -159,7 +159,7 @@ substTt x v u (Var y t)
   | x == y =
     case eqTy u t of
       Just Refl -> v
-      Nothing   -> error "ill-typed substitution"
+      Nothing   -> error ("Ill-typed substitution. Tried to match type " ++ show u ++ " with " ++ show t)
   | otherwise = Var y t
 substTt x v u (Lambda y t e)
   | x == y = Lambda y t e
@@ -298,3 +298,6 @@ printTt DtFoldr = "DtFoldr"
 printTt (DtMap t) = "DtMap(" ++ printTt t ++ ")"
 printTt (DIt d1t d2t) = "DIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
 printTt (DtIt d1t d2t) = "DtIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
+
+instance Show (TTerm a) where 
+  show = printTt
