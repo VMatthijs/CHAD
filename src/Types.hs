@@ -358,3 +358,4 @@ instance (LT a, LT b) => LT (LFun a b) where
   zero = lConst zero
   plus = lPlus
   inferType = TLinFun inferType inferType
+
