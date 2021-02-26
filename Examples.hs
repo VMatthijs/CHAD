@@ -367,3 +367,9 @@ fact2' = SL.evalSt fact2
 
 fwdFinDiffFact2 :: Scal -> Scal -> Scal 
 fwdFinDiffFact2 = evalFwdFinDiff fact2
+
+fwdDerFact2 :: Scal -> Scal -> Scal -- OK!
+fwdDerFact2 = evalFwdDerivative fact2
+
+revDerFact2 :: Scal -> Scal -> Scal -- OK!
+revDerFact2 = evalRevDerivative fact2

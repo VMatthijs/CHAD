@@ -224,8 +224,13 @@ d2 (SL.Op EScalAdd) = return $ TL.LOp DEScalAdd
 d2 (SL.Op EScalSubt) = return $ TL.LOp DEScalSubt
 d2 (SL.Op EScalProd) = return $ TL.LOp DEScalProd
 d2 (SL.Op Sum) = return $ TL.LOp DSum
-d2 (SL.Rec _) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS IS WRONG: THREAD THROUGH THE CORRECT LIST OF PRIMALS
- = error "This is not yet implemented."
+d2 (SL.Rec t)           = do -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS IS PROBABLY WRONG
+    d1t <- d1 t 
+    d2t <- d2 t 
+    x <- gensym
+    let body = d2t `TL.App` TL.Pair (TL.Var x xType) ((TL.Rec d1t) `TL.App` (TL.Var x xType))
+    return $ TL.Lambda x xType $ TL.LRec $ body
+    where xType = inferType
 d2 (SL.It t) -- EXPERIMENTAL SUPPORT FOR ITERATION
  = do
   d1t <- d1 t

@@ -15,7 +15,7 @@ import           Types                     as T (LFun, LT (..), Scal, Tens,
                                                  dtFoldr, dtIt, eqTy, lApp,
                                                  lComp, lCur, lEval, lFst, lId,
                                                  lMap, lPair, lSnd, lSwap, lZip,
-                                                 lZipWith', singleton)
+                                                 lZipWith', singleton, lRec, lIt)
 
 -- | Terms of the target language
 data TTerm t
@@ -107,6 +107,8 @@ data TTerm t
     => TTerm ((d1a, d1b) -> Either d1c d1b)
     -> TTerm ((d1a, d1b) -> LFun (d2c, d2b) (d2a, d2b))
     -> TTerm ((d1a, d1b) -> LFun d2c (d2a, d2b)) -- EXPERIMENTAL SUPPORT FOR ITERATION
+  LRec      :: TTerm (LFun (a, b) b) -> TTerm (LFun a b) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+  LIt       :: LT a => TTerm (LFun b (a, b)) -> TTerm (LFun b a) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 -- | Substitute variable for term
 subst :: String -> u -> Type u -> TTerm t -> TTerm t
@@ -156,7 +158,9 @@ subst x v u (DtMap t) = DtMap (subst x v u t)
 subst _ _ _ DFoldr = DFoldr
 subst _ _ _ DtFoldr = DtFoldr
 subst x v u (DIt d1t d2t) = DIt (subst x v u d1t) (subst x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
-subst x v u (DtIt d1t d2t) = DtIt (subst x v u d1t) (subst x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+subst x v u (DtIt d1t d2t) = DtIt (subst x v u d1t) (subst x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATIO
+subst x v u (LRec t)                    = LRec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+subst x v u (LIt t)                     = LIt (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 -- | Substitute variable for a TTerm
 substTt :: String -> TTerm u -> Type u -> TTerm t -> TTerm t
@@ -208,6 +212,8 @@ substTt _ _ _ DFoldr = DFoldr
 substTt _ _ _ DtFoldr = DtFoldr
 substTt x v u (DIt d1t d2t) = DIt (substTt x v u d1t) (substTt x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
 substTt x v u (DtIt d1t d2t) = DtIt (substTt x v u d1t) (substTt x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+substTt x v u (LRec t)                    = LRec (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+substTt x v u (LIt t)                     = LIt (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 -- | Evaluate the target language
 evalTt :: TTerm t -> t
@@ -273,6 +279,8 @@ evalTt DFoldr = dFoldr
 evalTt DtFoldr = dtFoldr
 evalTt (DIt d1t d2t) = dIt (evalTt d1t) (evalTt d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
 evalTt (DtIt d1t d2t) = dtIt (evalTt d1t) (evalTt d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+evalTt (LRec t)      = lRec (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+evalTt (LIt t)       = lIt (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 -- | Pretty print the target language
 printTt :: TTerm t -> String
@@ -315,6 +323,8 @@ printTt DtFoldr = "DtFoldr"
 printTt (DtMap t) = "DtMap(" ++ printTt t ++ ")"
 printTt (DIt d1t d2t) = "DIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
 printTt (DtIt d1t d2t) = "DtIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
+printTt (LRec t)          = "lrec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+printTt (LIt t)           = "lit(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 instance Show (TTerm a) where
   show = printTt

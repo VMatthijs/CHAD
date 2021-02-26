@@ -41,6 +41,8 @@ module Types
   , dtFoldr
   , dIt
   , dtIt
+  , lRec
+  , lIt
   , Tens
   , empty
   , (Types.++)
@@ -252,6 +254,14 @@ scanIt f (c, a) =
     Right a' ->
       let as = scanIt f (c, a')
        in a : as
+
+lRec :: LFun (a, b) b -> LFun a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+lRec (MkLFun g) = MkLFun $ lrec g where 
+    lrec f a = f (a, lrec f a)
+
+lIt :: LT a => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+lIt (MkLFun g) = MkLFun $ lit g where 
+    lit f b = let (a, b') = f b in plus a (lit f b')
 
 -- CAN WE MAKE THIS THING TERMINATE UNDER ANY CIRCUMSTANCES? E.G. FIRST ORDER b SO WE CAN CHECK WHETHER THEY ARE 0? (IMPLEMENT TYPE CLASS FOR THIS)
 -- SIMILAR IDEA: CAN WE IMPLEMENT ONE FOR ALL TYPES IN THE HIERARCHY? THEN, WE CAN ALSO CHECK WHETHER LINEAR FUNCTIONS ARE ZERO.
