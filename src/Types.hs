@@ -246,9 +246,12 @@ lRec :: LFun (a, b) b -> LFun a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 lRec (MkLFun g) = MkLFun $ lrec g where 
     lrec f a = f (a, lrec f a)
 
-lIt :: LT a => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS ALMOST WORKS: IT CALCULATES THE CORRECT DERIVATIVE IN b, BUT IT LOOPS FOREVER IN a
-lIt (MkLFun g) = MkLFun $ lit g where 
-    lit f b = let (a, b') = f b in plus a (lit f b')
+lIt' :: LT a => Int -> LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS ALMOST WORKS. WE NEED TO BREAK OUT OF THE POTENTIALLY INFINITE LOOP THOUGH, SOMEHOW
+lIt' n (MkLFun g) = MkLFun $ lit n g where 
+    lit n f b = let (a, b') = f b in if n <= 0 then a else plus a (lit (n-1) f b')
+
+lIt :: LT a => LFun b (a, b) -> LFun b a
+lIt = lIt' 1000
 
 -- Forward mode AD type families
 type family Df1 a where
@@ -349,6 +352,7 @@ instance (LT a, LT b) => LT (a, b) where
   scalProd r a = (scalProd r (fst a), scalProd r (snd a))
   scalDiv a r = (scalDiv (fst a) r, scalDiv (snd a) r)
   minus a b = (fst a `minus` fst b, snd a `minus` snd b)
+
 
 instance (LT a, LT b) => LT (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
                                                                                where
