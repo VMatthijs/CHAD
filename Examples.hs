@@ -373,3 +373,22 @@ fwdDerFact2 = evalFwdDerivative fact2
 
 revDerFact2 :: Scal -> Scal -> Scal -- OK!
 revDerFact2 = evalRevDerivative fact2
+
+
+fact2Extra :: SL.STerm (Scal, Scal) Scal  -- to test derivative of parameterized iteration w.r.t. parameter
+fact2Extra = SL.Pair  (SL.Snd `SL.Comp` SL.Rec (SL.Curry (realCase (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt `SL.Comp` SL.Sign) (SL.Fst `SL.Comp` SL.Fst) (SL.Pair SL.Snd (SL.Pair (SL.Fst `SL.Comp` SL.Snd) (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt)`SL.Comp` SL.Ev) `SL.Comp` (SL.Op EScalProd))))) SL.Fst `SL.Comp` SL.Ev
+
+fact2Extra' :: (Scal, Scal) -> Scal -- OK
+fact2Extra' = SL.evalSt fact2Extra
+
+fwdFinDiffFact2Extra :: (Scal, Scal)  -> (Scal, Scal)  -> Scal 
+fwdFinDiffFact2Extra = evalFwdFinDiff fact2Extra
+
+fwdDerFact2Extra :: (Scal, Scal)  -> (Scal, Scal)  -> Scal -- OK!
+fwdDerFact2Extra = evalFwdDerivative fact2Extra
+
+revDerFact2Extra :: (Scal, Scal)  -> Scal -> (Scal, Scal) -- Loops forever when computing derivative w.r.t. parameter
+revDerFact2Extra = evalRevDerivative fact2Extra
+
+revFinDiffFact2Extra :: (Scal, Scal)  -> Scal -> (Scal, Scal) -- Loops forever when computing derivative w.r.t. parameter
+revFinDiffFact2Extra (x, x') y = ((fact2Extra' (x + y * delta, x') - fact2Extra' (x, x'))/delta, (fact2Extra' (x, x' + y * delta) - fact2Extra' (x,x'))/delta) where delta = 0.000001

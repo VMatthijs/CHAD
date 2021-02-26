@@ -15,7 +15,7 @@ import           Types                     as T (LFun, LT (..), Scal, Tens,
                                                  dtFoldr, dtIt, eqTy, lApp,
                                                  lComp, lCur, lEval, lFst, lId,
                                                  lMap, lPair, lSnd, lSwap, lZip,
-                                                 lZipWith', singleton, lRec, lIt)
+                                                 lZipWith, singleton, lRec, lIt)
 
 -- | Terms of the target language
 data TTerm t
@@ -46,7 +46,7 @@ data TTerm t
   Foldr :: (LT a, KnownNat n) => TTerm ((((Scal, a) -> a, a), Vect n) -> a)
     -- Target language extension
     -- | Linear operation
-  LOp :: LinearOperation a b c -> TTerm (a -> LFun b c)
+  LOp :: LT b => LinearOperation a b c -> TTerm (a -> LFun b c)
     -- Linear functions
   LId :: TTerm (LFun a a)
   LComp
@@ -265,14 +265,12 @@ evalTt (Singleton t) = T.singleton (evalTt t)
 evalTt Zero = zero
 evalTt (Plus a b) = plus (evalTt a) (evalTt b)
 evalTt (LSwap t) = lSwap (evalTt t)
-evalTt (LCur t) = lCur f
-  where
-    f x acc = plus (lApp (evalTt t (fst x)) (snd x)) acc
+evalTt (LCur t) = lCur (evalTt t)
 evalTt (DMap t) =
-  plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith' (snd . f) v))
+  plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith (snd . f) v))
   where
     (f, v) = evalTt t
-evalTt (DtMap t) = lPair (lZip v) (lZipWith' (snd . f) v)
+evalTt (DtMap t) = lPair (lZip v) (lZipWith (snd . f) v)
   where
     (f, v) = evalTt t
 evalTt DFoldr = dFoldr

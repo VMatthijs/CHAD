@@ -10,9 +10,9 @@ import           GHC.TypeNats              (KnownNat)
 import           Prelude                   hiding (sum, zipWith)
 
 import           Types                     (LFun, LT, Scal, Vect, lAdd, lComp,
-                                            lConst, lDup, lExpand, lId,
+                                            lDup, lExpand, lId,
                                             lMapTuple, lNegate, lPair, lProd,
-                                            lSubt, lSum, lUncurry, lZipWith,
+                                            lSubt, lSum, lZipWith,
                                             zero)
 
 -- | Possible operators in the source language
@@ -82,13 +82,13 @@ showLOp DSum        = "DSum"
 showLOp DSumT       = "DSumT"
 
 -- | Evaluate the linear operators
-evalLOp :: LinearOperation a b c -> a -> LFun b c
-evalLOp DConstant () = lConst $ zero
-evalLOp DConstantT () = lConst ()
-evalLOp DEAdd (_x, _y) = lUncurry $ lZipWith lAdd
+evalLOp :: LT b => LinearOperation a b c -> a -> LFun b c
+evalLOp DConstant () = zero
+evalLOp DConstantT () = zero
+evalLOp DEAdd (_x, _y) = lAdd
 evalLOp DEAddT (_x, _y) = lDup
 evalLOp DEProd (x, y) =
-  lComp (lMapTuple xDeriv yDeriv) (lUncurry (lZipWith lAdd))
+  lComp (lMapTuple xDeriv yDeriv) lAdd
   where
     xDeriv = lZipWith lProd y
     yDeriv = lZipWith lProd x
@@ -96,11 +96,11 @@ evalLOp DEProdT (x, y) = lPair xDeriv yDeriv
   where
     xDeriv = lZipWith lProd y
     yDeriv = lZipWith lProd x
-evalLOp DEScalAdd (_, _) = lUncurry lAdd
+evalLOp DEScalAdd (_, _) = lAdd
 evalLOp DEScalAddT (_, _) = lDup
-evalLOp DEScalSubt (_, _) = lUncurry lSubt
+evalLOp DEScalSubt (_, _) = lSubt
 evalLOp DEScalSubtT (_, _) = lPair lId lNegate
-evalLOp DEScalProd (x, y) = lComp (lMapTuple xDeriv yDeriv) (lUncurry lAdd)
+evalLOp DEScalProd (x, y) = lComp (lMapTuple xDeriv yDeriv) lAdd
   where
     xDeriv = lProd y
     yDeriv = lProd x

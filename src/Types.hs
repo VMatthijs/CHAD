@@ -15,14 +15,12 @@ module Types
   , LFun
   , lId
   , lNegate
-  , lConst
   , lDup
   , lComp
   , lApp
   , lEval
   , lUncurry
   , lZipWith
-  , lZipWith'
   , lPair
   , lMapTuple
   , lAdd
@@ -46,7 +44,6 @@ module Types
   , Tens
   , empty
   , (Types.++)
-  , tensFoldr
   , singleton
   , Df1
   , Df2
@@ -65,10 +62,10 @@ import qualified Data.Vector.Unboxed.Sized as V (Unbox, Vector, foldr, init,
                                                  zipWith)
 import           GHC.TypeNats              (KnownNat, sameNat)
 
--- | Real numbers
+-- | Real scalars
 type Scal = Double
 
--- | Vector of size n containing real values
+-- | Vector of size n containing real scalars
 type Vect n = V.Vector n Double
 
 -- | Tensor products
@@ -87,9 +84,6 @@ empty = MkTens []
 (++) :: Tens a b -> Tens a b -> Tens a b
 (MkTens x) ++ (MkTens y) = MkTens (x Prelude.++ y)
 
-tensFoldr :: ((a, b) -> c -> c) -> c -> Tens a b -> c
-tensFoldr f d (MkTens xs) = foldr f d xs
-
 singleton :: a -> LFun b (Tens a b)
 singleton t = MkLFun $ \x -> MkTens [(t, x)]
 
@@ -99,9 +93,6 @@ lId = MkLFun id
 
 lNegate :: LFun Scal Scal
 lNegate = MkLFun (\x -> -x)
-
-lConst :: b -> LFun a b
-lConst x = MkLFun $ const x
 
 lDup :: LFun a (a, a)
 lDup = MkLFun $ \a -> (a, a)
@@ -120,15 +111,10 @@ lUncurry :: (LT a, LT b, LT c) => (a -> LFun b c) -> LFun (a, b) c
 lUncurry f = MkLFun $ uncurry (lApp . f)
 
 -- | Linear zipWith
-lZipWith :: (Double -> LFun Double Double) -> Vect n -> LFun (Vect n) (Vect n)
+lZipWith :: (Scal -> LFun Scal Scal) -> Vect n -> LFun (Vect n) (Vect n)
 lZipWith f a = MkLFun $ V.zipWith (lApp . f) a
 
-lZipWith' :: (Scal -> LFun Scal Scal) -> Vect n -> LFun (Vect n) (Vect n)
-lZipWith' f a = MkLFun $ V.zipWith f' a
-  where
-    f' x y = lApp (f x) y
-
-lZip :: Vect n -> LFun (Vect n) (Tens (Scal) (Scal))
+lZip :: Vect n -> LFun (Vect n) (Tens Scal Scal)
 lZip x = MkLFun $ \y -> MkTens $ V.toList $ V.zipWith f x y
   where
     f a b = (a, b)
@@ -145,22 +131,22 @@ lMapTuple ::
   -> LFun (a, b) (a', b')
 lMapTuple f g = MkLFun $ \(a, b) -> (lApp f a, lApp g b)
 
--- | Addition linear in second argument
-lAdd :: Num a => (a -> LFun a a)
-lAdd x = MkLFun $ \y -> x + y
+-- | Addition is linear
+lAdd :: LT a => LFun (a, a) a
+lAdd = MkLFun $ uncurry plus
 
--- | Subtraction linear in second argument
-lSubt :: Num a => (a -> LFun a a)
-lSubt x = MkLFun $ \y -> x - y
+-- | Subtraction is linear
+lSubt :: LT a => LFun (a, a) a
+lSubt = MkLFun $ uncurry minus
 
 -- | Multiplication linear in second argument
 lProd :: Num a => (a -> LFun a a)
 lProd x = MkLFun $ \y -> x * y
 
-lSum :: LFun (Vect n) (Scal)
+lSum :: LFun (Vect n) Scal
 lSum = MkLFun V.sum
 
-lExpand :: KnownNat n => LFun (Scal) (Vect n)
+lExpand :: KnownNat n => LFun Scal (Vect n)
 lExpand = MkLFun $ \a -> V.replicate a
 
 lFst :: LFun (a, b) a
@@ -172,8 +158,9 @@ lSnd = MkLFun snd
 lSwap :: (LT a, LT b, LT c) => (a -> LFun b c) -> LFun b (a -> c)
 lSwap t = MkLFun $ \x y -> lApp (t y) x
 
-lCur :: (LT b, LT c) => ((a, b) -> c -> c) -> LFun (Tens a b) c
-lCur f = MkLFun $ tensFoldr f zero
+lCur :: (LT b, LT c) => (a -> LFun b c) -> LFun (Tens a b) c
+lCur f = MkLFun $ g where 
+  g (MkTens abs') = foldr (\(a, b) acc -> (f a `lApp` b) `plus` acc) zero abs'
 
 lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
 lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
@@ -259,20 +246,10 @@ lRec :: LFun (a, b) b -> LFun a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 lRec (MkLFun g) = MkLFun $ lrec g where 
     lrec f a = f (a, lrec f a)
 
-lIt :: LT a => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+lIt :: LT a => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS ALMOST WORKS: IT CALCULATES THE CORRECT DERIVATIVE IN b, BUT IT LOOPS FOREVER IN a
 lIt (MkLFun g) = MkLFun $ lit g where 
     lit f b = let (a, b') = f b in plus a (lit f b')
 
--- CAN WE MAKE THIS THING TERMINATE UNDER ANY CIRCUMSTANCES? E.G. FIRST ORDER b SO WE CAN CHECK WHETHER THEY ARE 0? (IMPLEMENT TYPE CLASS FOR THIS)
--- SIMILAR IDEA: CAN WE IMPLEMENT ONE FOR ALL TYPES IN THE HIERARCHY? THEN, WE CAN ALSO CHECK WHETHER LINEAR FUNCTIONS ARE ZERO.
--- YES, SO WE SHOULD JUST CHECK WHETHER b' IS 0 AND THEN JUST RETURN a.
--- THE REAL PROBLEM IS THAT + IS STRICT IN BOTH ARGUMENTS, SO THE CONDITIONS FOR DEFINING ITERATION AS A FIXPOINT ARE PROBABLY NOT MET.
--- UNLESS THAT FIXPOINT IS BOT
--- AH! What we really need is to enforce in some way that linear function application is really linear in the sense that
--- f(0) = 0 even if f=bot.
--- So linear function application is going to be lazy in the function argument.
--- Of course,this will be a bit hard to achieve at arbitrary types, as we cannot compare for equality.
--- However, perhaps we can do it for all the types that we will need for reverse AD, using some type class? Yes!
 -- Forward mode AD type families
 type family Df1 a where
   Df1 Scal = Scal
@@ -421,7 +398,7 @@ instance (LT a, LT b) => LT (Tens a b) where
   minus = error "This should never be used." -- This doesn't make sense.
 
 instance (LT a, LT b) => LT (LFun a b) where
-  zero = lConst zero
+  zero = MkLFun zero
   plus = lPlus
   inferType = TLinFun inferType inferType
   scalProd = lScalProd
