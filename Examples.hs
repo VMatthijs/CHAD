@@ -250,3 +250,120 @@ finRevDiffFoldProd x y =
     delta = 0.000001
     partial z =
       y * (fwdFoldProd (x + V.map (* delta) z) - fwdFoldProd x) / delta
+
+foldProd2 :: SL.STerm Scal Scal
+foldProd2 =
+  SL.Comp
+    (SL.Pair
+       (SL.Pair (SL.Curry (SL.Comp SL.Snd (SL.Op EScalProd))) SL.Id)
+       (constant v))
+    SL.Foldr
+  where
+    v :: Vect 3
+    v = (fromList' [1, 2, 3])
+
+fwdFinDiffFoldProd2 :: Scal -> Scal -> Scal -- OK
+fwdFinDiffFoldProd2 = evalFwdFinDiff foldProd2
+
+fwdDerFoldProd2 :: Scal -> Scal -> Scal -- OK
+fwdDerFoldProd2 = evalFwdDerivative foldProd2
+
+revDerFoldProd2 :: Scal -> Scal -> Scal -- OK
+revDerFoldProd2 = evalRevDerivative foldProd2
+
+realCase ::
+     ( LT a
+     , LT (Dr1 a)
+     , LT (Df1 a)
+     , LT (Dr2 a)
+     , LT (Df2 a)
+     , LT b
+     , LT (Dr1 b)
+     , LT (Df1 b)
+     , LT (Dr2 b)
+     , LT (Df2 b)
+     )
+  => SL.STerm a (Either () ())
+  -> SL.STerm a b
+  -> SL.STerm a b
+  -> SL.STerm a b
+realCase c l r =
+  SL.Comp
+    (SL.Pair
+       (SL.Comp
+          c
+          (SL.CoPair (SL.Curry (SL.Comp SL.Snd l)) (SL.Curry (SL.Comp SL.Snd r))))
+       SL.Id)
+    SL.Ev
+
+fact :: SL.STerm Scal Scal
+fact =
+  SL.Comp
+    (SL.Pair SL.Unit (SL.Pair SL.Id (constant 1)))
+    (SL.It
+       (realCase
+          (SL.Comp (SL.Comp SL.Snd SL.Fst) SL.Sign)
+          (SL.Comp (SL.Comp SL.Snd SL.Snd) SL.Inl)
+          (SL.Comp
+             (SL.Pair
+                (SL.Comp
+                   (SL.Pair (SL.Comp SL.Snd SL.Fst) (constant 1))
+                   (SL.Op EScalSubt))
+                (SL.Comp
+                   (SL.Pair (SL.Comp SL.Snd SL.Fst) (SL.Comp SL.Snd SL.Snd))
+                   (SL.Op EScalProd)))
+             SL.Inr)))
+
+fact' :: Scal -> Scal -- OK!
+fact' = SL.evalSt fact
+
+fwdFinDiffFact :: Scal -> Scal -> Scal
+fwdFinDiffFact = evalFwdFinDiff fact
+
+fwdDerFact :: Scal -> Scal -> Scal -- OK!
+fwdDerFact = evalFwdDerivative fact
+
+revDerFact :: Scal -> Scal -> Scal -- OK!
+revDerFact = evalRevDerivative fact
+
+factExtra :: SL.STerm (Scal, Scal) Scal -- to test derivative of parameterized iteration w.r.t. parameter
+factExtra =
+  SL.Comp
+    (SL.Pair SL.Unit SL.Id)
+    (SL.It
+       (realCase
+          (SL.Comp (SL.Comp SL.Snd SL.Fst) SL.Sign)
+          (SL.Comp (SL.Comp SL.Snd SL.Snd) SL.Inl)
+          (SL.Comp
+             (SL.Pair
+                (SL.Comp
+                   (SL.Pair (SL.Comp SL.Snd SL.Fst) (constant 1))
+                   (SL.Op EScalSubt))
+                (SL.Comp
+                   (SL.Pair (SL.Comp SL.Snd SL.Fst) (SL.Comp SL.Snd SL.Snd))
+                   (SL.Op EScalProd)))
+             SL.Inr)))
+
+factExtra' :: (Scal, Scal) -> Scal
+factExtra' = SL.evalSt factExtra
+
+fwdFinDiffFactExtra :: (Scal, Scal) -> (Scal, Scal) -> Scal
+fwdFinDiffFactExtra = evalFwdFinDiff factExtra
+
+fwdDerFactExtra :: (Scal, Scal) -> (Scal, Scal) -> Scal -- OK
+fwdDerFactExtra = evalFwdDerivative factExtra
+
+revDerFactExtra :: (Scal, Scal) -> Scal -> (Scal, Scal) -- OK
+revDerFactExtra = evalRevDerivative factExtra
+
+revFinDiffFactExtra :: (Scal, Scal) -> Scal -> (Scal, Scal)
+revFinDiffFactExtra (x, x') y = ((factExtra' (x + y * delta, x') - factExtra' (x, x'))/delta, (factExtra' (x, x' + y * delta) - factExtra' (x,x'))/delta) where delta = 0.000001
+
+fact2 :: SL.STerm Scal Scal
+fact2 = SL.Pair ((constant 1) `SL.Comp` (SL.Rec (SL.Curry (realCase (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt `SL.Comp` SL.Sign) (SL.Fst `SL.Comp` SL.Fst) (SL.Pair SL.Snd (SL.Pair (SL.Fst `SL.Comp` SL.Snd) (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt)`SL.Comp` SL.Ev) `SL.Comp` (SL.Op EScalProd)))))) SL.Id `SL.Comp` SL.Ev
+
+fact2' :: Scal -> Scal -- OK
+fact2' = SL.evalSt fact2
+
+fwdFinDiffFact2 :: Scal -> Scal -> Scal 
+fwdFinDiffFact2 = evalFwdFinDiff fact2

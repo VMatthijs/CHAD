@@ -245,7 +245,7 @@ evalTt (Sign t) =
         then Left ()
         else if r > 0
                then Right ()
-               else undefined
+               else error "Tried to call real conditional at 0" 
 -- Target language extension
 evalTt (LOp lop) = evalLOp lop
 evalTt LId = lId

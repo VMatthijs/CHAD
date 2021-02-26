@@ -155,20 +155,6 @@ data STerm a b
        , KnownNat n
        )
     => STerm (((Scal, a) -> a, a), Vect n) a
-  Rec
-    :: ( LT a
-       , LT (Dr1 a)
-       , LT (Dr2 a)
-       , LT (Df1 a)
-       , LT (Df2 a)
-       , LT b
-       , LT (Dr1 b)
-       , LT (Dr2 b)
-       , LT (Df1 b)
-       , LT (Df2 b)
-       )
-    => STerm (a, b) b
-    -> STerm a b
   Inl
     :: ( LT a
        , LT (Dr1 a)
@@ -234,7 +220,21 @@ data STerm a b
        )
     => STerm (a, b) (Either c b)
     -> STerm (a, b) c
-  Sign :: STerm Scal (Either () ())
+  Sign :: STerm Scal (Either () ()) -- EXPERIMENTAL SUPPORT FOR REAL CONDITIONALS
+  Rec
+    :: ( LT a
+       , LT (Dr1 a)
+       , LT (Dr2 a)
+       , LT (Df1 a)
+       , LT (Df2 a)
+       , LT b
+       , LT (Dr1 b)
+       , LT (Dr2 b)
+       , LT (Df1 b)
+       , LT (Df2 b)
+       )
+    => STerm (a, b) b
+    -> STerm a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
 
 --     -- | Foldr
 -- | Evaluate the source language
@@ -250,7 +250,7 @@ evalSt (Curry a) = curry $ evalSt a
 evalSt (Op op) = evalOp op
 evalSt Map = \(f, v) -> V.map f v
 evalSt Foldr = \((f, v), xs) -> V.foldr (\r a -> f (r, a)) v xs
-evalSt (Rec t) = fix (evalSt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+evalSt (Rec t) = fix (evalSt t)
   where
     fix f a = f (a, fix f a)
 evalSt Inl = Left -- EXPERIMENTAL SUPPORT FOR SUM TYPES
@@ -267,4 +267,4 @@ evalSt (It t) = fix (evalSt t) -- EXPERIMENTAL SUPPORT FOR ITERATION
       case f (a, b) of
         Left c   -> c
         Right b' -> fix f (a, b')
-evalSt Sign = \r -> if r < 0 then Left () else if r > 0 then Right () else undefined 
+evalSt Sign = \r -> if r < 0 then Left () else if r > 0 then Right () else error "Tried to call real conditional at 0" 

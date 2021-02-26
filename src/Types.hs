@@ -222,12 +222,12 @@ dIt d1t d2t (d1a, d1b) =
   MkLFun $ \(d2a, d2b) ->
     let d1bs = scanIt d1t (d1a, d1b)
      in fst
-          (d2t (d1a, head d1bs) `lApp`
+          (d2t (d1a, last d1bs) `lApp`
            ( d2a
            , foldl
                (\acc d1b' -> snd (d2t (d1a, d1b') `lApp` (d2a, acc)))
                d2b
-               (tail d1bs)))
+               (init d1bs)))
 
 dtIt ::
      (LT d2a, LT d2b, LT d2c)
@@ -366,11 +366,17 @@ instance (LT a, LT b) => LT (a, b) where
 instance (LT a, LT b) => LT (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
                                                                                where
   zero = error "This should never be used." -- This doesn't make sense.
-  plus = error "This should never be used." -- This doesn't make sense.
+  plus (Left a) (Left a') = Left (a `plus` a')
+  plus (Right a) (Right a') = Right (a `plus` a')
+  plus _ _ = error "This should never be used." -- This doesn't make sense.
   inferType = TEither inferType inferType
-  scalProd = error "This should never be used." -- This doesn't make sense.
-  scalDiv = error "This should never be used." -- This doesn't make sense.
-  minus = error "This should never be used." -- This doesn't make sense.
+  scalProd r (Left a) = Left (scalProd r a)
+  scalProd r (Right a) = Right (scalProd r a)
+  scalDiv (Left a) r = Left (scalDiv a r)
+  scalDiv (Right a) r = Right (scalDiv a r)
+  minus (Left a) (Left a') = Left (a `minus` a')
+  minus (Right a) (Right a') = Right (a `minus` a')
+  minus _ _ = error "This should never be used." -- This doesn't make sense.
 
 instance LT Scal where
   zero = 0
