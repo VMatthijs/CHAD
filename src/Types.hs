@@ -43,7 +43,6 @@ module Types
   , lIt
   , Tens
   , empty
-  , (Types.++)
   , singleton
   , Df1
   , Df2
@@ -61,6 +60,7 @@ import qualified Data.Vector.Unboxed.Sized as V (Unbox, Vector, foldr, init,
                                                  scanl, sum, toList, zip,
                                                  zipWith)
 import           GHC.TypeNats              (KnownNat, sameNat)
+import           System.IO.Unsafe          (unsafePerformIO)
 
 -- | Real scalars
 type Scal = Double
@@ -81,8 +81,8 @@ newtype LFun a b =
 empty :: Tens a b
 empty = MkTens []
 
-(++) :: Tens a b -> Tens a b -> Tens a b
-(MkTens x) ++ (MkTens y) = MkTens (x Prelude.++ y)
+addTens :: Tens a b -> Tens a b -> Tens a b
+addTens (MkTens x) (MkTens y) = MkTens (x ++ y)
 
 singleton :: a -> LFun b (Tens a b)
 singleton t = MkLFun $ \x -> MkTens [(t, x)]
@@ -159,8 +159,9 @@ lSwap :: (LT a, LT b, LT c) => (a -> LFun b c) -> LFun b (a -> c)
 lSwap t = MkLFun $ \x y -> lApp (t y) x
 
 lCur :: (LT b, LT c) => (a -> LFun b c) -> LFun (Tens a b) c
-lCur f = MkLFun $ g where 
-  g (MkTens abs') = foldr (\(a, b) acc -> (f a `lApp` b) `plus` acc) zero abs'
+lCur f = MkLFun $ g
+  where
+    g (MkTens abs') = foldr (\(a, b) acc -> (f a `lApp` b) `plus` acc) zero abs'
 
 lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
 lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
@@ -243,15 +244,17 @@ scanIt f (c, a) =
        in a : as
 
 lRec :: LFun (a, b) b -> LFun a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-lRec (MkLFun g) = MkLFun $ lrec g where 
+lRec (MkLFun g) = MkLFun $ lrec g
+  where
     lrec f a = f (a, lrec f a)
 
-lIt' :: LT a => Int -> LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS ALMOST WORKS. WE NEED TO BREAK OUT OF THE POTENTIALLY INFINITE LOOP THOUGH, SOMEHOW
-lIt' n (MkLFun g) = MkLFun $ lit n g where 
-    lit n f b = let (a, b') = f b in if n <= 0 then a else plus a (lit (n-1) f b')
-
-lIt :: LT a => LFun b (a, b) -> LFun b a
-lIt = lIt' 1000
+lIt :: (LT a, LT b) => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+lIt f =
+  MkLFun $ \b ->
+    if isZero b -- Note that this will be decidable in practice as b will not contain any function types (being a Dr2 type)!
+      then zero
+      else let (a, b') = f `lApp` b
+            in plus a (lIt f `lApp` b')
 
 -- Forward mode AD type families
 type family Df1 a where
@@ -332,79 +335,99 @@ eqTy _ _ = Nothing
 class LT a where
   zero :: a -- For automatic differentiation
   plus :: a -> a -> a -- For automatic differentiation
+  isZero :: a -> Bool -- For reverse AD of recursion
   inferType :: Type a -- For interpreter of target language
   scalProd :: Scal -> a -> a -- For finite differencing
   scalDiv :: a -> Scal -> a -- For finite differencing
   minus :: a -> a -> a -- For finite differencing
+  showMe :: a -> String -- for debugging
 
 instance LT () where
   zero = ()
   plus _ _ = ()
+  isZero _ = True
   inferType = TUnit
   scalProd _ _ = ()
   scalDiv _ _ = ()
   minus _ _ = ()
+  showMe = show
 
 instance (LT a, LT b) => LT (a, b) where
   zero = (zero, zero)
   plus a b = (fst a `plus` fst b, snd a `plus` snd b)
+  isZero (a, b) = isZero a && isZero b
   inferType = TPair inferType inferType
   scalProd r a = (scalProd r (fst a), scalProd r (snd a))
   scalDiv a r = (scalDiv (fst a) r, scalDiv (snd a) r)
   minus a b = (fst a `minus` fst b, snd a `minus` snd b)
-
+  showMe (a, b) = "(" ++ showMe a ++ ", " ++ showMe b ++ ")"
 
 instance (LT a, LT b) => LT (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
                                                                                where
   zero = error "This should never be used." -- This doesn't make sense.
-  plus (Left a) (Left a') = Left (a `plus` a')
+  plus (Left a) (Left a')   = Left (a `plus` a')
   plus (Right a) (Right a') = Right (a `plus` a')
-  plus _ _ = error "This should never be used." -- This doesn't make sense.
+  plus _ _                  = error "This should never be used." -- This doesn't make sense.
+  isZero (Left a)  = isZero a
+  isZero (Right b) = isZero b
   inferType = TEither inferType inferType
-  scalProd r (Left a) = Left (scalProd r a)
+  scalProd r (Left a)  = Left (scalProd r a)
   scalProd r (Right a) = Right (scalProd r a)
-  scalDiv (Left a) r = Left (scalDiv a r)
+  scalDiv (Left a) r  = Left (scalDiv a r)
   scalDiv (Right a) r = Right (scalDiv a r)
-  minus (Left a) (Left a') = Left (a `minus` a')
+  minus (Left a) (Left a')   = Left (a `minus` a')
   minus (Right a) (Right a') = Right (a `minus` a')
-  minus _ _ = error "This should never be used." -- This doesn't make sense.
+  minus _ _                  = error "This should never be used." -- This doesn't make sense.
+  showMe (Left a)  = "Left (" ++ showMe a ++ ")"
+  showMe (Right a) = "Right (" ++ showMe a ++ ")"
 
 instance LT Scal where
   zero = 0
   plus = (+)
+  isZero = (== zero)
   inferType = TScal
   scalProd = (*)
   scalDiv = (/)
   minus = (-)
+  showMe = show
 
 instance KnownNat n => LT (Vect n) where
   zero = V.replicate 0
   plus = V.zipWith (+)
+  isZero = (== zero)
   inferType = TVect (Proxy @n)
   scalProd r = V.map (* r)
   scalDiv v r = V.map (/ r) v
   minus = V.zipWith (-)
+  showMe = show
 
 instance (LT a, LT b) => LT (a -> b) where
   zero = const zero
   plus f g = \x -> plus (f x) (g x)
+  isZero = error "This should never be used." -- undecidable
   inferType = TArrow inferType inferType
   scalProd r f = \x -> scalProd r (f x)
   scalDiv f r = \x -> scalDiv (f x) r
   minus f g = \x -> minus (f x) (g x)
+  showMe = error "This should never be used." -- This doesn't make sense.
 
 instance (LT a, LT b) => LT (Tens a b) where
   zero = empty
-  plus = (Types.++)
+  plus = addTens
+  isZero (MkTens xs) = all isZero (map snd xs)
   inferType = TTens inferType inferType
   scalProd = error "This should never be used." -- This doesn't make sense.
   scalDiv = error "This should never be used." -- This doesn't make sense.
   minus = error "This should never be used." -- This doesn't make sense.
+  showMe (MkTens xs) =
+    "[" ++ (foldr (\x acc -> showMe x ++ ", " ++ acc) "" xs) ++ "]"
 
 instance (LT a, LT b) => LT (LFun a b) where
   zero = MkLFun zero
   plus = lPlus
+  isZero = error "This should never be used." -- undecidable
   inferType = TLinFun inferType inferType
   scalProd = lScalProd
   scalDiv = lScalDiv
   minus = lMinus
+  showMe = error "This should never be used." -- This doesn't make sense.

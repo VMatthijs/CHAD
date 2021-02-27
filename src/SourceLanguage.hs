@@ -267,4 +267,10 @@ evalSt (It t) = fix (evalSt t) -- EXPERIMENTAL SUPPORT FOR ITERATION
       case f (a, b) of
         Left c   -> c
         Right b' -> fix f (a, b')
-evalSt Sign = \r -> if r < 0 then Left () else if r > 0 then Right () else error "Tried to call real conditional at 0" 
+evalSt Sign =
+  \r ->
+    if r < 0
+      then Left ()
+      else if r > 0
+             then Right ()
+             else error "Tried to call real conditional at 0"

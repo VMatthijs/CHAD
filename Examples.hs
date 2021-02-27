@@ -9,6 +9,7 @@ import qualified Data.Vector.Unboxed.Sized as V (Unbox, Vector, fromList, map,
                                                  replicate)
 import           Prelude                   hiding (replicate)
 
+import           Control.Monad.State.Lazy  (State, modify, runState)
 import qualified ForwardAD                 as F
 import           GHC.TypeNats              (KnownNat)
 import           Helper
@@ -357,15 +358,36 @@ revDerFactExtra :: (Scal, Scal) -> Scal -> (Scal, Scal) -- OK
 revDerFactExtra = evalRevDerivative factExtra
 
 revFinDiffFactExtra :: (Scal, Scal) -> Scal -> (Scal, Scal)
-revFinDiffFactExtra (x, x') y = ((factExtra' (x + y * delta, x') - factExtra' (x, x'))/delta, (factExtra' (x, x' + y * delta) - factExtra' (x,x'))/delta) where delta = 0.000001
+revFinDiffFactExtra (x, x') y =
+  ( (factExtra' (x + y * delta, x') - factExtra' (x, x')) / delta
+  , (factExtra' (x, x' + y * delta) - factExtra' (x, x')) / delta)
+  where
+    delta = 0.000001
 
 fact2 :: SL.STerm Scal Scal
-fact2 = SL.Pair ((constant 1) `SL.Comp` (SL.Rec (SL.Curry (realCase (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt `SL.Comp` SL.Sign) (SL.Fst `SL.Comp` SL.Fst) (SL.Pair SL.Snd (SL.Pair (SL.Fst `SL.Comp` SL.Snd) (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt)`SL.Comp` SL.Ev) `SL.Comp` (SL.Op EScalProd)))))) SL.Id `SL.Comp` SL.Ev
+fact2 =
+  SL.Pair
+    ((constant 1) `SL.Comp`
+     (SL.Rec
+        (SL.Curry
+           (realCase
+              (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt `SL.Comp`
+               SL.Sign)
+              (SL.Fst `SL.Comp` SL.Fst)
+              (SL.Pair
+                 SL.Snd
+                 (SL.Pair
+                    (SL.Fst `SL.Comp` SL.Snd)
+                    (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt) `SL.Comp`
+                  SL.Ev) `SL.Comp`
+               (SL.Op EScalProd))))))
+    SL.Id `SL.Comp`
+  SL.Ev
 
 fact2' :: Scal -> Scal -- OK
 fact2' = SL.evalSt fact2
 
-fwdFinDiffFact2 :: Scal -> Scal -> Scal 
+fwdFinDiffFact2 :: Scal -> Scal -> Scal
 fwdFinDiffFact2 = evalFwdFinDiff fact2
 
 fwdDerFact2 :: Scal -> Scal -> Scal -- OK!
@@ -374,21 +396,54 @@ fwdDerFact2 = evalFwdDerivative fact2
 revDerFact2 :: Scal -> Scal -> Scal -- OK!
 revDerFact2 = evalRevDerivative fact2
 
-
-fact2Extra :: SL.STerm (Scal, Scal) Scal  -- to test derivative of parameterized iteration w.r.t. parameter
-fact2Extra = SL.Pair  (SL.Snd `SL.Comp` SL.Rec (SL.Curry (realCase (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt `SL.Comp` SL.Sign) (SL.Fst `SL.Comp` SL.Fst) (SL.Pair SL.Snd (SL.Pair (SL.Fst `SL.Comp` SL.Snd) (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt)`SL.Comp` SL.Ev) `SL.Comp` (SL.Op EScalProd))))) SL.Fst `SL.Comp` SL.Ev
+fact2Extra :: SL.STerm (Scal, Scal) Scal -- to test derivative of parameterized recursion w.r.t. parameter
+fact2Extra =
+  SL.Pair
+    (SL.Snd `SL.Comp`
+     SL.Rec
+       (SL.Curry
+          (realCase
+             (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt `SL.Comp`
+              SL.Sign)
+             (SL.Fst `SL.Comp` SL.Fst)
+             (SL.Pair
+                SL.Snd
+                (SL.Pair
+                   (SL.Fst `SL.Comp` SL.Snd)
+                   (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt) `SL.Comp`
+                 SL.Ev) `SL.Comp`
+              (SL.Op EScalProd)))))
+    SL.Fst `SL.Comp`
+  SL.Ev
 
 fact2Extra' :: (Scal, Scal) -> Scal -- OK
 fact2Extra' = SL.evalSt fact2Extra
 
-fwdFinDiffFact2Extra :: (Scal, Scal)  -> (Scal, Scal)  -> Scal 
+fwdFinDiffFact2Extra :: (Scal, Scal) -> (Scal, Scal) -> Scal
 fwdFinDiffFact2Extra = evalFwdFinDiff fact2Extra
 
-fwdDerFact2Extra :: (Scal, Scal)  -> (Scal, Scal)  -> Scal -- OK!
+fwdDerFact2Extra :: (Scal, Scal) -> (Scal, Scal) -> Scal -- OK!
 fwdDerFact2Extra = evalFwdDerivative fact2Extra
 
-revDerFact2Extra :: (Scal, Scal)  -> Scal -> (Scal, Scal) -- Loops forever when computing derivative w.r.t. parameter
+revDerFact2Extra :: (Scal, Scal) -> Scal -> (Scal, Scal) -- OK!
 revDerFact2Extra = evalRevDerivative fact2Extra
 
-revFinDiffFact2Extra :: (Scal, Scal)  -> Scal -> (Scal, Scal) -- Loops forever when computing derivative w.r.t. parameter
-revFinDiffFact2Extra (x, x') y = ((fact2Extra' (x + y * delta, x') - fact2Extra' (x, x'))/delta, (fact2Extra' (x, x' + y * delta) - fact2Extra' (x,x'))/delta) where delta = 0.000001
+revFinDiffFact2Extra :: (Scal, Scal) -> Scal -> (Scal, Scal)
+revFinDiffFact2Extra (x, x') y =
+  ( (fact2Extra' (x + y * delta, x') - fact2Extra' (x, x')) / delta
+  , (fact2Extra' (x, x' + y * delta) - fact2Extra' (x, x')) / delta)
+  where
+    delta = 0.000001
+
+fib :: Int -> Int
+fib =
+  recur
+    (\((r, r'), g) ->
+       \n ->
+         if (n == 0)
+           then r
+           else if (n == 1)
+                  then r'
+                  else g (n - 1) + g (n - 2))
+    (0, 1)
+ --- TODO: translate this example into the language and test it as well!

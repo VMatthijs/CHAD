@@ -10,10 +10,9 @@ import           GHC.TypeNats              (KnownNat)
 import           Prelude                   hiding (sum, zipWith)
 
 import           Types                     (LFun, LT, Scal, Vect, lAdd, lComp,
-                                            lDup, lExpand, lId,
-                                            lMapTuple, lNegate, lPair, lProd,
-                                            lSubt, lSum, lZipWith,
-                                            zero)
+                                            lDup, lExpand, lId, lMapTuple,
+                                            lNegate, lPair, lProd, lSubt, lSum,
+                                            lZipWith, zero)
 
 -- | Possible operators in the source language
 data Operation a b where
@@ -87,8 +86,7 @@ evalLOp DConstant () = zero
 evalLOp DConstantT () = zero
 evalLOp DEAdd (_x, _y) = lAdd
 evalLOp DEAddT (_x, _y) = lDup
-evalLOp DEProd (x, y) =
-  lComp (lMapTuple xDeriv yDeriv) lAdd
+evalLOp DEProd (x, y) = lComp (lMapTuple xDeriv yDeriv) lAdd
   where
     xDeriv = lZipWith lProd y
     yDeriv = lZipWith lProd x
