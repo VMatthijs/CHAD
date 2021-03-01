@@ -1,4 +1,4 @@
-# Source Code Transformation Automatic Differentiation
+# Sr. Chad: Source Rewriting, Combinatory Homomorphic Automatic Differentiation 
 
 This project gives an implementation and extension of the automatic differentiation algorithm described in [[1]](https://arxiv.org/abs/2007.05283).
 
