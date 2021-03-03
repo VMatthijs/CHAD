@@ -220,7 +220,7 @@ d2 (SL.Op EScalAdd) = return $ TL.LOp DEScalAddT
 d2 (SL.Op EScalSubt) = return $ TL.LOp DEScalSubtT
 d2 (SL.Op EScalProd) = return $ TL.LOp DEScalProdT
 d2 (SL.Op Sum) = return $ TL.LOp DSumT -- [1, 1, 1, 1, ...]
-d2 (SL.Rec t)           = do  -- THIS IS PROBABLY WRONG
+d2 (SL.Rec t)           = do
     d1t <- d1 t 
     d2t <- d2 t 
     x <- gensym
