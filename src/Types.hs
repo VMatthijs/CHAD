@@ -43,7 +43,7 @@ module Types
   , lIt
   , LEither
   , lInl
-  , lInr  
+  , lInr
   , lCoPair
   , Tens
   , empty
@@ -81,7 +81,8 @@ newtype LFun a b =
   MkLFun (a -> b)
 
 -- | Linear coproduct
-newtype LEither a b = MkLEither (Maybe (Either a b))
+newtype LEither a b =
+  MkLEither (Maybe (Either a b))
 
 -- Methods for tensor products
 -- | Empty tensor product
@@ -101,11 +102,12 @@ lInl = MkLFun (MkLEither . Just . Left)
 lInr :: LFun b (LEither a b)
 lInr = MkLFun (MkLEither . Just . Right)
 
-lCoPair :: LT c => LFun a c -> LFun b c -> LFun (LEither a b) c 
-lCoPair (MkLFun f) (MkLFun g) = MkLFun h where 
-  h (MkLEither Nothing) = zero 
-  h (MkLEither (Just (Left a))) = f a 
-  h (MkLEither (Just (Right b))) = g b
+lCoPair :: LT c => LFun a c -> LFun b c -> LFun (LEither a b) c
+lCoPair (MkLFun f) (MkLFun g) = MkLFun h
+  where
+    h (MkLEither Nothing)          = zero
+    h (MkLEither (Just (Left a)))  = f a
+    h (MkLEither (Just (Right b))) = g b
 
 -- Methods for linear functions
 lId :: LFun a a
@@ -120,7 +122,7 @@ lDup = MkLFun $ \a -> (a, a)
 lComp :: LFun a b -> LFun b c -> LFun a c
 lComp (MkLFun f) (MkLFun g) = MkLFun $ g . f
 
-lApp :: (LT a, LT b) => LFun a b -> a -> b
+lApp :: LFun a b -> a -> b
 lApp (MkLFun f) = f
 
 lEval :: a -> LFun (a -> b) b
@@ -231,11 +233,11 @@ dIt ::
 dIt d1t d2t (d1a, d1b) =
   MkLFun $ \(d2a, d2b) ->
     let d1bs = scanIt d1t (d1a, d1b)
-        vfst (MkLEither Nothing) = zero 
-        vfst (MkLEither (Just (Left a))) = a 
+        vfst (MkLEither Nothing)          = zero
+        vfst (MkLEither (Just (Left a)))  = a
         vfst (MkLEither (Just (Right _))) = error "This should never happen."
-        vsnd (MkLEither Nothing) = zero 
-        vsnd (MkLEither (Just (Left _))) = error "This should never happen."
+        vsnd (MkLEither Nothing)          = zero
+        vsnd (MkLEither (Just (Left _)))  = error "This should never happen."
         vsnd (MkLEither (Just (Right b))) = b
      in vfst
           (d2t (d1a, last d1bs) `lApp`
@@ -283,7 +285,7 @@ lIt f =
             in plus a (lIt f `lApp` b')
 
 -- Forward mode AD type families
-type family Df1 a where
+type family Df1 a = r | r -> a where
   Df1 Scal = Scal
   Df1 (Vect n) = Vect n
   Df1 (a -> b) = Df1 a -> (Df1 b, LFun (Df2 a) (Df2 b))
@@ -291,7 +293,7 @@ type family Df1 a where
   Df1 () = ()
   Df1 (Either a b) = Either (Df1 a) (Df1 b)
 
-type family Df2 a where
+type family Df2 a = r | r -> a where
   Df2 Scal = Scal
   Df2 (Vect n) = Vect n
   Df2 (a -> b) = Df1 a -> Df2 b
@@ -300,7 +302,7 @@ type family Df2 a where
   Df2 (Either a b) = LEither (Df2 a) (Df2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), which is possible as long as we use zeroR and zeroF.
 
 -- Reverse mode AD type families
-type family Dr1 a where
+type family Dr1 a = r | r -> a where
   Dr1 Scal = Scal
   Dr1 (Vect n) = Vect n
   Dr1 (a -> b) = Dr1 a -> (Dr1 b, LFun (Dr2 b) (Dr2 a))
@@ -308,7 +310,7 @@ type family Dr1 a where
   Dr1 () = ()
   Dr1 (Either a b) = Either (Dr1 a) (Dr1 b)
 
-type family Dr2 a where
+type family Dr2 a = r | r -> a where
   Dr2 Scal = Scal
   Dr2 (Vect n) = Vect n
   Dr2 (a -> b) = Tens (Dr1 a) (Dr2 b)
@@ -365,8 +367,8 @@ eqTy _ _ = Nothing
 -- | Operators defined over multiple language types
 class LT a where
   zero :: a -- For automatic differentiation
-  -- zeroF :: Df1 a -> Df2 a -- TODO: Better, for types of varying dimension like unsized vectors or variants.
-  -- zeroR :: Dr1 a -> Dr2 a -- TODO: Better, for types of varying dimension like unsized vectors or variants.
+  zeroF :: Df1 a -> Df2 a -- TODO: Better, for types of varying dimension like unsized vectors or variants.
+  zeroR :: Dr1 a -> Dr2 a -- TODO: Better, for types of varying dimension like unsized vectors or variants.
   plus :: a -> a -> a -- For automatic differentiation
   isZero :: a -> Bool -- For reverse AD of recursion
   inferType :: Type a -- For interpreter of target language
@@ -377,6 +379,8 @@ class LT a where
 
 instance LT () where
   zero = ()
+  zeroF = const ()
+  zeroR = const ()
   plus _ _ = ()
   isZero _ = True
   inferType = TUnit
@@ -387,6 +391,8 @@ instance LT () where
 
 instance (LT a, LT b) => LT (a, b) where
   zero = (zero, zero)
+  zeroF (a, b) = (zeroF a, zeroF b)
+  zeroR (a, b) = (zeroR a, zeroR b)
   plus a b = (fst a `plus` fst b, snd a `plus` snd b)
   isZero (a, b) = isZero a && isZero b
   inferType = TPair inferType inferType
@@ -397,6 +403,10 @@ instance (LT a, LT b) => LT (a, b) where
 
 instance (LT a, LT b) => LT (Either a b) where
   zero = error "This should never be used." -- This doesn't make sense.
+  zeroF (Left a)  = MkLEither (Just (Left (zeroF a)))
+  zeroF (Right b) = MkLEither (Just (Right (zeroF b)))
+  zeroR (Left a)  = MkLEither (Just (Left (zeroR a)))
+  zeroR (Right b) = MkLEither (Just (Right (zeroR b)))
   plus (Left a) (Left a')   = Left (a `plus` a')
   plus (Right a) (Right a') = Right (a `plus` a')
   plus _ _                  = error "This should never be used." -- This doesn't make sense.
@@ -415,6 +425,8 @@ instance (LT a, LT b) => LT (Either a b) where
 
 instance LT Scal where
   zero = 0
+  zeroF = const zero
+  zeroR = const zero
   plus = (+)
   isZero = (== zero)
   inferType = TScal
@@ -425,6 +437,8 @@ instance LT Scal where
 
 instance KnownNat n => LT (Vect n) where
   zero = V.replicate 0
+  zeroF = const zero
+  zeroR = const zero
   plus = V.zipWith (+)
   isZero = (== zero)
   inferType = TVect (Proxy @n)
@@ -435,6 +449,8 @@ instance KnownNat n => LT (Vect n) where
 
 instance (LT a, LT b) => LT (a -> b) where
   zero = const zero
+  zeroF f a = snd (f a) `lApp` (zeroF a)
+  zeroR _ = MkTens []
   plus f g = \x -> plus (f x) (g x)
   isZero = error "This should never be used." -- undecidable
   inferType = TArrow inferType inferType
@@ -445,6 +461,8 @@ instance (LT a, LT b) => LT (a -> b) where
 
 instance (LT a, LT b) => LT (Tens a b) where
   zero = empty
+  zeroF = error "This should never be used."
+  zeroR = error "This should never be used."
   plus = addTens
   isZero (MkTens xs) = all isZero (map snd xs)
   inferType = TTens inferType inferType
@@ -456,6 +474,8 @@ instance (LT a, LT b) => LT (Tens a b) where
 
 instance (LT a, LT b) => LT (LFun a b) where
   zero = MkLFun zero
+  zeroF = error "This should never be used."
+  zeroR = error "This should never be used."
   plus = lPlus
   isZero = error "This should never be used." -- undecidable
   inferType = TLinFun inferType inferType
@@ -464,30 +484,41 @@ instance (LT a, LT b) => LT (LFun a b) where
   minus = lMinus
   showMe = error "This should never be used." -- This doesn't make sense.
 
-instance (LT a, LT b) => LT (LEither a b) where 
-  zero = MkLEither Nothing 
-  plus (MkLEither Nothing ) b = b 
-  plus a (MkLEither Nothing) = a 
-  plus (MkLEither (Just (Left a))) (MkLEither (Just (Left a'))) = MkLEither (Just (Left (a `plus` a')))
-  plus (MkLEither (Just (Right b))) (MkLEither (Just (Right b'))) = MkLEither (Just (Right (b `plus` b')))
+instance (LT a, LT b) => LT (LEither a b) where
+  zero = MkLEither Nothing
+  zeroF = error "This should never be used."
+  zeroR = error "This should never be used."
+  plus (MkLEither Nothing) b = b
+  plus a (MkLEither Nothing) = a
+  plus (MkLEither (Just (Left a))) (MkLEither (Just (Left a'))) =
+    MkLEither (Just (Left (a `plus` a')))
+  plus (MkLEither (Just (Right b))) (MkLEither (Just (Right b'))) =
+    MkLEither (Just (Right (b `plus` b')))
   plus _ _ = error "This should never be used." -- This doesn't make sense.
-  isZero (MkLEither Nothing) = True 
-  isZero (MkLEither (Just (Left a))) = isZero a 
+  isZero (MkLEither Nothing)          = True
+  isZero (MkLEither (Just (Left a)))  = isZero a
   isZero (MkLEither (Just (Right b))) = isZero b
-  inferType = TLEither inferType inferType 
+  inferType = TLEither inferType inferType
   scalProd _ (MkLEither Nothing) = MkLEither Nothing
-  scalProd r (MkLEither (Just (Left a)))  = MkLEither (Just (Left (scalProd r a)))
-  scalProd r (MkLEither (Just (Right b))) = MkLEither (Just (Right (scalProd r b)))
+  scalProd r (MkLEither (Just (Left a))) =
+    MkLEither (Just (Left (scalProd r a)))
+  scalProd r (MkLEither (Just (Right b))) =
+    MkLEither (Just (Right (scalProd r b)))
   scalDiv (MkLEither Nothing) _ = MkLEither Nothing
-  scalDiv (MkLEither (Just (Left a))) r  = MkLEither (Just (Left (scalDiv a r)))
-  scalDiv (MkLEither (Just (Right b))) r = MkLEither (Just (Right (scalDiv b r)))
-  minus (MkLEither Nothing ) (MkLEither Nothing ) = MkLEither Nothing
-  minus (MkLEither Nothing ) (MkLEither (Just (Left a)) ) = MkLEither (Just (Left (zero `minus` a)))
-  minus (MkLEither Nothing ) (MkLEither (Just (Right b)) ) = MkLEither (Just (Right (zero `minus` b)))
-  minus a (MkLEither Nothing) = a 
-  minus (MkLEither (Just (Left a))) (MkLEither (Just (Left a'))) = MkLEither (Just (Left (a `minus` a')))
-  minus (MkLEither (Just (Right b))) (MkLEither (Just (Right b'))) = MkLEither (Just (Right (b `minus` b')))
+  scalDiv (MkLEither (Just (Left a))) r = MkLEither (Just (Left (scalDiv a r)))
+  scalDiv (MkLEither (Just (Right b))) r =
+    MkLEither (Just (Right (scalDiv b r)))
+  minus (MkLEither Nothing) (MkLEither Nothing) = MkLEither Nothing
+  minus (MkLEither Nothing) (MkLEither (Just (Left a))) =
+    MkLEither (Just (Left (zero `minus` a)))
+  minus (MkLEither Nothing) (MkLEither (Just (Right b))) =
+    MkLEither (Just (Right (zero `minus` b)))
+  minus a (MkLEither Nothing) = a
+  minus (MkLEither (Just (Left a))) (MkLEither (Just (Left a'))) =
+    MkLEither (Just (Left (a `minus` a')))
+  minus (MkLEither (Just (Right b))) (MkLEither (Just (Right b'))) =
+    MkLEither (Just (Right (b `minus` b')))
   minus _ _ = error "This should never be used." -- This doesn't make sense.
-  showMe (MkLEither Nothing) = "Nothing"
+  showMe (MkLEither Nothing)          = "Nothing"
   showMe (MkLEither (Just (Left a)))  = "Left (" ++ showMe a ++ ")"
   showMe (MkLEither (Just (Right b))) = "Right (" ++ showMe b ++ ")"
