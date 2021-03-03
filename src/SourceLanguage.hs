@@ -167,7 +167,7 @@ data STerm a b
        , LT (Df1 b)
        , LT (Df2 b)
        )
-    => STerm a (Either a b) 
+    => STerm a (Either a b)
   Inr
     :: ( LT a
        , LT (Dr1 a)
@@ -180,7 +180,7 @@ data STerm a b
        , LT (Df1 b)
        , LT (Df2 b)
        )
-    => STerm b (Either a b) 
+    => STerm b (Either a b)
   CoPair
     :: ( LT a
        , LT (Dr1 a)
@@ -234,7 +234,7 @@ data STerm a b
        , LT (Df2 b)
        )
     => STerm (a, b) b
-    -> STerm a b 
+    -> STerm a b
 
 --     -- | Foldr
 -- | Evaluate the source language
@@ -253,15 +253,14 @@ evalSt Foldr = \((f, v), xs) -> V.foldr (\r a -> f (r, a)) v xs
 evalSt (Rec t) = fix (evalSt t)
   where
     fix f a = f (a, fix f a)
-evalSt Inl = Left 
-evalSt Inr = Right 
+evalSt Inl = Left
+evalSt Inr = Right
 evalSt (CoPair f g) =
   \x ->
-    case x 
-          of
+    case x of
       Left a  -> evalSt f a
       Right b -> evalSt g b
-evalSt (It t) = fix (evalSt t) 
+evalSt (It t) = fix (evalSt t)
   where
     fix f (a, b) =
       case f (a, b) of

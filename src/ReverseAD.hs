@@ -70,19 +70,19 @@ d1 (SL.Curry t) = do
     yType = inferType
 d1 SL.Inl = do
   xVar <- gensym
-  return $ TL.Lambda xVar t $ TL.Inl (TL.Var xVar t) 
+  return $ TL.Lambda xVar t $ TL.Inl (TL.Var xVar t)
   where
     t = inferType
 d1 SL.Inr = do
   xVar <- gensym
-  return $ TL.Lambda xVar t $ TL.Inr (TL.Var xVar t) 
+  return $ TL.Lambda xVar t $ TL.Inr (TL.Var xVar t)
   where
     t = inferType
 d1 (SL.CoPair s t) = do
   yVar <- gensym
   d1t <- d1 t
   d1s <- d1 s
-  return $ TL.Lambda yVar yType $ TL.Case (TL.Var yVar yType) d1s d1t 
+  return $ TL.Lambda yVar yType $ TL.Case (TL.Var yVar yType) d1s d1t
   where
     yType = inferType
 d1 (SL.Op op) = do
@@ -120,10 +120,10 @@ d1 SL.Foldr = do
             (TL.Snd (TL.Fst (TL.Var xVar xType))))
          (TL.Snd (TL.Var xVar xType)))
 d1 (SL.Rec t) = do
-  d1t <- d1 t 
+  d1t <- d1 t
   return $ TL.Rec d1t
 d1 (SL.It t) = do
-  d1t <- d1 t 
+  d1t <- d1 t
   return $ TL.It d1t
 d1 SL.Sign = do
   xVar <- gensym
@@ -179,12 +179,12 @@ d2 SL.Inl = do
   xVar <- gensym
   return $ TL.Lambda xVar xType TL.LFst -- Note, we could make this more type safe by doing a dynamic check in TL.LFst to make sure the second component is 0.
   where
-    xType = inferType 
+    xType = inferType
 d2 SL.Inr = do
   xVar <- gensym
   return $ TL.Lambda xVar xType TL.LSnd -- Note, we could make this more type safe by doing a dynamic check in TL.LSnd to make sure the first component is 0.
   where
-    xType = inferType 
+    xType = inferType
 d2 (SL.CoPair f g) = do
   xVar <- gensym
   yVar <- gensym
@@ -204,7 +204,7 @@ d2 (SL.CoPair f g) = do
   where
     xType = inferType
     yType = inferType
-    zType = inferType 
+    zType = inferType
 -- Map
 d2 SL.Map = do
   xVar <- gensym
@@ -220,15 +220,17 @@ d2 (SL.Op EScalAdd) = return $ TL.LOp DEScalAddT
 d2 (SL.Op EScalSubt) = return $ TL.LOp DEScalSubtT
 d2 (SL.Op EScalProd) = return $ TL.LOp DEScalProdT
 d2 (SL.Op Sum) = return $ TL.LOp DSumT -- [1, 1, 1, 1, ...]
-d2 (SL.Rec t)           = do
-    d1t <- d1 t 
-    d2t <- d2 t 
-    x <- gensym
-    let body = d2t `TL.App` TL.Pair (TL.Var x xType) ((TL.Rec d1t) `TL.App` (TL.Var x xType))
-    return $ TL.Lambda x xType $ TL.LIt $ body
-    where xType = inferType
-d2 (SL.It t) 
- = do
+d2 (SL.Rec t) = do
+  d1t <- d1 t
+  d2t <- d2 t
+  x <- gensym
+  let body =
+        d2t `TL.App`
+        TL.Pair (TL.Var x xType) ((TL.Rec d1t) `TL.App` (TL.Var x xType))
+  return $ TL.Lambda x xType $ TL.LIt $ body
+  where
+    xType = inferType
+d2 (SL.It t) = do
   d1t <- d1 t
   d2t <- d2 t
   return $ TL.DtIt d1t d2t
