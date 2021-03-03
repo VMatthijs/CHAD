@@ -69,19 +69,19 @@ d1 (SL.Curry t) = do
     yType = inferType
 d1 SL.Inl = do
   xVar <- gensym
-  return $ TL.Lambda xVar t $ TL.Inl (TL.Var xVar t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  return $ TL.Lambda xVar t $ TL.Inl (TL.Var xVar t) 
   where
     t = inferType
 d1 SL.Inr = do
   xVar <- gensym
-  return $ TL.Lambda xVar t $ TL.Inr (TL.Var xVar t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  return $ TL.Lambda xVar t $ TL.Inr (TL.Var xVar t) 
   where
     t = inferType
 d1 (SL.CoPair s t) = do
   yVar <- gensym
   d1t <- d1 t
   d1s <- d1 s
-  return $ TL.Lambda yVar yType $ TL.Case (TL.Var yVar yType) d1s d1t -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  return $ TL.Lambda yVar yType $ TL.Case (TL.Var yVar yType) d1s d1t 
   where
     yType = inferType
 d1 (SL.Op op) = do
@@ -118,10 +118,10 @@ d1 SL.Foldr = do
             (TL.Snd (TL.Fst (TL.Var xVar xType))))
          (TL.Snd (TL.Var xVar xType)))
 d1 (SL.Rec t) = do
-  d1t <- d1 t -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+  d1t <- d1 t 
   return $ TL.Rec d1t
 d1 (SL.It t) = do
-  d1t <- d1 t -- EXPERIMENTAL SUPPORT FOR ITERATION
+  d1t <- d1 t 
   return $ TL.It d1t
 d1 SL.Sign = do
   xVar <- gensym
@@ -174,19 +174,19 @@ d2 (SL.Curry t) = do
   where
     xType = inferType
     yType = inferType
-d2 SL.Inl -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+d2 SL.Inl 
  = do
   xVar <- gensym
   return $ TL.Lambda xVar xType (TL.LPair TL.LId TL.Zero)
   where
     xType = inferType
-d2 SL.Inr -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+d2 SL.Inr 
  = do
   xVar <- gensym
   return $ TL.Lambda xVar xType (TL.LPair TL.Zero TL.LId)
   where
     xType = inferType
-d2 (SL.CoPair f g) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+d2 (SL.CoPair f g) 
  = do
   xVar <- gensym
   yVar <- gensym
@@ -224,14 +224,14 @@ d2 (SL.Op EScalAdd) = return $ TL.LOp DEScalAdd
 d2 (SL.Op EScalSubt) = return $ TL.LOp DEScalSubt
 d2 (SL.Op EScalProd) = return $ TL.LOp DEScalProd
 d2 (SL.Op Sum) = return $ TL.LOp DSum
-d2 (SL.Rec t)           = do -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION -- THIS IS PROBABLY WRONG
+d2 (SL.Rec t)           = do
     d1t <- d1 t 
     d2t <- d2 t 
     x <- gensym
     let body = d2t `TL.App` TL.Pair (TL.Var x xType) ((TL.Rec d1t) `TL.App` (TL.Var x xType))
     return $ TL.Lambda x xType $ TL.LRec $ body
     where xType = inferType
-d2 (SL.It t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+d2 (SL.It t)
  = do
   d1t <- d1 t
   d2t <- d2 t

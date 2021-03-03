@@ -207,7 +207,7 @@ dIt ::
      (LT d2a, LT d2b, LT d2c)
   => ((d1a, d1b) -> Either d1c d1b)
   -> ((d1a, d1b) -> LFun (d2a, d2b) (d2c, d2b))
-  -> ((d1a, d1b) -> LFun (d2a, d2b) d2c) -- EXPERIMENTAL SUPPORT FOR ITERATION
+  -> ((d1a, d1b) -> LFun (d2a, d2b) d2c) 
 dIt d1t d2t (d1a, d1b) =
   MkLFun $ \(d2a, d2b) ->
     let d1bs = scanIt d1t (d1a, d1b)
@@ -223,7 +223,7 @@ dtIt ::
      (LT d2a, LT d2b, LT d2c)
   => ((d1a, d1b) -> Either d1c d1b)
   -> ((d1a, d1b) -> LFun (d2c, d2b) (d2a, d2b))
-  -> ((d1a, d1b) -> LFun d2c (d2a, d2b)) -- EXPERIMENTAL SUPPORT FOR ITERATION
+  -> ((d1a, d1b) -> LFun d2c (d2a, d2b)) 
 dtIt d1t d2t (d1a, d1b) =
   MkLFun $ \d2c ->
     let d1bs = scanIt d1t (d1a, d1b)
@@ -243,12 +243,12 @@ scanIt f (c, a) =
       let as = scanIt f (c, a')
        in a : as
 
-lRec :: LFun (a, b) b -> LFun a b -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+lRec :: LFun (a, b) b -> LFun a b 
 lRec (MkLFun g) = MkLFun $ lrec g
   where
     lrec f a = f (a, lrec f a)
 
-lIt :: (LT a, LT b) => LFun b (a, b) -> LFun b a -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+lIt :: (LT a, LT b) => LFun b (a, b) -> LFun b a 
 lIt f =
   MkLFun $ \b ->
     if isZero b -- Note that this will be decidable in practice as b will not contain any function types (being a Dr2 type)!
@@ -263,7 +263,7 @@ type family Df1 a where
   Df1 (a -> b) = Df1 a -> (Df1 b, LFun (Df2 a) (Df2 b))
   Df1 (a, b) = (Df1 a, Df1 b)
   Df1 () = ()
-  Df1 (Either a b) = Either (Df1 a) (Df1 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  Df1 (Either a b) = Either (Df1 a) (Df1 b) 
 
 type family Df2 a where
   Df2 Scal = Scal
@@ -271,7 +271,7 @@ type family Df2 a where
   Df2 (a -> b) = Df1 a -> Df2 b
   Df2 (a, b) = (Df2 a, Df2 b)
   Df2 () = ()
-  Df2 (Either a b) = (Df2 a, Df2 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  Df2 (Either a b) = (Df2 a, Df2 b) 
 
 -- Reverse mode AD type families
 type family Dr1 a where
@@ -280,7 +280,7 @@ type family Dr1 a where
   Dr1 (a -> b) = Dr1 a -> (Dr1 b, LFun (Dr2 b) (Dr2 a))
   Dr1 (a, b) = (Dr1 a, Dr1 b)
   Dr1 () = ()
-  Dr1 (Either a b) = Either (Dr1 a) (Dr1 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  Dr1 (Either a b) = Either (Dr1 a) (Dr1 b) 
 
 type family Dr2 a where
   Dr2 Scal = Scal
@@ -288,7 +288,7 @@ type family Dr2 a where
   Dr2 (a -> b) = Tens (Dr1 a) (Dr2 b)
   Dr2 (a, b) = (Dr2 a, Dr2 b)
   Dr2 () = ()
-  Dr2 (Either a b) = (Dr2 a, Dr2 b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  Dr2 (Either a b) = (Dr2 a, Dr2 b) 
 
 data Type a where
   TScal :: Type Scal
@@ -296,7 +296,7 @@ data Type a where
   TArrow :: Type a -> Type b -> Type (a -> b)
   TPair :: Type a -> Type b -> Type (a, b)
   TUnit :: Type ()
-  TEither :: Type a -> Type b -> Type (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  TEither :: Type a -> Type b -> Type (Either a b) 
   TLinFun :: Type a -> Type b -> Type (LFun a b)
   TTens :: Type a -> Type b -> Type (Tens a b)
 
@@ -362,7 +362,7 @@ instance (LT a, LT b) => LT (a, b) where
   minus a b = (fst a `minus` fst b, snd a `minus` snd b)
   showMe (a, b) = "(" ++ showMe a ++ ", " ++ showMe b ++ ")"
 
-instance (LT a, LT b) => LT (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+instance (LT a, LT b) => LT (Either a b) 
                                                                                where
   zero = error "This should never be used." -- This doesn't make sense.
   plus (Left a) (Left a')   = Left (a `plus` a')

@@ -29,16 +29,16 @@ data TTerm t
   Pair :: TTerm a -> TTerm b -> TTerm (a, b)
   Fst :: TTerm (a, b) -> TTerm a
   Snd :: TTerm (a, b) -> TTerm b
-  Inl :: (LT a, LT b) => TTerm a -> TTerm (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-  Inr :: (LT a, LT b) => TTerm b -> TTerm (Either a b) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  Inl :: (LT a, LT b) => TTerm a -> TTerm (Either a b) 
+  Inr :: (LT a, LT b) => TTerm b -> TTerm (Either a b) 
   Case
     :: (LT a, LT b, LT c)
     => TTerm (Either a b)
     -> TTerm (a -> c)
     -> TTerm (b -> c)
-    -> TTerm c -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-  It :: TTerm ((a, b) -> Either c b) -> TTerm ((a, b) -> c) -- EXPERIMENTAL SUPPORT FOR ITERATION
-  Rec :: TTerm ((a, b) -> b) -> TTerm (a -> b) -- EXPERIMENTAL SUPPORT FOR RECURSION (Should we work with a representation that is variable binding instead?)
+    -> TTerm c 
+  It :: TTerm ((a, b) -> Either c b) -> TTerm ((a, b) -> c) 
+  Rec :: TTerm ((a, b) -> b) -> TTerm (a -> b)  (Should we work with a representation that is variable binding instead?)
   Sign :: TTerm Scal -> TTerm (Either () ())
   Lift :: a -> Type a -> TTerm a
     -- | Operators
@@ -102,14 +102,14 @@ data TTerm t
     :: (LT d2a, LT d2b, LT d2c)
     => TTerm ((d1a, d1b) -> Either d1c d1b)
     -> TTerm ((d1a, d1b) -> LFun (d2a, d2b) (d2c, d2b))
-    -> TTerm ((d1a, d1b) -> LFun (d2a, d2b) d2c) -- EXPERIMENTAL SUPPORT FOR ITERATION
+    -> TTerm ((d1a, d1b) -> LFun (d2a, d2b) d2c) 
   DtIt
     :: (LT d2a, LT d2b, LT d2c)
     => TTerm ((d1a, d1b) -> Either d1c d1b)
     -> TTerm ((d1a, d1b) -> LFun (d2c, d2b) (d2a, d2b))
-    -> TTerm ((d1a, d1b) -> LFun d2c (d2a, d2b)) -- EXPERIMENTAL SUPPORT FOR ITERATION
-  LRec :: TTerm (LFun (a, b) b) -> TTerm (LFun a b) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-  LIt :: (LT a, LT b) => TTerm (LFun b (a, b)) -> TTerm (LFun b a) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+    -> TTerm ((d1a, d1b) -> LFun d2c (d2a, d2b)) 
+  LRec :: TTerm (LFun (a, b) b) -> TTerm (LFun a b) 
+  LIt :: (LT a, LT b) => TTerm (LFun b (a, b)) -> TTerm (LFun b a) 
 
 -- | Substitute variable for term
 subst :: String -> u -> Type u -> TTerm t -> TTerm t
@@ -134,12 +134,12 @@ subst _ _ _ (Lift x t) = Lift x t
 subst x v u (Op op y) = Op op (subst x v u y)
 subst x v u (Map f y) = Map (subst x v u f) (subst x v u y)
 subst _ _ _ Foldr = Foldr
-subst x v u (Inl t) = Inl (subst x v u t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-subst x v u (Inr t) = Inr (subst x v u t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-subst x v u (Case t l r) = Case (subst x v u t) (subst x v u l) (subst x v u r) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+subst x v u (Inl t) = Inl (subst x v u t) 
+subst x v u (Inr t) = Inr (subst x v u t) 
+subst x v u (Case t l r) = Case (subst x v u t) (subst x v u l) (subst x v u r) 
 -- Target language extension
-subst x v u (Rec t) = Rec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-subst x v u (It t) = It (subst x v u t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+subst x v u (Rec t) = Rec (subst x v u t) 
+subst x v u (It t) = It (subst x v u t) 
 subst x v u (Sign t) = Sign (subst x v u t)
 subst _ _ _ LId = LId
 subst x v u (LComp f g) = LComp (subst x v u f) (subst x v u g)
@@ -158,10 +158,10 @@ subst x v u (DMap t) = DMap (subst x v u t)
 subst x v u (DtMap t) = DtMap (subst x v u t)
 subst _ _ _ DFoldr = DFoldr
 subst _ _ _ DtFoldr = DtFoldr
-subst x v u (DIt d1t d2t) = DIt (subst x v u d1t) (subst x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
-subst x v u (DtIt d1t d2t) = DtIt (subst x v u d1t) (subst x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATIO
-subst x v u (LRec t) = LRec (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-subst x v u (LIt t) = LIt (subst x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+subst x v u (DIt d1t d2t) = DIt (subst x v u d1t) (subst x v u d2t) 
+subst x v u (DtIt d1t d2t) = DtIt (subst x v u d1t) (subst x v u d2t)
+subst x v u (LRec t) = LRec (subst x v u t) 
+subst x v u (LIt t) = LIt (subst x v u t) 
 
 -- | Substitute variable for a TTerm
 substTt :: String -> TTerm u -> Type u -> TTerm t -> TTerm t
@@ -182,16 +182,16 @@ substTt _ _ _ Unit = Unit
 substTt x v u (Pair a b) = Pair (substTt x v u a) (substTt x v u b)
 substTt x v u (Fst p) = Fst (substTt x v u p)
 substTt x v u (Snd p) = Snd (substTt x v u p)
-substTt x v u (Inl t) = Inl (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-substTt x v u (Inr t) = Inr (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+substTt x v u (Inl t) = Inl (substTt x v u t) 
+substTt x v u (Inr t) = Inr (substTt x v u t) 
 substTt x v u (Case t l r) =
-  Case (substTt x v u t) (substTt x v u l) (substTt x v u r) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  Case (substTt x v u t) (substTt x v u l) (substTt x v u r) 
 substTt _ _ _ (Lift x t) = Lift x t
 substTt x v u (Op op y) = Op op (substTt x v u y)
 substTt x v u (Map f y) = Map (substTt x v u f) (substTt x v u y)
 substTt _ _ _ Foldr = Foldr
-substTt x v u (Rec t) = Rec (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-substTt x v u (It t) = It (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+substTt x v u (Rec t) = Rec (substTt x v u t) 
+substTt x v u (It t) = It (substTt x v u t) 
 substTt x v u (Sign t) = Sign (substTt x v u t)
 -- Target language extension
 substTt _ _ _ LId = LId
@@ -211,10 +211,10 @@ substTt x v u (DMap t) = DMap (substTt x v u t)
 substTt x v u (DtMap t) = DtMap (substTt x v u t)
 substTt _ _ _ DFoldr = DFoldr
 substTt _ _ _ DtFoldr = DtFoldr
-substTt x v u (DIt d1t d2t) = DIt (substTt x v u d1t) (substTt x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
-substTt x v u (DtIt d1t d2t) = DtIt (substTt x v u d1t) (substTt x v u d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
-substTt x v u (LRec t) = LRec (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-substTt x v u (LIt t) = LIt (substTt x v u t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+substTt x v u (DIt d1t d2t) = DIt (substTt x v u d1t) (substTt x v u d2t) 
+substTt x v u (DtIt d1t d2t) = DtIt (substTt x v u d1t) (substTt x v u d2t) 
+substTt x v u (LRec t) = LRec (substTt x v u t) 
+substTt x v u (LIt t) = LIt (substTt x v u t) 
 
 -- | Evaluate the target language
 evalTt :: TTerm t -> t
@@ -226,10 +226,10 @@ evalTt Unit = ()
 evalTt (Pair a b) = (evalTt a, evalTt b)
 evalTt (Fst p) = fst $ evalTt p
 evalTt (Snd p) = snd $ evalTt p
-evalTt (Inl p) = Left $ evalTt p -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-evalTt (Inr p) = Right $ evalTt p -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+evalTt (Inl p) = Left $ evalTt p 
+evalTt (Inr p) = Right $ evalTt p 
 evalTt (Case p l r) =
-  case evalTt p -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  case evalTt p 
         of
     Left q  -> evalTt l q
     Right q -> evalTt r q
@@ -237,10 +237,10 @@ evalTt (Lift x _) = x
 evalTt (Op op a) = evalOp op (evalTt a)
 evalTt (Map f x) = V.map (evalTt f) (evalTt x)
 evalTt Foldr = \((f, v), xs) -> V.foldr (\r a -> f (r, a)) v xs
-evalTt (Rec t) = fix (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+evalTt (Rec t) = fix (evalTt t) 
   where
     fix f a = f (a, fix f a)
-evalTt (It t) = fix (evalTt t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+evalTt (It t) = fix (evalTt t) 
   where
     fix f (a, b) =
       case f (a, b) of
@@ -275,10 +275,10 @@ evalTt (DtMap t) = lPair (lZip v) (lZipWith (snd . f) v)
     (f, v) = evalTt t
 evalTt DFoldr = dFoldr
 evalTt DtFoldr = dtFoldr
-evalTt (DIt d1t d2t) = dIt (evalTt d1t) (evalTt d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
-evalTt (DtIt d1t d2t) = dtIt (evalTt d1t) (evalTt d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
-evalTt (LRec t) = lRec (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-evalTt (LIt t) = lIt (evalTt t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+evalTt (DIt d1t d2t) = dIt (evalTt d1t) (evalTt d2t) 
+evalTt (DtIt d1t d2t) = dtIt (evalTt d1t) (evalTt d2t) 
+evalTt (LRec t) = lRec (evalTt t) 
+evalTt (LIt t) = lIt (evalTt t) 
 
 -- | Pretty print the target language
 printTt :: TTerm t -> String
@@ -290,16 +290,16 @@ printTt Unit = "()"
 printTt (Pair a b) = "(" ++ printTt a ++ ", " ++ printTt b ++ ")"
 printTt (Fst p) = "Fst(" ++ printTt p ++ ")"
 printTt (Snd p) = "Snd(" ++ printTt p ++ ")"
-printTt (Inl p) = "Inl(" ++ printTt p ++ ")" -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-printTt (Inr p) = "Inr(" ++ printTt p ++ ")" -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+printTt (Inl p) = "Inl(" ++ printTt p ++ ")" 
+printTt (Inr p) = "Inr(" ++ printTt p ++ ")" 
 printTt (Case p l r) =
-  "Case(" ++ printTt p ++ ", " ++ printTt l ++ ", " ++ printTt r ++ ")" -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  "Case(" ++ printTt p ++ ", " ++ printTt l ++ ", " ++ printTt r ++ ")" 
 printTt (Lift _ _) = error "Can't print lifted value"
 printTt (Op op a) = "evalOp " ++ showOp op ++ " " ++ printTt a
 printTt (Map f a) = "map (" ++ printTt f ++ ") " ++ printTt a
 printTt Foldr = "foldr"
-printTt (Rec t) = "rec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-printTt (It t) = "it(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
+printTt (Rec t) = "rec(" ++ printTt t ++ ")" 
+printTt (It t) = "it(" ++ printTt t ++ ")" 
 printTt (Sign t) = "sign(" ++ printTt t ++ ")"
 -- Target language extension
 printTt (LOp lop) = "evalLOp " ++ showLOp lop
@@ -319,10 +319,10 @@ printTt (DMap t) = "DMap(" ++ printTt t ++ ")"
 printTt DFoldr = "DFoldr"
 printTt DtFoldr = "DtFoldr"
 printTt (DtMap t) = "DtMap(" ++ printTt t ++ ")"
-printTt (DIt d1t d2t) = "DIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
-printTt (DtIt d1t d2t) = "DtIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")" -- EXPERIMENTAL SUPPORT FOR ITERATION
-printTt (LRec t) = "lrec(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-printTt (LIt t) = "lit(" ++ printTt t ++ ")" -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+printTt (DIt d1t d2t) = "DIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")" 
+printTt (DtIt d1t d2t) = "DtIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")" 
+printTt (LRec t) = "lrec(" ++ printTt t ++ ")" 
+printTt (LIt t) = "lit(" ++ printTt t ++ ")" 
 
 instance Show (TTerm a) where
   show = printTt

@@ -20,15 +20,15 @@ simplifyTTerm Unit = Unit
 simplifyTTerm (Pair a b) = Pair (simplifyTTerm a) (simplifyTTerm b)
 simplifyTTerm (Fst p) = simplifyFst (simplifyTTerm p)
 simplifyTTerm (Snd p) = simplifySnd (simplifyTTerm p)
-simplifyTTerm (Inl p) = Inl (simplifyTTerm p) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-simplifyTTerm (Inr p) = Inr (simplifyTTerm p) -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-simplifyTTerm (Case p f g) = simplifyCase p f g -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+simplifyTTerm (Inl p) = Inl (simplifyTTerm p) 
+simplifyTTerm (Inr p) = Inr (simplifyTTerm p) 
+simplifyTTerm (Case p f g) = simplifyCase p f g 
 simplifyTTerm (Lift x t) = Lift x t
 simplifyTTerm (Op op a) = Op op (simplifyTTerm a)
 simplifyTTerm (Map f a) = Map (simplifyTTerm f) (simplifyTTerm a)
 simplifyTTerm Foldr = Foldr
-simplifyTTerm (Rec t) = Rec (simplifyTTerm t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-simplifyTTerm (It t) = It (simplifyTTerm t) -- EXPERIMENTAL SUPPORT FOR ITERATION
+simplifyTTerm (Rec t) = Rec (simplifyTTerm t) 
+simplifyTTerm (It t) = It (simplifyTTerm t) 
 simplifyTTerm (Sign t) = Sign (simplifyTTerm t)
 -- Target language extension
 simplifyTTerm LId = LId
@@ -48,10 +48,10 @@ simplifyTTerm (DMap t) = DMap (simplifyTTerm t)
 simplifyTTerm (DtMap t) = DtMap (simplifyTTerm t)
 simplifyTTerm DFoldr = DFoldr
 simplifyTTerm DtFoldr = DtFoldr
-simplifyTTerm (DIt d1t d2t) = DIt (simplifyTTerm d1t) (simplifyTTerm d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
-simplifyTTerm (DtIt d1t d2t) = DtIt (simplifyTTerm d1t) (simplifyTTerm d2t) -- EXPERIMENTAL SUPPORT FOR ITERATION
-simplifyTTerm (LRec t) = LRec (simplifyTTerm t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-simplifyTTerm (LIt t) = LIt (simplifyTTerm t) -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+simplifyTTerm (DIt d1t d2t) = DIt (simplifyTTerm d1t) (simplifyTTerm d2t) 
+simplifyTTerm (DtIt d1t d2t) = DtIt (simplifyTTerm d1t) (simplifyTTerm d2t) 
+simplifyTTerm (LRec t) = LRec (simplifyTTerm t) 
+simplifyTTerm (LIt t) = LIt (simplifyTTerm t) 
 
 -- | Simplify the App TTerm
 simplifyApp :: (LT a, LT b) => TTerm (a -> b) -> TTerm a -> TTerm b
@@ -79,7 +79,7 @@ simplifyCase ::
   => TTerm (Either a b)
   -> TTerm (a -> c)
   -> TTerm (b -> c)
-  -> TTerm c -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+  -> TTerm c 
 simplifyCase (Inl p) f _ = simplifyTTerm $ App f p
 simplifyCase (Inr p) _ g = simplifyTTerm $ App g p
 simplifyCase x f g       = Case x (simplifyTTerm f) (simplifyTTerm g)
@@ -129,15 +129,15 @@ usesOf _ _ Unit = 0
 usesOf x t (Pair a b) = usesOf x t a + usesOf x t b
 usesOf x t (Fst p) = usesOf x t p
 usesOf x t (Snd p) = usesOf x t p
-usesOf x t (Inl p) = usesOf x t p -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-usesOf x t (Inr p) = usesOf x t p -- EXPERIMENTAL SUPPORT FOR SUM TYPES
-usesOf x t (Case p f g) = usesOf x t p + usesOf x t f + usesOf x t g -- EXPERIMENTAL SUPPORT FOR SUM TYPES
+usesOf x t (Inl p) = usesOf x t p 
+usesOf x t (Inr p) = usesOf x t p 
+usesOf x t (Case p f g) = usesOf x t p + usesOf x t f + usesOf x t g 
 usesOf _ _ (Lift _ _) = 0
 usesOf x t (Op _ a) = usesOf x t a
 usesOf x t (Map f y) = usesOf x t f + usesOf x t y
 usesOf _ _ Foldr = 0
-usesOf x t (Rec s) = usesOf x t s -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-usesOf x t (It s) = usesOf x t s -- EXPERIMENTAL SUPPORT FOR ITERATION
+usesOf x t (Rec s) = usesOf x t s 
+usesOf x t (It s) = usesOf x t s 
 usesOf x t (Sign s) = usesOf x t s
 usesOf _ _ LId = 0
 usesOf x t (LComp f g) = usesOf x t f + usesOf x t g
@@ -156,7 +156,7 @@ usesOf x t (DMap s) = usesOf x t s
 usesOf x t (DtMap s) = usesOf x t s
 usesOf _ _ DFoldr = 0
 usesOf _ _ DtFoldr = 0
-usesOf x t (DIt d1t d2t) = usesOf x t d1t + usesOf x t d2t -- EXPERIMENTAL SUPPORT FOR ITERATION
-usesOf x t (DtIt d1t d2t) = usesOf x t d1t + usesOf x t d2t -- EXPERIMENTAL SUPPORT FOR ITERATION
-usesOf x t (LRec s) = usesOf x t s -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
-usesOf x t (LIt s) = usesOf x t s -- EXPERIMENTAL SUPPORT FOR GENERAL RECURSION
+usesOf x t (DIt d1t d2t) = usesOf x t d1t + usesOf x t d2t 
+usesOf x t (DtIt d1t d2t) = usesOf x t d1t + usesOf x t d2t 
+usesOf x t (LRec s) = usesOf x t s 
+usesOf x t (LIt s) = usesOf x t s 
