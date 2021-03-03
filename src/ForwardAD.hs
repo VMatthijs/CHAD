@@ -176,12 +176,12 @@ d2 (SL.Curry t) = do
     yType = inferType
 d2 SL.Inl = do
   xVar <- gensym
-  return $ TL.Lambda xVar xType (TL.LPair TL.LId TL.Zero)
+  return $ TL.Lambda xVar xType TL.LInl
   where
     xType = inferType
 d2 SL.Inr = do
   xVar <- gensym
-  return $ TL.Lambda xVar xType (TL.LPair TL.Zero TL.LId)
+  return $ TL.Lambda xVar xType TL.LInr
   where
     xType = inferType
 d2 (SL.CoPair f g) = do
@@ -197,9 +197,9 @@ d2 (SL.CoPair f g) = do
       (TL.Case
          (TL.Var xVar xType)
          (TL.Lambda yVar yType $
-          TL.LFst `TL.LComp` (d2f `TL.App` TL.Var yVar yType))
+          TL.LCoPair (d2f `TL.App` TL.Var yVar yType) TL.Zero)
          (TL.Lambda zVar zType $
-          TL.LSnd `TL.LComp` (d2g `TL.App` TL.Var zVar zType)))
+          TL.LCoPair TL.Zero (d2g `TL.App` TL.Var zVar zType)))
   where
     xType = inferType
     yType = inferType

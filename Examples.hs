@@ -435,15 +435,15 @@ revFinDiffFact2Extra (x, x') y =
   where
     delta = 0.000001
 
-fib :: Int -> Int
-fib =
-  recur
-    (\((r, r'), g) ->
-       \n ->
-         if (n == 0)
-           then r
-           else if (n == 1)
-                  then r'
-                  else g (n - 1) + g (n - 2))
-    (0, 1)
+-- fib :: Int -> Int
+-- fib =
+--   recur
+--     (\((r, r'), g) ->
+--        \n ->
+--          if (n == 0)
+--            then r
+--            else if (n == 1)
+--                   then r'
+--                   else g (n - 1) + g (n - 2))
+--     (0, 1)
  --- TODO: translate this example into the language and test it as well!

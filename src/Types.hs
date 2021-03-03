@@ -41,6 +41,10 @@ module Types
   , dtIt
   , lRec
   , lIt
+  , LEither
+  , lInl
+  , lInr  
+  , lCoPair
   , Tens
   , empty
   , singleton
@@ -76,6 +80,9 @@ newtype Tens a b =
 newtype LFun a b =
   MkLFun (a -> b)
 
+-- | Linear coproduct
+newtype LEither a b = MkLEither (Maybe (Either a b))
+
 -- Methods for tensor products
 -- | Empty tensor product
 empty :: Tens a b
@@ -86,6 +93,19 @@ addTens (MkTens x) (MkTens y) = MkTens (x ++ y)
 
 singleton :: a -> LFun b (Tens a b)
 singleton t = MkLFun $ \x -> MkTens [(t, x)]
+
+-- Methods for linear coproducts
+lInl :: LFun a (LEither a b)
+lInl = MkLFun (MkLEither . Just . Left)
+
+lInr :: LFun b (LEither a b)
+lInr = MkLFun (MkLEither . Just . Right)
+
+lCoPair :: LT c => LFun a c -> LFun b c -> LFun (LEither a b) c 
+lCoPair (MkLFun f) (MkLFun g) = MkLFun h where 
+  h (MkLEither Nothing) = zero 
+  h (MkLEither (Just (Left a))) = f a 
+  h (MkLEither (Just (Right b))) = g b
 
 -- Methods for linear functions
 lId :: LFun a a
@@ -206,31 +226,37 @@ dtFoldr ((f, i), v) =
 dIt ::
      (LT d2a, LT d2b, LT d2c)
   => ((d1a, d1b) -> Either d1c d1b)
-  -> ((d1a, d1b) -> LFun (d2a, d2b) (d2c, d2b))
+  -> ((d1a, d1b) -> LFun (d2a, d2b) (LEither d2c d2b))
   -> ((d1a, d1b) -> LFun (d2a, d2b) d2c)
 dIt d1t d2t (d1a, d1b) =
   MkLFun $ \(d2a, d2b) ->
     let d1bs = scanIt d1t (d1a, d1b)
-     in fst
+        vfst (MkLEither Nothing) = zero 
+        vfst (MkLEither (Just (Left a))) = a 
+        vfst (MkLEither (Just (Right _))) = error "This should never happen."
+        vsnd (MkLEither Nothing) = zero 
+        vsnd (MkLEither (Just (Left _))) = error "This should never happen."
+        vsnd (MkLEither (Just (Right b))) = b
+     in vfst
           (d2t (d1a, last d1bs) `lApp`
            ( d2a
            , foldl
-               (\acc d1b' -> snd (d2t (d1a, d1b') `lApp` (d2a, acc)))
+               (\acc d1b' -> vsnd (d2t (d1a, d1b') `lApp` (d2a, acc)))
                d2b
                (init d1bs)))
 
 dtIt ::
      (LT d2a, LT d2b, LT d2c)
   => ((d1a, d1b) -> Either d1c d1b)
-  -> ((d1a, d1b) -> LFun (d2c, d2b) (d2a, d2b))
+  -> ((d1a, d1b) -> LFun (LEither d2c d2b) (d2a, d2b))
   -> ((d1a, d1b) -> LFun d2c (d2a, d2b))
 dtIt d1t d2t (d1a, d1b) =
   MkLFun $ \d2c ->
     let d1bs = scanIt d1t (d1a, d1b)
-        d2ad2b = d2t (d1a, last d1bs) `lApp` (d2c, zero)
+        d2ad2b = d2t (d1a, last d1bs) `lApp` (lInl `lApp` d2c)
         d2ad2bs =
           scanr
-            (\d1b' acc -> d2t (d1a, d1b') `lApp` (zero, snd acc))
+            (\d1b' acc -> d2t (d1a, d1b') `lApp` (lInr `lApp` snd acc))
             d2ad2b
             (init d1bs)
      in (foldr plus zero (map fst d2ad2bs), snd (head d2ad2bs))
@@ -271,7 +297,7 @@ type family Df2 a where
   Df2 (a -> b) = Df1 a -> Df2 b
   Df2 (a, b) = (Df2 a, Df2 b)
   Df2 () = ()
-  Df2 (Either a b) = (Df2 a, Df2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), which is possible as long as we use zeroR and zeroF.
+  Df2 (Either a b) = LEither (Df2 a) (Df2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), which is possible as long as we use zeroR and zeroF.
 
 -- Reverse mode AD type families
 type family Dr1 a where
@@ -288,7 +314,7 @@ type family Dr2 a where
   Dr2 (a -> b) = Tens (Dr1 a) (Dr2 b)
   Dr2 (a, b) = (Dr2 a, Dr2 b)
   Dr2 () = ()
-  Dr2 (Either a b) = (Dr2 a, Dr2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), which is possible as long as we use zeroR and zeroF.
+  Dr2 (Either a b) = LEither (Dr2 a) (Dr2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), which is possible as long as we use zeroR and zeroF.
 
 data Type a where
   TScal :: Type Scal
@@ -299,6 +325,7 @@ data Type a where
   TEither :: Type a -> Type b -> Type (Either a b)
   TLinFun :: Type a -> Type b -> Type (LFun a b)
   TTens :: Type a -> Type b -> Type (Tens a b)
+  TLEither :: Type a -> Type b -> Type (LEither a b)
 
 deriving instance Show (Type a)
 
@@ -326,6 +353,10 @@ eqTy (TTens u1 u2) (TTens v1 v2) = do
   return Refl
 eqTy TScal TScal = return Refl
 eqTy (TEither u1 u2) (TEither v1 v2) = do
+  Refl <- eqTy u1 v1
+  Refl <- eqTy u2 v2
+  return Refl
+eqTy (TLEither u1 u2) (TLEither v1 v2) = do
   Refl <- eqTy u1 v1
   Refl <- eqTy u2 v2
   return Refl
@@ -432,3 +463,31 @@ instance (LT a, LT b) => LT (LFun a b) where
   scalDiv = lScalDiv
   minus = lMinus
   showMe = error "This should never be used." -- This doesn't make sense.
+
+instance (LT a, LT b) => LT (LEither a b) where 
+  zero = MkLEither Nothing 
+  plus (MkLEither Nothing ) b = b 
+  plus a (MkLEither Nothing) = a 
+  plus (MkLEither (Just (Left a))) (MkLEither (Just (Left a'))) = MkLEither (Just (Left (a `plus` a')))
+  plus (MkLEither (Just (Right b))) (MkLEither (Just (Right b'))) = MkLEither (Just (Right (b `plus` b')))
+  plus _ _ = error "This should never be used." -- This doesn't make sense.
+  isZero (MkLEither Nothing) = True 
+  isZero (MkLEither (Just (Left a))) = isZero a 
+  isZero (MkLEither (Just (Right b))) = isZero b
+  inferType = TLEither inferType inferType 
+  scalProd _ (MkLEither Nothing) = MkLEither Nothing
+  scalProd r (MkLEither (Just (Left a)))  = MkLEither (Just (Left (scalProd r a)))
+  scalProd r (MkLEither (Just (Right b))) = MkLEither (Just (Right (scalProd r b)))
+  scalDiv (MkLEither Nothing) _ = MkLEither Nothing
+  scalDiv (MkLEither (Just (Left a))) r  = MkLEither (Just (Left (scalDiv a r)))
+  scalDiv (MkLEither (Just (Right b))) r = MkLEither (Just (Right (scalDiv b r)))
+  minus (MkLEither Nothing ) (MkLEither Nothing ) = MkLEither Nothing
+  minus (MkLEither Nothing ) (MkLEither (Just (Left a)) ) = MkLEither (Just (Left (zero `minus` a)))
+  minus (MkLEither Nothing ) (MkLEither (Just (Right b)) ) = MkLEither (Just (Right (zero `minus` b)))
+  minus a (MkLEither Nothing) = a 
+  minus (MkLEither (Just (Left a))) (MkLEither (Just (Left a'))) = MkLEither (Just (Left (a `minus` a')))
+  minus (MkLEither (Just (Right b))) (MkLEither (Just (Right b'))) = MkLEither (Just (Right (b `minus` b')))
+  minus _ _ = error "This should never be used." -- This doesn't make sense.
+  showMe (MkLEither Nothing) = "Nothing"
+  showMe (MkLEither (Just (Left a)))  = "Left (" ++ showMe a ++ ")"
+  showMe (MkLEither (Just (Right b))) = "Right (" ++ showMe b ++ ")"

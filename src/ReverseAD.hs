@@ -177,12 +177,12 @@ d2 (SL.Curry t) = do
     yType = inferType
 d2 SL.Inl = do
   xVar <- gensym
-  return $ TL.Lambda xVar xType TL.LFst -- Note, we could make this more type safe by doing a dynamic check in TL.LFst to make sure the second component is 0.
+  return $ TL.Lambda xVar xType (TL.LCoPair TL.LId TL.Zero) -- Note, we could make this more type safe by doing a dynamic check in TL.LFst to make sure the second component is 0.
   where
     xType = inferType
 d2 SL.Inr = do
   xVar <- gensym
-  return $ TL.Lambda xVar xType TL.LSnd -- Note, we could make this more type safe by doing a dynamic check in TL.LSnd to make sure the first component is 0.
+  return $ TL.Lambda xVar xType (TL.LCoPair TL.Zero TL.LId) -- Note, we could make this more type safe by doing a dynamic check in TL.LSnd to make sure the first component is 0.
   where
     xType = inferType
 d2 (SL.CoPair f g) = do
@@ -198,9 +198,9 @@ d2 (SL.CoPair f g) = do
       (TL.Case
          (TL.Var xVar xType)
          (TL.Lambda yVar yType $
-          (d2f `TL.App` TL.Var yVar yType) `TL.LComp` (TL.LPair TL.LId TL.Zero))
+          (d2f `TL.App` TL.Var yVar yType) `TL.LComp` TL.LInl)
          (TL.Lambda zVar zType $
-          (d2g `TL.App` TL.Var zVar zType) `TL.LComp` (TL.LPair TL.Zero TL.LId)))
+          (d2g `TL.App` TL.Var zVar zType) `TL.LComp` TL.LInr))
   where
     xType = inferType
     yType = inferType

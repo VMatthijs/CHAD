@@ -10,13 +10,13 @@ import           Data.Type.Equality        ((:~:) (Refl))
 import           GHC.TypeNats              (KnownNat)
 import           Operation                 (LinearOperation, Operation, evalLOp,
                                             evalOp, showLOp, showOp)
-import           Types                     as T (LFun, LT (..), Scal, Tens,
-                                                 Type, Vect, dFoldr, dIt,
+import           Types                     as T (LEither, LFun, LT (..), Scal,
+                                                 Tens, Type, Vect, dFoldr, dIt,
                                                  dtFoldr, dtIt, eqTy, lApp,
-                                                 lComp, lCur, lEval, lFst, lId,
-                                                 lIt, lMap, lPair, lRec, lSnd,
-                                                 lSwap, lZip, lZipWith,
-                                                 singleton)
+                                                 lCoPair, lComp, lCur, lEval,
+                                                 lFst, lId, lInl, lInr, lIt,
+                                                 lMap, lPair, lRec, lSnd, lSwap,
+                                                 lZip, lZipWith, singleton)
 
 -- | Terms of the target language
 data TTerm t
@@ -65,6 +65,14 @@ data TTerm t
     => TTerm (LFun a b)
     -> TTerm (LFun a c)
     -> TTerm (LFun a (b, c))
+    -- Variants
+  LInl :: TTerm (LFun a (LEither a b))
+  LInr :: TTerm (LFun b (LEither a b))
+  LCoPair
+    :: LT c
+    => TTerm (LFun a c)
+    -> TTerm (LFun b c)
+    -> TTerm (LFun (LEither a b) c)
     -- | Singleton
   Singleton :: TTerm b -> TTerm (LFun c (Tens b c))
     -- Zero
@@ -101,12 +109,12 @@ data TTerm t
   DIt
     :: (LT d2a, LT d2b, LT d2c)
     => TTerm ((d1a, d1b) -> Either d1c d1b)
-    -> TTerm ((d1a, d1b) -> LFun (d2a, d2b) (d2c, d2b))
+    -> TTerm ((d1a, d1b) -> LFun (d2a, d2b) (LEither d2c d2b))
     -> TTerm ((d1a, d1b) -> LFun (d2a, d2b) d2c)
   DtIt
     :: (LT d2a, LT d2b, LT d2c)
     => TTerm ((d1a, d1b) -> Either d1c d1b)
-    -> TTerm ((d1a, d1b) -> LFun (d2c, d2b) (d2a, d2b))
+    -> TTerm ((d1a, d1b) -> LFun (LEither d2c d2b) (d2a, d2b))
     -> TTerm ((d1a, d1b) -> LFun d2c (d2a, d2b))
   LRec :: TTerm (LFun (a, b) b) -> TTerm (LFun a b)
   LIt :: (LT a, LT b) => TTerm (LFun b (a, b)) -> TTerm (LFun b a)
@@ -148,6 +156,9 @@ subst x v u (LEval t) = LEval (subst x v u t)
 subst _ _ _ LFst = LFst
 subst _ _ _ LSnd = LSnd
 subst x v u (LPair a b) = LPair (subst x v u a) (subst x v u b)
+subst _ _ _ LInl = LInl
+subst _ _ _ LInr = LInr
+subst x v u (LCoPair a b) = LCoPair (subst x v u a) (subst x v u b)
 subst x v u (Singleton t) = Singleton (subst x v u t)
 subst _ _ _ Zero = Zero
 subst x v u (Plus a b) = Plus (subst x v u a) (subst x v u b)
@@ -201,6 +212,9 @@ substTt x v u (LEval t) = LEval (substTt x v u t)
 substTt _ _ _ LFst = LFst
 substTt _ _ _ LSnd = LSnd
 substTt x v u (LPair a b) = LPair (substTt x v u a) (substTt x v u b)
+substTt _ _ _ LInl = LInl
+substTt _ _ _ LInr = LInr
+substTt x v u (LCoPair a b) = LCoPair (substTt x v u a) (substTt x v u b)
 substTt x v u (Singleton t) = Singleton (substTt x v u t)
 substTt _ _ _ Zero = Zero
 substTt x v u (Plus a b) = Plus (substTt x v u a) (substTt x v u b)
@@ -261,6 +275,9 @@ evalTt (LApp f a) = lApp (evalTt f) (evalTt a)
 evalTt LFst = lFst
 evalTt LSnd = lSnd
 evalTt (LPair a b) = lPair (evalTt a) (evalTt b)
+evalTt LInl = lInl
+evalTt LInr = lInr
+evalTt (LCoPair a b) = lCoPair (evalTt a) (evalTt b)
 evalTt (Singleton t) = T.singleton (evalTt t)
 evalTt Zero = zero
 evalTt (Plus a b) = plus (evalTt a) (evalTt b)
@@ -309,6 +326,9 @@ printTt (LApp f a) = printTt f ++ "(" ++ printTt a ++ ")"
 printTt LFst = "lfst"
 printTt LSnd = "lsnd"
 printTt (LPair a b) = "lpair(" ++ printTt a ++ ", " ++ printTt b ++ ")"
+printTt LInl = "linl"
+printTt LInr = "linr"
+printTt (LCoPair a b) = "lcopair(" ++ printTt a ++ ", " ++ printTt b ++ ")"
 printTt (Singleton t) = "[(" ++ printTt t ++ ", -)]"
 printTt Zero = "0"
 printTt (Plus a b) = "(" ++ printTt a ++ ") + (" ++ printTt b ++ ")"

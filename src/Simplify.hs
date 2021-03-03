@@ -38,6 +38,9 @@ simplifyTTerm (LEval t) = LEval (simplifyTTerm t)
 simplifyTTerm LFst = LFst
 simplifyTTerm LSnd = LSnd
 simplifyTTerm (LPair a b) = LPair (simplifyTTerm a) (simplifyTTerm b)
+simplifyTTerm LInl = LInl
+simplifyTTerm LInr = LInr
+simplifyTTerm (LCoPair a b) = LCoPair (simplifyTTerm a) (simplifyTTerm b)
 simplifyTTerm (Singleton t) = Singleton (simplifyTTerm t)
 simplifyTTerm Zero = Zero
 simplifyTTerm (Plus a b) = simplifyPlus (simplifyTTerm a) (simplifyTTerm b)
@@ -91,16 +94,20 @@ simplifyLComp ::
   -> TTerm (LFun b c)
   -> TTerm (LFun a c)
 -- Remove LId
-simplifyLComp f LId                      = f
-simplifyLComp LId g                      = g
+simplifyLComp f LId                        = f
+simplifyLComp LId g                        = g
 -- Remove redundant LPair
-simplifyLComp (LPair a _) LFst           = a
-simplifyLComp (LPair _ b) LSnd           = b
-simplifyLComp (LComp f (LPair a _)) LFst = LComp f a
-simplifyLComp (LComp f (LPair _ b)) LSnd = LComp f b
-simplifyLComp _ Zero                     = Zero
+simplifyLComp (LPair a _) LFst             = a
+simplifyLComp (LPair _ b) LSnd             = b
+simplifyLComp (LComp f (LPair a _)) LFst   = LComp f a
+simplifyLComp (LComp f (LPair _ b)) LSnd   = LComp f b
+simplifyLComp LInl (LCoPair a _)           = a
+simplifyLComp LInr (LCoPair _ b)           = b
+simplifyLComp LInl (LComp (LCoPair a _) f) = LComp a f
+simplifyLComp LInr (LComp (LCoPair _ b) f) = LComp b f
+simplifyLComp _ Zero                       = Zero
 -- Base case
-simplifyLComp f g                        = LComp f g
+simplifyLComp f g                          = LComp f g
 
 -- | Simplify the LApp TTerm
 simplifyLApp :: (LT a, LT b) => TTerm (LFun a b) -> TTerm a -> TTerm b
@@ -146,6 +153,9 @@ usesOf x t (LEval e) = usesOf x t e
 usesOf _ _ LFst = 0
 usesOf _ _ LSnd = 0
 usesOf x t (LPair a b) = usesOf x t a + usesOf x t b
+usesOf _ _ LInl = 0
+usesOf _ _ LInr = 0
+usesOf x t (LCoPair a b) = usesOf x t a + usesOf x t b
 usesOf x t (Singleton s) = usesOf x t s
 usesOf _ _ Zero = 0
 usesOf x t (Plus a b) = usesOf x t a + usesOf x t b
