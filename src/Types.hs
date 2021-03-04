@@ -89,9 +89,6 @@ newtype LEither a b =
 empty :: Tens a b
 empty = MkTens []
 
-addTens :: Tens a b -> Tens a b -> Tens a b
-addTens (MkTens x) (MkTens y) = MkTens (x ++ y)
-
 singleton :: a -> LFun b (Tens a b)
 singleton t = MkLFun $ \x -> MkTens [(t, x)]
 
@@ -137,9 +134,7 @@ lZipWith :: (Scal -> LFun Scal Scal) -> Vect n -> LFun (Vect n) (Vect n)
 lZipWith f a = MkLFun $ V.zipWith (lApp . f) a
 
 lZip :: Vect n -> LFun (Vect n) (Tens Scal Scal)
-lZip x = MkLFun $ \y -> MkTens $ V.toList $ V.zipWith f x y
-  where
-    f a b = (a, b)
+lZip x = MkLFun $ \y -> MkTens $ V.toList $ V.zip x y
 
 -- | Pair two functions
 lPair :: (LT a, LT b, LT c) => LFun a b -> LFun a c -> LFun a (b, c)
@@ -305,18 +300,18 @@ type family Df2 a = r | r -> a where
 type family Dr1 a = r | r -> a where
   Dr1 Scal = Scal
   Dr1 (Vect n) = Vect n
-  Dr1 (a -> b) = Dr1 a -> (Dr1 b, LFun (Dr2 b) (Dr2 a))
   Dr1 (a, b) = (Dr1 a, Dr1 b)
   Dr1 () = ()
   Dr1 (Either a b) = Either (Dr1 a) (Dr1 b)
+  Dr1 (a -> b) = Dr1 a -> (Dr1 b, LFun (Dr2 b) (Dr2 a))
 
 type family Dr2 a = r | r -> a where
   Dr2 Scal = Scal
   Dr2 (Vect n) = Vect n
-  Dr2 (a -> b) = Tens (Dr1 a) (Dr2 b)
   Dr2 (a, b) = (Dr2 a, Dr2 b)
   Dr2 () = ()
   Dr2 (Either a b) = LEither (Dr2 a) (Dr2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), which is possible as long as we use zeroR and zeroF.
+  Dr2 (a -> b) = Tens (Dr1 a) (Dr2 b)
 
 data Type a where
   TScal :: Type Scal
@@ -463,7 +458,7 @@ instance (LT a, LT b) => LT (Tens a b) where
   zero = empty
   zeroF = error "This should never be used."
   zeroR = error "This should never be used."
-  plus = addTens
+  plus (MkTens x) (MkTens y) = MkTens (x ++ y)
   isZero (MkTens xs) = all isZero (map snd xs)
   inferType = TTens inferType inferType
   scalProd = error "This should never be used." -- This doesn't make sense.
