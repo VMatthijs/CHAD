@@ -16,7 +16,8 @@ import           Types                     as T (LEither, LFun, LT (..), Scal,
                                                  lCoPair, lComp, lCur, lEval,
                                                  lFst, lId, lInl, lInr, lIt,
                                                  lMap, lPair, lRec, lSnd, lSwap,
-                                                 lZip, lZipWith, singleton)
+                                                 lUnit, lZip, lZipWith,
+                                                 singleton)
 
 -- | Terms of the target language
 data TTerm t
@@ -58,6 +59,7 @@ data TTerm t
   LApp :: (LT a, LT b) => TTerm (LFun a b) -> TTerm a -> TTerm b
   LEval :: TTerm a -> TTerm (LFun (a -> b) b)
     -- Tuples
+  LUnit :: TTerm (LFun a ())
   LFst :: TTerm (LFun (a, b) a)
   LSnd :: TTerm (LFun (a, b) b)
   LPair
@@ -153,6 +155,7 @@ subst _ _ _ LId = LId
 subst x v u (LComp f g) = LComp (subst x v u f) (subst x v u g)
 subst x v u (LApp f a) = LApp (subst x v u f) (subst x v u a)
 subst x v u (LEval t) = LEval (subst x v u t)
+subst _ _ _ LUnit = LUnit
 subst _ _ _ LFst = LFst
 subst _ _ _ LSnd = LSnd
 subst x v u (LPair a b) = LPair (subst x v u a) (subst x v u b)
@@ -209,6 +212,7 @@ substTt _ _ _ LId = LId
 substTt x v u (LComp f g) = LComp (substTt x v u f) (substTt x v u g)
 substTt x v u (LApp f a) = LApp (substTt x v u f) (substTt x v u a)
 substTt x v u (LEval t) = LEval (substTt x v u t)
+substTt _ _ _ LUnit = LUnit
 substTt _ _ _ LFst = LFst
 substTt _ _ _ LSnd = LSnd
 substTt x v u (LPair a b) = LPair (substTt x v u a) (substTt x v u b)
@@ -272,6 +276,7 @@ evalTt LId = lId
 evalTt (LComp f g) = lComp (evalTt f) (evalTt g)
 evalTt (LEval t) = lEval (evalTt t)
 evalTt (LApp f a) = lApp (evalTt f) (evalTt a)
+evalTt LUnit = lUnit
 evalTt LFst = lFst
 evalTt LSnd = lSnd
 evalTt (LPair a b) = lPair (evalTt a) (evalTt b)
@@ -323,6 +328,7 @@ printTt LId = "lid"
 printTt (LComp f g) = "(" ++ printTt f ++ ";;" ++ printTt g ++ ")"
 printTt (LEval e) = "leval(" ++ printTt e ++ ")"
 printTt (LApp f a) = printTt f ++ "(" ++ printTt a ++ ")"
+printTt LUnit = "lunit"
 printTt LFst = "lfst"
 printTt LSnd = "lsnd"
 printTt (LPair a b) = "lpair(" ++ printTt a ++ ", " ++ printTt b ++ ")"

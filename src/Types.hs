@@ -21,6 +21,7 @@ module Types
   , lEval
   , lUncurry
   , lZipWith
+  , lUnit
   , lPair
   , lMapTuple
   , lAdd
@@ -135,6 +136,10 @@ lZipWith f a = MkLFun $ V.zipWith (lApp . f) a
 
 lZip :: Vect n -> LFun (Vect n) (Tens Scal Scal)
 lZip x = MkLFun $ \y -> MkTens $ V.toList $ V.zip x y
+
+-- | Linear unit
+lUnit :: LFun a () 
+lUnit = MkLFun (const ())
 
 -- | Pair two functions
 lPair :: (LT a, LT b, LT c) => LFun a b -> LFun a c -> LFun a (b, c)

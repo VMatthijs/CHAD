@@ -35,6 +35,7 @@ simplifyTTerm LId = LId
 simplifyTTerm (LComp f g) = simplifyLComp (simplifyTTerm f) (simplifyTTerm g)
 simplifyTTerm (LApp f a) = simplifyLApp (simplifyTTerm f) (simplifyTTerm a)
 simplifyTTerm (LEval t) = LEval (simplifyTTerm t)
+simplifyTTerm LUnit = LUnit
 simplifyTTerm LFst = LFst
 simplifyTTerm LSnd = LSnd
 simplifyTTerm (LPair a b) = LPair (simplifyTTerm a) (simplifyTTerm b)
@@ -96,6 +97,8 @@ simplifyLComp ::
 -- Remove LId
 simplifyLComp f LId                        = f
 simplifyLComp LId g                        = g
+-- Simplify LUnit
+simplifyLComp _ LUnit                      = LUnit
 -- Remove redundant LPair
 simplifyLComp (LPair a _) LFst             = a
 simplifyLComp (LPair _ b) LSnd             = b
@@ -150,6 +153,7 @@ usesOf _ _ LId = 0
 usesOf x t (LComp f g) = usesOf x t f + usesOf x t g
 usesOf x t (LApp f a) = usesOf x t f + usesOf x t a
 usesOf x t (LEval e) = usesOf x t e
+usesOf _ _ LUnit = 0
 usesOf _ _ LFst = 0
 usesOf _ _ LSnd = 0
 usesOf x t (LPair a b) = usesOf x t a + usesOf x t b
