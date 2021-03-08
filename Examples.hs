@@ -231,7 +231,7 @@ fwdFoldProd :: (Vect 3) -> Scal -- OK
 fwdFoldProd = evalFwd foldProd
 
 revFoldProd :: (Vect 3) -> Scal -- OK
-revFoldProd = evalFwd foldProd
+revFoldProd = evalRev foldProd
 
 fwdDerFoldProd :: (Vect 3) -> Vect 3 -> Scal -- OK
 fwdDerFoldProd = evalFwdDerivative foldProd
