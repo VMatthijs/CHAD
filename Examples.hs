@@ -438,8 +438,8 @@ revFinDiffFact2Extra (x, x') y =
 recurse :: ((a, c) -> c) -> (a -> c)
 recurse f a = f (a, recurse f a)
 
-branch2 :: Scal -> Scal
-branch2 =
+tree2 :: Scal -> Scal
+tree2 =
   recurse
     (\(r, g) ->
        \n ->
@@ -448,8 +448,8 @@ branch2 =
            else r)
     1
 
-branch :: SL.STerm Scal Scal
-branch =
+tree :: SL.STerm Scal Scal
+tree =
   SL.Pair
     ((constant 1) `SL.Comp`
      (SL.Rec
@@ -474,20 +474,20 @@ branch =
     SL.Id `SL.Comp`
   SL.Ev
 
-branch' :: Scal -> Scal -- OK
-branch' = SL.evalSt branch
+tree' :: Scal -> Scal -- OK
+tree' = SL.evalSt tree
 
-fwdFinDiffBranch :: Scal -> Scal -> Scal
-fwdFinDiffBranch = evalFwdFinDiff branch
+fwdFinDiffTree :: Scal -> Scal -> Scal
+fwdFinDiffTree = evalFwdFinDiff tree
 
-fwdDerBranch :: Scal -> Scal -> Scal -- OK!
-fwdDerBranch = evalFwdDerivative branch
+fwdDerTree :: Scal -> Scal -> Scal -- OK!
+fwdDerTree = evalFwdDerivative tree
 
-revDerBranch :: Scal -> Scal -> Scal -- OK!
-revDerBranch = evalRevDerivative branch
+revDerTree :: Scal -> Scal -> Scal -- OK!
+revDerTree = evalRevDerivative tree
 
-branch2extra :: (Scal, Scal) -> Scal
-branch2extra (r', n') =
+tree2extra :: (Scal, Scal) -> Scal
+tree2extra (r', n') =
   recurse
     (\(r, g) ->
        \n ->
@@ -497,8 +497,8 @@ branch2extra (r', n') =
     n'
     r'
 
-branchExtra :: SL.STerm (Scal, Scal) Scal
-branchExtra =
+treeExtra :: SL.STerm (Scal, Scal) Scal
+treeExtra =
   SL.Pair
     (SL.Snd `SL.Comp`
      (SL.Rec
@@ -523,21 +523,21 @@ branchExtra =
     SL.Fst `SL.Comp`
   SL.Ev
 
-branchExtra' :: (Scal, Scal) -> Scal -- OK
-branchExtra' = SL.evalSt branchExtra
+treeExtra' :: (Scal, Scal) -> Scal -- OK
+treeExtra' = SL.evalSt treeExtra
 
-fwdFinDiffBranchExtra :: (Scal, Scal) -> (Scal, Scal) -> Scal
-fwdFinDiffBranchExtra = evalFwdFinDiff branchExtra
+fwdFinDiffTreeExtra :: (Scal, Scal) -> (Scal, Scal) -> Scal
+fwdFinDiffTreeExtra = evalFwdFinDiff treeExtra
 
-fwdDerBranchExtra :: (Scal, Scal) -> (Scal, Scal) -> Scal -- OK!
-fwdDerBranchExtra = evalFwdDerivative branchExtra
+fwdDerTreeExtra :: (Scal, Scal) -> (Scal, Scal) -> Scal -- OK!
+fwdDerTreeExtra = evalFwdDerivative treeExtra
 
-revDerBranchExtra :: (Scal, Scal) -> Scal -> (Scal, Scal) -- OK!
-revDerBranchExtra = evalRevDerivative branchExtra
+revDerTreeExtra :: (Scal, Scal) -> Scal -> (Scal, Scal) -- OK!
+revDerTreeExtra = evalRevDerivative treeExtra
 
-revFinDiffBranchExtra :: (Scal, Scal) -> Scal -> (Scal, Scal)
-revFinDiffBranchExtra (x, x') y =
-  ( (branchExtra' (x + y * delta, x') - branchExtra' (x, x')) / delta
-  , (branchExtra' (x, x' + y * delta) - branchExtra' (x, x')) / delta)
+revFinDiffTreeExtra :: (Scal, Scal) -> Scal -> (Scal, Scal)
+revFinDiffTreeExtra (x, x') y =
+  ( (treeExtra' (x + y * delta, x') - treeExtra' (x, x')) / delta
+  , (treeExtra' (x, x' + y * delta) - treeExtra' (x, x')) / delta)
   where
     delta = 0.000001
