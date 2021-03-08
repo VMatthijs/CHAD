@@ -435,15 +435,109 @@ revFinDiffFact2Extra (x, x') y =
   where
     delta = 0.000001
 
--- fib :: Int -> Int
--- fib =
---   recur
---     (\((r, r'), g) ->
---        \n ->
---          if (n == 0)
---            then r
---            else if (n == 1)
---                   then r'
---                   else g (n - 1) + g (n - 2))
---     (0, 1)
- --- TODO: translate this example into the language and test it as well!
+recurse :: ((a, c) -> c) -> (a -> c)
+recurse f a = f (a, recurse f a)
+
+branch2 :: Scal -> Scal
+branch2 =
+  recurse
+    (\(r, g) ->
+       \n ->
+         if n > 1
+           then n * g (n - 1) * g (n * 0.5)
+           else r)
+    1
+
+branch :: SL.STerm Scal Scal
+branch =
+  SL.Pair
+    ((constant 1) `SL.Comp`
+     (SL.Rec
+        (SL.Curry
+           (realCase
+              (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt `SL.Comp`
+               SL.Sign)
+              (SL.Fst `SL.Comp` SL.Fst)
+              (SL.Pair
+                 (SL.Pair
+                    SL.Snd
+                    (SL.Pair
+                       (SL.Fst `SL.Comp` SL.Snd)
+                       (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt) `SL.Comp`
+                     SL.Ev) `SL.Comp`
+                  (SL.Op EScalProd))
+                 (SL.Pair
+                    (SL.Fst `SL.Comp` SL.Snd)
+                    (SL.Pair SL.Snd (constant 0.5) `SL.Comp` SL.Op EScalProd) `SL.Comp`
+                  SL.Ev) `SL.Comp`
+               (SL.Op EScalProd))))))
+    SL.Id `SL.Comp`
+  SL.Ev
+
+branch' :: Scal -> Scal -- OK
+branch' = SL.evalSt branch
+
+fwdFinDiffBranch :: Scal -> Scal -> Scal
+fwdFinDiffBranch = evalFwdFinDiff branch
+
+fwdDerBranch :: Scal -> Scal -> Scal -- OK!
+fwdDerBranch = evalFwdDerivative branch
+
+revDerBranch :: Scal -> Scal -> Scal -- OK!
+revDerBranch = evalRevDerivative branch
+
+branch2extra :: (Scal, Scal) -> Scal
+branch2extra (r', n') =
+  recurse
+    (\(r, g) ->
+       \n ->
+         if n > 1
+           then n * g (n - 1) * g (n * 0.5)
+           else r)
+    n'
+    r'
+
+branchExtra :: SL.STerm (Scal, Scal) Scal
+branchExtra =
+  SL.Pair
+    (SL.Snd `SL.Comp`
+     (SL.Rec
+        (SL.Curry
+           (realCase
+              (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt `SL.Comp`
+               SL.Sign)
+              (SL.Fst `SL.Comp` SL.Fst)
+              (SL.Pair
+                 (SL.Pair
+                    SL.Snd
+                    (SL.Pair
+                       (SL.Fst `SL.Comp` SL.Snd)
+                       (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt) `SL.Comp`
+                     SL.Ev) `SL.Comp`
+                  (SL.Op EScalProd))
+                 (SL.Pair
+                    (SL.Fst `SL.Comp` SL.Snd)
+                    (SL.Pair SL.Snd (constant 0.5) `SL.Comp` SL.Op EScalProd) `SL.Comp`
+                  SL.Ev) `SL.Comp`
+               (SL.Op EScalProd))))))
+    SL.Fst `SL.Comp`
+  SL.Ev
+
+branchExtra' :: (Scal, Scal) -> Scal -- OK
+branchExtra' = SL.evalSt branchExtra
+
+fwdFinDiffBranchExtra :: (Scal, Scal) -> (Scal, Scal) -> Scal
+fwdFinDiffBranchExtra = evalFwdFinDiff branchExtra
+
+fwdDerBranchExtra :: (Scal, Scal) -> (Scal, Scal) -> Scal -- OK!
+fwdDerBranchExtra = evalFwdDerivative branchExtra
+
+revDerBranchExtra :: (Scal, Scal) -> Scal -> (Scal, Scal) -- OK!
+revDerBranchExtra = evalRevDerivative branchExtra
+
+revFinDiffBranchExtra :: (Scal, Scal) -> Scal -> (Scal, Scal)
+revFinDiffBranchExtra (x, x') y =
+  ( (branchExtra' (x + y * delta, x') - branchExtra' (x, x')) / delta
+  , (branchExtra' (x, x' + y * delta) - branchExtra' (x, x')) / delta)
+  where
+    delta = 0.000001
