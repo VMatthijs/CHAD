@@ -83,7 +83,7 @@ newtype LFun a b =
 
 -- | Linear coproduct
 newtype LEither a b =
-  MkLEither (Maybe (Either a b))
+  MkLEither (Maybe (Either a b)) 
 
 -- Methods for copowers
 -- | Empty copower
