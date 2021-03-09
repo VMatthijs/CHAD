@@ -3,9 +3,10 @@
 -- | Simplify terms in the target language
 module Simplify
   ( simplifyTTerm
+  , usesOf
   ) where
 
-import           TargetLanguage (TTerm (..), substTt)
+import           TargetLanguage (TTerm (..), substTt, usesOf)
 import           Types
 
 -- | Simplify a TTerm
@@ -122,55 +123,3 @@ simplifyPlus :: LT a => TTerm a -> TTerm a -> TTerm a
 simplifyPlus a Zero = a
 simplifyPlus Zero b = b
 simplifyPlus a b    = Plus a b
-
-{-
-    Other 'helper' functions
--}
--- | Count the uses of a variable in an expression
-usesOf :: String -> Type a -> TTerm b -> Integer
-usesOf x _ (Var y _)
-  | x == y = 1
-  | otherwise = 0
-usesOf x t (Lambda y _ e)
-  | x == y = 0
-  | otherwise = usesOf x t e
-usesOf x t (App f a) = usesOf x t f + usesOf x t a
-usesOf _ _ Unit = 0
-usesOf x t (Pair a b) = usesOf x t a + usesOf x t b
-usesOf x t (Fst p) = usesOf x t p
-usesOf x t (Snd p) = usesOf x t p
-usesOf x t (Inl p) = usesOf x t p
-usesOf x t (Inr p) = usesOf x t p
-usesOf x t (Case p f g) = usesOf x t p + usesOf x t f + usesOf x t g
-usesOf _ _ (Lift _ _) = 0
-usesOf x t (Op _ a) = usesOf x t a
-usesOf x t (Map f y) = usesOf x t f + usesOf x t y
-usesOf _ _ Foldr = 0
-usesOf x t (Rec s) = usesOf x t s
-usesOf x t (It s) = usesOf x t s
-usesOf x t (Sign s) = usesOf x t s
-usesOf _ _ LId = 0
-usesOf x t (LComp f g) = usesOf x t f + usesOf x t g
-usesOf x t (LApp f a) = usesOf x t f + usesOf x t a
-usesOf x t (LEval e) = usesOf x t e
-usesOf _ _ LUnit = 0
-usesOf _ _ LFst = 0
-usesOf _ _ LSnd = 0
-usesOf x t (LPair a b) = usesOf x t a + usesOf x t b
-usesOf _ _ LInl = 0
-usesOf _ _ LInr = 0
-usesOf x t (LCoPair a b) = usesOf x t a + usesOf x t b
-usesOf x t (Singleton s) = usesOf x t s
-usesOf _ _ Zero = 0
-usesOf x t (Plus a b) = usesOf x t a + usesOf x t b
-usesOf x t (LSwap s) = usesOf x t s
-usesOf x t (LCopowFold s) = usesOf x t s
-usesOf _ _ (LOp _) = 0
-usesOf x t (DMap s) = usesOf x t s
-usesOf x t (DtMap s) = usesOf x t s
-usesOf _ _ DFoldr = 0
-usesOf _ _ DtFoldr = 0
-usesOf x t (DIt d1t d2t) = usesOf x t d1t + usesOf x t d2t
-usesOf x t (DtIt d1t d2t) = usesOf x t d1t + usesOf x t d2t
-usesOf x t (LRec s) = usesOf x t s
-usesOf x t (LIt s) = usesOf x t s

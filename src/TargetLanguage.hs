@@ -4,7 +4,8 @@
 -- | Definition of the target language
 module TargetLanguage where
 
-import           Data.Vector.Unboxed.Sized as V (Unbox, foldr, map)
+import qualified Data.Vector.Unboxed.Sized as V (Unbox, foldr, map)
+import qualified Data.Set                  as Set
 
 import           Data.Type.Equality        ((:~:) (Refl))
 import           GHC.TypeNats              (KnownNat)
@@ -188,7 +189,15 @@ substTt x v u (Var y t)
            show u ++ " with " ++ show t)
   | otherwise = Var y t
 substTt x v u (Lambda y t e)
+  -- Substituting for variable x under λx. E does nothing
   | x == y = Lambda y t e
+  -- When substituting F under λx. E where x occurs in F, we first need to
+  -- alpha-rename x to something unused in both E and F, and only afterwards
+  -- substitute normally.
+  | usesOf y t v >= 1 =
+      let y' = freshVariable (allVars v ++ allVars e)
+      in Lambda y' t (substTt x v u (substTt y (Var y' t) t e))
+  -- Otherwise, we can substitute normally.
   | otherwise = Lambda y t (substTt x v u e)
 substTt x v u (App f a) = App (substTt x v u f) (substTt x v u a)
 substTt _ _ _ Unit = Unit
@@ -350,3 +359,102 @@ printTt (LIt t) = "lit(" ++ printTt t ++ ")"
 
 instance Show (TTerm a) where
   show = printTt
+
+-- | Count the uses of a variable in an expression
+usesOf :: String -> Type a -> TTerm b -> Integer
+usesOf x _ (Var y _)
+  | x == y = 1
+  | otherwise = 0
+usesOf x t (Lambda y _ e)
+  | x == y = 0
+  | otherwise = usesOf x t e
+usesOf x t (App f a) = usesOf x t f + usesOf x t a
+usesOf _ _ Unit = 0
+usesOf x t (Pair a b) = usesOf x t a + usesOf x t b
+usesOf x t (Fst p) = usesOf x t p
+usesOf x t (Snd p) = usesOf x t p
+usesOf x t (Inl p) = usesOf x t p
+usesOf x t (Inr p) = usesOf x t p
+usesOf x t (Case p f g) = usesOf x t p + usesOf x t f + usesOf x t g
+usesOf _ _ (Lift _ _) = 0
+usesOf x t (Op _ a) = usesOf x t a
+usesOf x t (Map f y) = usesOf x t f + usesOf x t y
+usesOf _ _ Foldr = 0
+usesOf x t (Rec s) = usesOf x t s
+usesOf x t (It s) = usesOf x t s
+usesOf x t (Sign s) = usesOf x t s
+usesOf _ _ LId = 0
+usesOf x t (LComp f g) = usesOf x t f + usesOf x t g
+usesOf x t (LApp f a) = usesOf x t f + usesOf x t a
+usesOf x t (LEval e) = usesOf x t e
+usesOf _ _ LUnit = 0
+usesOf _ _ LFst = 0
+usesOf _ _ LSnd = 0
+usesOf x t (LPair a b) = usesOf x t a + usesOf x t b
+usesOf _ _ LInl = 0
+usesOf _ _ LInr = 0
+usesOf x t (LCoPair a b) = usesOf x t a + usesOf x t b
+usesOf x t (Singleton s) = usesOf x t s
+usesOf _ _ Zero = 0
+usesOf x t (Plus a b) = usesOf x t a + usesOf x t b
+usesOf x t (LSwap s) = usesOf x t s
+usesOf x t (LCopowFold s) = usesOf x t s
+usesOf _ _ (LOp _) = 0
+usesOf x t (DMap s) = usesOf x t s
+usesOf x t (DtMap s) = usesOf x t s
+usesOf _ _ DFoldr = 0
+usesOf _ _ DtFoldr = 0
+usesOf x t (DIt d1t d2t) = usesOf x t d1t + usesOf x t d2t
+usesOf x t (DtIt d1t d2t) = usesOf x t d1t + usesOf x t d2t
+usesOf x t (LRec s) = usesOf x t s
+usesOf x t (LIt s) = usesOf x t s
+
+allVars :: TTerm a -> [String]
+allVars (Var x _) = [x]
+allVars (Lambda x _ e) = x : allVars e
+allVars (App e1 e2) = allVars e1 ++ allVars e2
+allVars Unit = []
+allVars (Pair e1 e2) = allVars e1 ++ allVars e2
+allVars (Fst e) = allVars e
+allVars (Snd e) = allVars e
+allVars (Inl e) = allVars e
+allVars (Inr e) = allVars e
+allVars (Case e1 e2 e3) = allVars e1 ++ allVars e2 ++ allVars e3
+allVars (It e) = allVars e
+allVars (Rec e) = allVars e
+allVars (Sign e) = allVars e
+allVars (Lift  _ _) = []
+allVars (Op  _ e) = allVars e
+allVars (Map e1 e2) = allVars e1 ++ allVars e2
+allVars Foldr = []
+allVars (LOp _) = []
+allVars LId = []
+allVars (LComp e1 e2) = allVars e1 ++ allVars e2
+allVars (LApp e1 e2) = allVars e1 ++ allVars e2
+allVars (LEval e) = allVars e
+allVars LUnit = []
+allVars LFst = []
+allVars LSnd = []
+allVars (LPair e1 e2) = allVars e1 ++ allVars e2
+allVars LInl = []
+allVars LInr = []
+allVars (LCoPair e1 e2) = allVars e1 ++ allVars e2
+allVars (Singleton e) = allVars e
+allVars Zero = []
+allVars (Plus e1 e2) = allVars e1 ++ allVars e2
+allVars (LSwap e) = allVars e
+allVars (LCopowFold e) = allVars e
+allVars (DMap e) = allVars e
+allVars (DtMap e) = allVars e
+allVars DFoldr = []
+allVars DtFoldr = []
+allVars (DIt e1 e2) = allVars e1 ++ allVars e2
+allVars (DtIt e1 e2) = allVars e1 ++ allVars e2
+allVars (LRec e) = allVars e
+allVars (LIt e) = allVars e
+
+freshVariable :: [String] -> String
+freshVariable taken =
+    head [name
+         | name <- map (('y' :) . show) [1::Int ..]
+         , name `Set.notMember` Set.fromList taken]

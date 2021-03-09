@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 394fb10043ff616996abd2a48091e5b3c507e71ebc98f1de2eac8dd2624fcd7f
+-- hash: bcf50214797e28b1e9786bd1a94f7a96212381f8b1d39c6ca8173b48f9341573
 
 name:           ad-on-higher-order-functions
 version:        0.1.0.0
@@ -42,6 +42,7 @@ library
   ghc-options: -Wall
   build-depends:
       base >=4.7 && <5
+    , containers
     , ghc-typelits-natnormalise
     , mtl
     , vector-sized

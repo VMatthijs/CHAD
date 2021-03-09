@@ -24,6 +24,7 @@ dependencies:
 - vector-sized
 - mtl
 - ghc-typelits-natnormalise
+- containers
 
 ghc-options:
 - -Wall
