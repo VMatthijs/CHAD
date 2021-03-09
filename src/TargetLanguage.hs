@@ -13,7 +13,7 @@ import           Operation                 (LinearOperation, Operation, evalLOp,
 import           Types                     as T (LEither, LFun, LT (..), Scal,
                                                  Copower, Type, Vect, dFoldr, dIt,
                                                  dtFoldr, dtIt, eqTy, lApp,
-                                                 lCoPair, lComp, lCur, lEval,
+                                                 lCoPair, lComp, lCopowFold, lEval,
                                                  lFst, lId, lInl, lInr, lIt,
                                                  lMap, lPair, lRec, lSnd, lSwap,
                                                  lUnit, lZip, lZipWith,
@@ -85,7 +85,7 @@ data TTerm t
   LSwap
     :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun c (b -> d))
     -- | Copower-elimination
-  LCur
+  LCopowFold
     :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun (Copower b c) d)
     -- Map derivatives
   DMap
@@ -166,7 +166,7 @@ subst x v u (Singleton t) = Singleton (subst x v u t)
 subst _ _ _ Zero = Zero
 subst x v u (Plus a b) = Plus (subst x v u a) (subst x v u b)
 subst x v u (LSwap t) = LSwap (subst x v u t)
-subst x v u (LCur t) = LCur (subst x v u t)
+subst x v u (LCopowFold t) = LCopowFold (subst x v u t)
 subst _ _ _ (LOp lop) = LOp lop
 subst x v u (DMap t) = DMap (subst x v u t)
 subst x v u (DtMap t) = DtMap (subst x v u t)
@@ -223,7 +223,7 @@ substTt x v u (Singleton t) = Singleton (substTt x v u t)
 substTt _ _ _ Zero = Zero
 substTt x v u (Plus a b) = Plus (substTt x v u a) (substTt x v u b)
 substTt x v u (LSwap t) = LSwap (substTt x v u t)
-substTt x v u (LCur t) = LCur (substTt x v u t)
+substTt x v u (LCopowFold t) = LCopowFold (substTt x v u t)
 substTt _ _ _ (LOp lop) = LOp lop
 substTt x v u (DMap t) = DMap (substTt x v u t)
 substTt x v u (DtMap t) = DtMap (substTt x v u t)
@@ -287,7 +287,7 @@ evalTt (Singleton t) = T.singleton (evalTt t)
 evalTt Zero = zero
 evalTt (Plus a b) = plus (evalTt a) (evalTt b)
 evalTt (LSwap t) = lSwap (evalTt t)
-evalTt (LCur t) = lCur (evalTt t)
+evalTt (LCopowFold t) = lCopowFold (evalTt t)
 evalTt (DMap t) = plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith (snd . f) v))
   where
     (f, v) = evalTt t
@@ -339,7 +339,7 @@ printTt (Singleton t) = "[(" ++ printTt t ++ ", -)]"
 printTt Zero = "0"
 printTt (Plus a b) = "(" ++ printTt a ++ ") + (" ++ printTt b ++ ")"
 printTt (LSwap t) = "lswap(" ++ printTt t ++ ")"
-printTt (LCur t) = "lcur(" ++ printTt t ++ ")"
+printTt (LCopowFold t) = "lcur(" ++ printTt t ++ ")"
 printTt (DMap t) = "DMap(" ++ printTt t ++ ")"
 printTt DFoldr = "DFoldr"
 printTt DtFoldr = "DtFoldr"

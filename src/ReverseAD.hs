@@ -174,7 +174,7 @@ d2 (SL.Curry t) = do
   yVar <- gensym
   d2t <- d2 t
   let d2tTt = TL.App d2t (TL.Pair (TL.Var xVar xType) (TL.Var yVar yType))
-  let cur = TL.LCur $ TL.Lambda yVar yType d2tTt
+  let cur = TL.LCopowFold $ TL.Lambda yVar yType d2tTt
   return $ TL.Lambda xVar xType $ TL.LComp cur TL.LFst
   where
     xType = inferType

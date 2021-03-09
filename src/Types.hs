@@ -33,7 +33,7 @@ module Types
   , lFst
   , lSnd
   , lSwap
-  , lCur
+  , lCopowFold
   , lZip
   , lMap
   , dFoldr
@@ -180,8 +180,8 @@ lSnd = MkLFun snd
 lSwap :: (LT a, LT b, LT c) => (a -> LFun b c) -> LFun b (a -> c)
 lSwap t = MkLFun $ \x y -> lApp (t y) x
 
-lCur :: (LT b, LT c) => (a -> LFun b c) -> LFun (Copower a b) c
-lCur f = MkLFun $ g
+lCopowFold :: (LT b, LT c) => (a -> LFun b c) -> LFun (Copower a b) c
+lCopowFold f = MkLFun $ g
   where
     g (MkTens abs') = foldr (\(a, b) acc -> (f a `lApp` b) `plus` acc) zero abs'
 
