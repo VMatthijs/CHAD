@@ -13,12 +13,11 @@ import           Operation                 (Operation, evalOp)
 import           Types                     (Df1, Df2, Dr1, Dr2, LT, Scal, Vect)
 
 -- | Terms of the source language
-data STerm a b
-    -- | Identity function
-      where
+data STerm a b where
+  -- | Identity function
   Id :: (LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)) => STerm a a
-    -- | Composition
-    --   Read as: f; g
+  -- | Composition
+  --   Read as: f; g
   Comp
     :: ( LT a
        , LT (Dr1 a)
@@ -39,7 +38,7 @@ data STerm a b
     => STerm a b
     -> STerm b c
     -> STerm a c
-    -- Product tuples
+  -- Product tuples
   Unit :: (LT a, LT (Dr1 a), LT (Dr2 a), LT (Df1 a), LT (Df2 a)) => STerm a ()
   Pair
     :: ( LT a
@@ -87,7 +86,7 @@ data STerm a b
        , LT (Df2 b)
        )
     => STerm (a, b) b
-    -- | Evaluation
+  -- | Evaluation
   Ev
     :: ( LT a
        , LT (Dr1 a)
@@ -101,7 +100,7 @@ data STerm a b
        , LT (Df2 b)
        )
     => STerm (a -> b, a) b
-    -- | Curry
+  -- | Curry
   Curry
     :: ( LT a
        , LT (Dr1 a)
@@ -121,7 +120,7 @@ data STerm a b
        )
     => STerm (a, b) c
     -> STerm a (b -> c)
-    -- | Operators
+  -- | Operators
   Op
     :: ( LT a
        , LT (Dr1 a)
@@ -140,7 +139,7 @@ data STerm a b
        )
     => Operation a b
     -> STerm a b
-    -- | Map
+  -- | Map
   Map :: KnownNat n => STerm (Scal -> Scal, Vect n) (Vect n)
   Foldr
     :: ( LT a

@@ -20,9 +20,8 @@ import           Types                     as T (LEither, LFun, LT (..), Scal,
                                                  singleton)
 
 -- | Terms of the target language
-data TTerm t
-    -- Terms from source language
-      where
+data TTerm t where
+  -- Terms from source language
   Var :: String -> Type a -> TTerm a
   Lambda :: String -> Type a -> TTerm b -> TTerm (a -> b)
   App :: (LT a, LT b) => TTerm (a -> b) -> TTerm a -> TTerm b
@@ -42,14 +41,14 @@ data TTerm t
   Rec :: TTerm ((a, b) -> b) -> TTerm (a -> b) -- Should we work with a representation that is variable binding instead?
   Sign :: TTerm Scal -> TTerm (Either () ())
   Lift :: a -> Type a -> TTerm a
-    -- | Operators
+  -- | Operators
   Op :: Operation a b -> TTerm a -> TTerm b
   Map :: TTerm (Scal -> Scal) -> TTerm (Vect n) -> TTerm (Vect n)
   Foldr :: (LT a, KnownNat n) => TTerm ((((Scal, a) -> a, a), Vect n) -> a)
-    -- Target language extension
-    -- | Linear operation
+  -- Target language extension
+  -- | Linear operation
   LOp :: LT b => LinearOperation a b c -> TTerm (a -> LFun b c)
-    -- Linear functions
+  -- Linear functions
   LId :: TTerm (LFun a a)
   LComp
     :: (LT a, LT b, LT c)
@@ -58,7 +57,7 @@ data TTerm t
     -> TTerm (LFun a c)
   LApp :: (LT a, LT b) => TTerm (LFun a b) -> TTerm a -> TTerm b
   LEval :: TTerm a -> TTerm (LFun (a -> b) b)
-    -- Tuples
+  -- Tuples
   LUnit :: TTerm (LFun a ())
   LFst :: TTerm (LFun (a, b) a)
   LSnd :: TTerm (LFun (a, b) b)
@@ -67,7 +66,7 @@ data TTerm t
     => TTerm (LFun a b)
     -> TTerm (LFun a c)
     -> TTerm (LFun a (b, c))
-    -- Variants
+  -- Variants
   LInl :: TTerm (LFun a (LEither a b))
   LInr :: TTerm (LFun b (LEither a b))
   LCoPair
@@ -75,19 +74,19 @@ data TTerm t
     => TTerm (LFun a c)
     -> TTerm (LFun b c)
     -> TTerm (LFun (LEither a b) c)
-    -- | Singleton
+  -- | Singleton
   Singleton :: TTerm b -> TTerm (LFun c (Copower b c))
-    -- Zero
+  -- Zero
   Zero :: LT a => TTerm a
-    -- Plus
+  -- Plus
   Plus :: LT a => TTerm a -> TTerm a -> TTerm a
-    -- Swap
+  -- Swap
   LSwap
     :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun c (b -> d))
-    -- | Copower-elimination
+  -- | Copower-elimination
   LCopowFold
     :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun (Copower b c) d)
-    -- Map derivatives
+  -- Map derivatives
   DMap
     :: KnownNat n
     => TTerm (Scal -> (Scal, LFun Scal Scal), Vect n)
