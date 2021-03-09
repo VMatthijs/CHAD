@@ -46,7 +46,7 @@ module Types
   , lInl
   , lInr
   , lCoPair
-  , Tens
+  , Copower
   , empty
   , singleton
   , Df1
@@ -73,8 +73,8 @@ type Scal = Double
 -- | Vector of size n containing real scalars
 type Vect n = V.Vector n Double
 
--- | Tensor products
-newtype Tens a b =
+-- | Copower
+newtype Copower a b =
   MkTens [(a, b)]
 
 -- | Linear function
@@ -85,12 +85,12 @@ newtype LFun a b =
 newtype LEither a b =
   MkLEither (Maybe (Either a b))
 
--- Methods for tensor products
--- | Empty tensor product
-empty :: Tens a b
+-- Methods for copowers
+-- | Empty copower
+empty :: Copower a b
 empty = MkTens []
 
-singleton :: a -> LFun b (Tens a b)
+singleton :: a -> LFun b (Copower a b)
 singleton t = MkLFun $ \x -> MkTens [(t, x)]
 
 -- Methods for linear coproducts
@@ -134,7 +134,7 @@ lUncurry f = MkLFun $ uncurry (lApp . f)
 lZipWith :: (Scal -> LFun Scal Scal) -> Vect n -> LFun (Vect n) (Vect n)
 lZipWith f a = MkLFun $ V.zipWith (lApp . f) a
 
-lZip :: Vect n -> LFun (Vect n) (Tens Scal Scal)
+lZip :: Vect n -> LFun (Vect n) (Copower Scal Scal)
 lZip x = MkLFun $ \y -> MkTens $ V.toList $ V.zip x y
 
 -- | Linear unit
@@ -180,7 +180,7 @@ lSnd = MkLFun snd
 lSwap :: (LT a, LT b, LT c) => (a -> LFun b c) -> LFun b (a -> c)
 lSwap t = MkLFun $ \x y -> lApp (t y) x
 
-lCur :: (LT b, LT c) => (a -> LFun b c) -> LFun (Tens a b) c
+lCur :: (LT b, LT c) => (a -> LFun b c) -> LFun (Copower a b) c
 lCur f = MkLFun $ g
   where
     g (MkTens abs') = foldr (\(a, b) acc -> (f a `lApp` b) `plus` acc) zero abs'
@@ -215,7 +215,7 @@ dFoldr ((f, i), v) =
 dtFoldr ::
      (V.Unbox a, V.Unbox b, LT b)
   => (((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n)
-  -> LFun b ((Tens (Scal, a) b, b), Vect n)
+  -> LFun b ((Copower (Scal, a) b, b), Vect n)
 dtFoldr ((f, i), v) =
   MkLFun $ \w ->
     let s = V.prescanr (curry (fst . f)) i v
@@ -316,7 +316,7 @@ type family Dr2 a = r | r -> a where
   Dr2 (a, b) = (Dr2 a, Dr2 b)
   Dr2 () = ()
   Dr2 (Either a b) = LEither (Dr2 a) (Dr2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), which is possible as long as we use zeroR and zeroF.
-  Dr2 (a -> b) = Tens (Dr1 a) (Dr2 b)
+  Dr2 (a -> b) = Copower (Dr1 a) (Dr2 b)
 
 data Type a where
   TScal :: Type Scal
@@ -326,7 +326,7 @@ data Type a where
   TUnit :: Type ()
   TEither :: Type a -> Type b -> Type (Either a b)
   TLinFun :: Type a -> Type b -> Type (LFun a b)
-  TTens :: Type a -> Type b -> Type (Tens a b)
+  TTens :: Type a -> Type b -> Type (Copower a b)
   TLEither :: Type a -> Type b -> Type (LEither a b)
 
 deriving instance Show (Type a)
@@ -459,7 +459,7 @@ instance (LT a, LT b) => LT (a -> b) where
   minus f g = \x -> minus (f x) (g x)
   showMe = error "This should never be used." -- This doesn't make sense.
 
-instance (LT a, LT b) => LT (Tens a b) where
+instance (LT a, LT b) => LT (Copower a b) where
   zero = empty
   zeroF = error "This should never be used."
   zeroR = error "This should never be used."

@@ -11,7 +11,7 @@ import           GHC.TypeNats              (KnownNat)
 import           Operation                 (LinearOperation, Operation, evalLOp,
                                             evalOp, showLOp, showOp)
 import           Types                     as T (LEither, LFun, LT (..), Scal,
-                                                 Tens, Type, Vect, dFoldr, dIt,
+                                                 Copower, Type, Vect, dFoldr, dIt,
                                                  dtFoldr, dtIt, eqTy, lApp,
                                                  lCoPair, lComp, lCur, lEval,
                                                  lFst, lId, lInl, lInr, lIt,
@@ -76,7 +76,7 @@ data TTerm t
     -> TTerm (LFun b c)
     -> TTerm (LFun (LEither a b) c)
     -- | Singleton
-  Singleton :: TTerm b -> TTerm (LFun c (Tens b c))
+  Singleton :: TTerm b -> TTerm (LFun c (Copower b c))
     -- Zero
   Zero :: LT a => TTerm a
     -- Plus
@@ -84,9 +84,9 @@ data TTerm t
     -- Swap
   LSwap
     :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun c (b -> d))
-    -- | Tensor-elimination
+    -- | Copower-elimination
   LCur
-    :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun (Tens b c) d)
+    :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun (Copower b c) d)
     -- Map derivatives
   DMap
     :: KnownNat n
@@ -95,7 +95,7 @@ data TTerm t
   DtMap
     :: KnownNat n
     => TTerm (Scal -> (Scal, LFun Scal Scal), Vect n)
-    -> TTerm (LFun (Vect n) (Tens Scal Scal, Vect n))
+    -> TTerm (LFun (Vect n) (Copower Scal Scal, Vect n))
   DFoldr
     :: (KnownNat n, V.Unbox a, V.Unbox b, LT b)
     => TTerm ((((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n) -> LFun ( ( ( Scal
@@ -104,7 +104,7 @@ data TTerm t
                                                                         , Vect n) b)
   DtFoldr
     :: (KnownNat n, V.Unbox a, V.Unbox b, LT b)
-    => TTerm ((((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n) -> LFun b ( ( Tens ( Scal
+    => TTerm ((((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n) -> LFun b ( ( Copower ( Scal
                                                                                    , a) b
                                                                             , b)
                                                                           , Vect n))

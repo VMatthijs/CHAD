@@ -211,14 +211,14 @@ d2 (SL.CoPair f g) = do
     zType = inferType
 -- Map
 -- Map :: (Scal -> Scal, Vect n) -> Vect n
--- d2 Map :: (Scal -> (Scal, LFun Scal Scal), Vect n) -> LFun (Vect n) (Tens Scal Scal, Vect n)
+-- d2 Map :: (Scal -> (Scal, LFun Scal Scal), Vect n) -> LFun (Vect n) (Copower Scal Scal, Vect n)
 d2 SL.Map = do
   xVar <- gensym
   return $ TL.Lambda xVar xType $ TL.DtMap $ TL.Var xVar xType
   where
     xType = inferType
 -- Foldr :: ((Scal, a) -> a, a, Vect n) -> a
--- d2 Foldr :: ((Scal, D1 a) -> (D1 a, LFun (D2 a) (Scal, D2 a)), D1 a, Vect n) -> LFun (D2 a) (Tens (Scal, D1 a) (D2 a), D2 a ,Vect n)
+-- d2 Foldr :: ((Scal, D1 a) -> (D1 a, LFun (D2 a) (Scal, D2 a)), D1 a, Vect n) -> LFun (D2 a) (Copower (Scal, D1 a) (D2 a), D2 a ,Vect n)
 d2 SL.Foldr = return TL.DtFoldr
 -- Dop^t
 d2 (SL.Op (Constant _)) = return $ TL.LOp DConstantT
