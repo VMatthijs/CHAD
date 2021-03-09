@@ -121,62 +121,6 @@ data TTerm t where
   LRec :: TTerm (LFun (a, b) b) -> TTerm (LFun a b)
   LIt :: (LT a, LT b) => TTerm (LFun b (a, b)) -> TTerm (LFun b a)
 
--- | Substitute variable for term
-subst :: String -> u -> Type u -> TTerm t -> TTerm t
-subst x v u (Var y t)
-  | x == y =
-    case eqTy u t of
-      Just Refl -> Lift v u
-      Nothing ->
-        error
-          ("Ill-typed substitution. Tried to match type " ++
-           show u ++ " with " ++ show t)
-  | otherwise = Var y t
-subst x v u (Lambda y t e)
-  | x == y = Lambda y t e
-  | otherwise = Lambda y t (subst x v u e)
-subst x v u (App f a) = App (subst x v u f) (subst x v u a)
-subst _ _ _ Unit = Unit
-subst x v u (Pair a b) = Pair (subst x v u a) (subst x v u b)
-subst x v u (Fst p) = Fst (subst x v u p)
-subst x v u (Snd p) = Snd (subst x v u p)
-subst _ _ _ (Lift x t) = Lift x t
-subst x v u (Op op y) = Op op (subst x v u y)
-subst x v u (Map f y) = Map (subst x v u f) (subst x v u y)
-subst _ _ _ Foldr = Foldr
-subst x v u (Inl t) = Inl (subst x v u t)
-subst x v u (Inr t) = Inr (subst x v u t)
-subst x v u (Case t l r) = Case (subst x v u t) (subst x v u l) (subst x v u r)
--- Target language extension
-subst x v u (Rec t) = Rec (subst x v u t)
-subst x v u (It t) = It (subst x v u t)
-subst x v u (Sign t) = Sign (subst x v u t)
-subst _ _ _ LId = LId
-subst x v u (LComp f g) = LComp (subst x v u f) (subst x v u g)
-subst x v u (LApp f a) = LApp (subst x v u f) (subst x v u a)
-subst x v u (LEval t) = LEval (subst x v u t)
-subst _ _ _ LUnit = LUnit
-subst _ _ _ LFst = LFst
-subst _ _ _ LSnd = LSnd
-subst x v u (LPair a b) = LPair (subst x v u a) (subst x v u b)
-subst _ _ _ LInl = LInl
-subst _ _ _ LInr = LInr
-subst x v u (LCoPair a b) = LCoPair (subst x v u a) (subst x v u b)
-subst x v u (Singleton t) = Singleton (subst x v u t)
-subst _ _ _ Zero = Zero
-subst x v u (Plus a b) = Plus (subst x v u a) (subst x v u b)
-subst x v u (LSwap t) = LSwap (subst x v u t)
-subst x v u (LCopowFold t) = LCopowFold (subst x v u t)
-subst _ _ _ (LOp lop) = LOp lop
-subst x v u (DMap t) = DMap (subst x v u t)
-subst x v u (DtMap t) = DtMap (subst x v u t)
-subst _ _ _ DFoldr = DFoldr
-subst _ _ _ DtFoldr = DtFoldr
-subst x v u (DIt d1t d2t) = DIt (subst x v u d1t) (subst x v u d2t)
-subst x v u (DtIt d1t d2t) = DtIt (subst x v u d1t) (subst x v u d2t)
-subst x v u (LRec t) = LRec (subst x v u t)
-subst x v u (LIt t) = LIt (subst x v u t)
-
 -- | Substitute variable for a TTerm
 substTt :: String -> TTerm u -> Type u -> TTerm t -> TTerm t
 substTt x v u (Var y t)
@@ -246,7 +190,7 @@ substTt x v u (LIt t) = LIt (substTt x v u t)
 evalTt :: TTerm t -> t
 -- Source language extension
 evalTt (Var _ _) = error "Free variable has no value"
-evalTt (Lambda x t e) = \v -> evalTt $ subst x v t e
+evalTt (Lambda x t e) = \v -> evalTt $ substTt x (Lift v t) t e
 evalTt (App f a) = evalTt f (evalTt a)
 evalTt Unit = ()
 evalTt (Pair a b) = (evalTt a, evalTt b)
