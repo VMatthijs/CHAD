@@ -75,7 +75,7 @@ type Vect n = V.Vector n Double
 
 -- | Copower
 newtype Copower a b =
-  MkTens [(a, b)]
+  MkCopow [(a, b)]
 
 -- | Linear function
 newtype LFun a b =
@@ -88,10 +88,10 @@ newtype LEither a b =
 -- Methods for copowers
 -- | Empty copower
 empty :: Copower a b
-empty = MkTens []
+empty = MkCopow []
 
 singleton :: a -> LFun b (Copower a b)
-singleton t = MkLFun $ \x -> MkTens [(t, x)]
+singleton t = MkLFun $ \x -> MkCopow [(t, x)]
 
 -- Methods for linear coproducts
 lInl :: LFun a (LEither a b)
@@ -135,7 +135,7 @@ lZipWith :: (Scal -> LFun Scal Scal) -> Vect n -> LFun (Vect n) (Vect n)
 lZipWith f a = MkLFun $ V.zipWith (lApp . f) a
 
 lZip :: Vect n -> LFun (Vect n) (Copower Scal Scal)
-lZip x = MkLFun $ \y -> MkTens $ V.toList $ V.zip x y
+lZip x = MkLFun $ \y -> MkCopow $ V.toList $ V.zip x y
 
 -- | Linear unit
 lUnit :: LFun a () 
@@ -183,7 +183,7 @@ lSwap t = MkLFun $ \x y -> lApp (t y) x
 lCopowFold :: (LT b, LT c) => (a -> LFun b c) -> LFun (Copower a b) c
 lCopowFold f = MkLFun $ g
   where
-    g (MkTens abs') = foldr (\(a, b) acc -> (f a `lApp` b) `plus` acc) zero abs'
+    g (MkCopow abs') = foldr (\(a, b) acc -> (f a `lApp` b) `plus` acc) zero abs'
 
 lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
 lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
@@ -222,7 +222,7 @@ dtFoldr ((f, i), v) =
         vs = V.zip v s
         svs = V.scanl (flip $ curry (snd . uncurry (lApp . snd . f))) w vs
         vssvs = V.zip vs (V.init svs)
-     in ( (MkTens (V.toList vssvs), V.last svs)
+     in ( (MkCopow (V.toList vssvs), V.last svs)
         , V.map (fst . uncurry (lApp . snd . f)) vssvs)
 
 dIt ::
@@ -450,7 +450,7 @@ instance KnownNat n => LT (Vect n) where
 instance (LT a, LT b) => LT (a -> b) where
   zero = const zero
   zeroF f a = snd (f a) `lApp` (zeroF a)
-  zeroR _ = MkTens []
+  zeroR _ = MkCopow []
   plus f g = \x -> plus (f x) (g x)
   isZero = error "This should never be used." -- undecidable
   inferType = TArrow inferType inferType
@@ -463,13 +463,13 @@ instance (LT a, LT b) => LT (Copower a b) where
   zero = empty
   zeroF = error "This should never be used."
   zeroR = error "This should never be used."
-  plus (MkTens x) (MkTens y) = MkTens (x ++ y)
-  isZero (MkTens xs) = all isZero (map snd xs)
+  plus (MkCopow x) (MkCopow y) = MkCopow (x ++ y)
+  isZero (MkCopow xs) = all isZero (map snd xs)
   inferType = TTens inferType inferType
   scalProd = error "This should never be used." -- This doesn't make sense.
   scalDiv = error "This should never be used." -- This doesn't make sense.
   minus = error "This should never be used." -- This doesn't make sense.
-  showMe (MkTens xs) =
+  showMe (MkCopow xs) =
     "[" ++ (foldr (\x acc -> showMe x ++ ", " ++ acc) "" xs) ++ "]"
 
 instance (LT a, LT b) => LT (LFun a b) where
