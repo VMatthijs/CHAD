@@ -326,7 +326,7 @@ data Type a where
   TUnit :: Type ()
   TEither :: Type a -> Type b -> Type (Either a b)
   TLinFun :: Type a -> Type b -> Type (LFun a b)
-  TTens :: Type a -> Type b -> Type (Copower a b)
+  TCopow :: Type a -> Type b -> Type (Copower a b)
   TLEither :: Type a -> Type b -> Type (LEither a b)
 
 deriving instance Show (Type a)
@@ -349,7 +349,7 @@ eqTy (TLinFun u1 u2) (TLinFun v1 v2) = do
   Refl <- eqTy u1 v1
   Refl <- eqTy u2 v2
   return Refl
-eqTy (TTens u1 u2) (TTens v1 v2) = do
+eqTy (TCopow u1 u2) (TCopow v1 v2) = do
   Refl <- eqTy u1 v1
   Refl <- eqTy u2 v2
   return Refl
@@ -465,7 +465,7 @@ instance (LT a, LT b) => LT (Copower a b) where
   zeroR = error "This should never be used."
   plus (MkCopow x) (MkCopow y) = MkCopow (x ++ y)
   isZero (MkCopow xs) = all isZero (map snd xs)
-  inferType = TTens inferType inferType
+  inferType = TCopow inferType inferType
   scalProd = error "This should never be used." -- This doesn't make sense.
   scalDiv = error "This should never be used." -- This doesn't make sense.
   minus = error "This should never be used." -- This doesn't make sense.
