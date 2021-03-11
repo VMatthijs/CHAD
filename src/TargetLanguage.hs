@@ -1,5 +1,6 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs     #-}
+{-# LANGUAGE DataKinds  #-}
+{-# LANGUAGE GADTs      #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- | Definition of the target language
 module TargetLanguage where
@@ -254,55 +255,72 @@ evalTt (LRec t) = lRec (evalTt t)
 evalTt (LIt t) = lIt (evalTt t)
 
 -- | Pretty print the target language
-printTt :: TTerm t -> String
+--
+-- Precedences used are as follows:
+-- - application is 10
+-- - plus is 6
+-- - linear composition (;;) is 1
+printTt :: Int -> TTerm t -> ShowS
 -- Source language extension
-printTt (Var x _) = x
-printTt (Lambda x _ e) = "\\" ++ x ++ " -> (" ++ printTt e ++ ")"
-printTt (App f a) = printTt f ++ "(" ++ printTt a ++ ")"
-printTt Unit = "()"
-printTt (Pair a b) = "(" ++ printTt a ++ ", " ++ printTt b ++ ")"
-printTt (Fst p) = "Fst(" ++ printTt p ++ ")"
-printTt (Snd p) = "Snd(" ++ printTt p ++ ")"
-printTt (Inl p) = "Inl(" ++ printTt p ++ ")"
-printTt (Inr p) = "Inr(" ++ printTt p ++ ")"
-printTt (Case p l r) =
-  "Case(" ++ printTt p ++ ", " ++ printTt l ++ ", " ++ printTt r ++ ")"
-printTt (Lift _ _) = error "Can't print lifted value"
-printTt (Op op a) = "evalOp " ++ showOp op ++ " " ++ printTt a
-printTt (Map f a) = "map (" ++ printTt f ++ ") " ++ printTt a
-printTt Foldr = "foldr"
-printTt (Rec t) = "rec(" ++ printTt t ++ ")"
-printTt (It t) = "it(" ++ printTt t ++ ")"
-printTt (Sign t) = "sign(" ++ printTt t ++ ")"
+printTt _ (Var x _) = showString x
+printTt d (Lambda x _ e) = showParen (d > 0) $ showString ("\\" ++ x) . showString " -> " . printTt 0 e
+printTt d (App f a) = showParen (d > 10) $ printTt 10 f . showString " " . printTt 11 a
+printTt _ Unit = showString "()"
+printTt _ (Pair a b) = showString "(" . printTt 0 a . showString ", " . printTt 0 b . showString ")"
+printTt d (Fst p) = showFunction d "Fst" [Some p]
+printTt d (Snd p) = showFunction d "Snd" [Some p]
+printTt d (Inl p) = showFunction d "Inl" [Some p]
+printTt d (Inr p) = showFunction d "Inr" [Some p]
+printTt d (Case p l r) =
+  showParen (d > 0) $
+    showString "Case " . printTt 0 p . showString " in {" . printTt 0 l . showString " } { " . printTt 0 r . showString "}"
+printTt _ (Lift _ _) = error "Can't print lifted value"
+printTt d (Op op a) = showFunction d ("evalOp " ++ showOp op) [Some a]
+printTt d (Map f a) = showFunction d "map" [Some f, Some a]
+printTt _ Foldr = showString "foldr"
+printTt d (Rec t) = showFunction d "rec" [Some t]
+printTt d (It t) = showFunction d "it" [Some t]
+printTt d (Sign t) = showFunction d "sign" [Some t]
 -- Target language extension
-printTt (LOp lop) = "evalLOp " ++ showLOp lop
-printTt LId = "lid"
-printTt (LComp f g) = "(" ++ printTt f ++ ";;" ++ printTt g ++ ")"
-printTt (LEval e) = "leval(" ++ printTt e ++ ")"
-printTt (LApp f a) = printTt f ++ "(" ++ printTt a ++ ")"
-printTt LUnit = "lunit"
-printTt LFst = "lfst"
-printTt LSnd = "lsnd"
-printTt (LPair a b) = "lpair(" ++ printTt a ++ ", " ++ printTt b ++ ")"
-printTt LInl = "linl"
-printTt LInr = "linr"
-printTt (LCoPair a b) = "lcopair(" ++ printTt a ++ ", " ++ printTt b ++ ")"
-printTt (Singleton t) = "[(" ++ printTt t ++ ", -)]"
-printTt Zero = "0"
-printTt (Plus a b) = "(" ++ printTt a ++ ") + (" ++ printTt b ++ ")"
-printTt (LSwap t) = "lswap(" ++ printTt t ++ ")"
-printTt (LCopowFold t) = "lcopowfold(" ++ printTt t ++ ")"
-printTt (DMap t) = "DMap(" ++ printTt t ++ ")"
-printTt DFoldr = "DFoldr"
-printTt DtFoldr = "DtFoldr"
-printTt (DtMap t) = "DtMap(" ++ printTt t ++ ")"
-printTt (DIt d1t d2t) = "DIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")"
-printTt (DtIt d1t d2t) = "DtIt(" ++ printTt d1t ++ ", " ++ printTt d2t ++ ")"
-printTt (LRec t) = "lrec(" ++ printTt t ++ ")"
-printTt (LIt t) = "lit(" ++ printTt t ++ ")"
+printTt d (LOp lop) = showParen (d > 10) $ showString ("evalLOp " ++ showLOp lop)
+printTt _ LId = showString "lid"
+printTt d (LComp f g) = showParen (d > 1) $ printTt 1 f . showString " ;; " . printTt 1 g
+printTt d (LEval e) = showFunction d "leval" [Some e]
+printTt d (LApp f a) = showParen (d > 10) $ printTt 11 f . showString " " . printTt 11 a
+printTt _ LUnit = showString "lunit"
+printTt _ LFst = showString "lfst"
+printTt _ LSnd = showString "lsnd"
+printTt d (LPair a b) = showFunction d "lpair" [Some a, Some b]
+printTt _ LInl = showString "linl"
+printTt _ LInr = showString "linr"
+printTt d (LCoPair a b) = showFunction d "lcopair" [Some a, Some b]
+printTt _ (Singleton t) = showString "[(" . printTt 0 t . showString  ", -)]"
+printTt _ Zero = showString "0F"
+printTt d (Plus f g) = showParen (d > 6) $ printTt 6 f . showString " + " . printTt 6 g
+printTt d (LSwap t) = showFunction d "lswap" [Some t]
+printTt d (LCopowFold t) = showFunction d "lcopowfold" [Some t]
+printTt d (DMap t) = showFunction d "DMap" [Some t]
+printTt d (DtMap t) = showFunction d "DtMap" [Some t]
+printTt _ DFoldr = showString "DFoldr"
+printTt _ DtFoldr = showString "DtFoldr"
+printTt d (DIt d1t d2t) = showFunction d "DIt" [Some d1t, Some d2t]
+printTt d (DtIt d1t d2t) = showFunction d "DtIt" [Some d1t, Some d2t]
+printTt d (LRec t) = showFunction d "lrec" [Some t]
+printTt d (LIt t) = showFunction d "lit" [Some t]
+
+data Some f = forall a. Some (f a)
+
+withSome :: (forall a. f a -> b) -> Some f -> b
+withSome f (Some x) = f x
+
+showFunction :: Int -> String -> [Some TTerm] -> ShowS
+showFunction d funcname args =
+  showParen (d > 10) $
+    showString funcname
+      . foldr (.) id (map (withSome (\t -> showString " " . printTt 11 t)) args)
 
 instance Show (TTerm a) where
-  show = printTt
+  showsPrec p = printTt p
 
 -- | Count the uses of a variable in an expression
 usesOf :: String -> Type a -> TTerm b -> Integer
