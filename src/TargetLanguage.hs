@@ -5,10 +5,13 @@
 -- | Definition of the target language
 module TargetLanguage where
 
-import qualified Data.Vector.Unboxed.Sized as V (Unbox, foldr, map)
+import           Data.Foldable (fold)
+import           Data.Maybe (fromMaybe)
+import           Data.Monoid (Sum(..))
 import qualified Data.Set                  as Set
 
 import           Data.Type.Equality        ((:~:) (Refl))
+import qualified Data.Vector.Unboxed.Sized as V (Unbox, foldr, map)
 import           GHC.TypeNats              (KnownNat)
 import           Operation                 (LinearOperation, Operation, evalLOp,
                                             evalOp, showLOp, showOp)
@@ -139,7 +142,7 @@ substTt x v u (Lambda y t e)
   -- When substituting F under λx. E where x occurs in F, we first need to
   -- alpha-rename x to something unused in both E and F, and only afterwards
   -- substitute normally.
-  | usesOf y t v >= 1 =
+  | usesOf y v >= 1 =
       let y' = freshVariable (allVars v ++ allVars e)
       in Lambda y' t (substTt x v u (substTt y (Var y' t) t e))
   -- Otherwise, we can substitute normally.
@@ -322,54 +325,104 @@ showFunction d funcname args =
 instance Show (TTerm a) where
   showsPrec p = printTt p
 
+data Layout a = LyLeaf a | LyPair (Layout a) (Layout a)
+  deriving (Show)
+
+instance Functor Layout where
+  fmap f (LyLeaf x) = LyLeaf (f x)
+  fmap f (LyPair l1 l2) = LyPair (fmap f l1) (fmap f l2)
+
+instance Foldable Layout where
+  foldMap f (LyLeaf x) = f x
+  foldMap f (LyPair l1 l2) = foldMap f l1 <> foldMap f l2
+
+instance Semigroup a => Semigroup (Layout a) where
+  LyLeaf a <> LyLeaf b = LyLeaf (a <> b)
+  l@(LyLeaf _) <> LyPair l1 l2 = LyPair (l <> l1) (l <> l2)
+  LyPair l1 l2 <> l@(LyLeaf _) = LyPair (l1 <> l) (l2 <> l)
+  LyPair l1 l2 <> LyPair l3 l4 = LyPair (l1 <> l3) (l2 <> l4)
+
+instance Monoid a => Monoid (Layout a) where
+  mempty = LyLeaf mempty
+
+-- Monoid is strictly speaking not necessary here with a more careful implementation
+truncateLayoutWithExpr :: Monoid s => Layout s -> TTerm a -> Layout s
+truncateLayoutWithExpr l@(LyLeaf _) _ = l
+truncateLayoutWithExpr (LyPair l1 l2) (Pair e1 e2) =
+    LyPair (truncateLayoutWithExpr l1 e1) (truncateLayoutWithExpr l2 e2)
+truncateLayoutWithExpr l@(LyPair _ _) _ = LyLeaf (fold l)
+
 -- | Count the uses of a variable in an expression
-usesOf :: String -> Type a -> TTerm b -> Integer
-usesOf x _ (Var y _)
-  | x == y = 1
-  | otherwise = 0
-usesOf x t (Lambda y _ e)
-  | x == y = 0
-  | otherwise = usesOf x t e
-usesOf x t (App f a) = usesOf x t f + usesOf x t a
-usesOf _ _ Unit = 0
-usesOf x t (Pair a b) = usesOf x t a + usesOf x t b
-usesOf x t (Fst p) = usesOf x t p
-usesOf x t (Snd p) = usesOf x t p
-usesOf x t (Inl p) = usesOf x t p
-usesOf x t (Inr p) = usesOf x t p
-usesOf x t (Case p f g) = usesOf x t p + usesOf x t f + usesOf x t g
-usesOf _ _ (Lift _ _) = 0
-usesOf x t (Op _ a) = usesOf x t a
-usesOf x t (Map f y) = usesOf x t f + usesOf x t y
-usesOf _ _ Foldr = 0
-usesOf x t (Rec s) = usesOf x t s
-usesOf x t (It s) = usesOf x t s
-usesOf x t (Sign s) = usesOf x t s
-usesOf _ _ LId = 0
-usesOf x t (LComp f g) = usesOf x t f + usesOf x t g
-usesOf x t (LApp f a) = usesOf x t f + usesOf x t a
-usesOf x t (LEval e) = usesOf x t e
-usesOf _ _ LUnit = 0
-usesOf _ _ LFst = 0
-usesOf _ _ LSnd = 0
-usesOf x t (LPair a b) = usesOf x t a + usesOf x t b
-usesOf _ _ LInl = 0
-usesOf _ _ LInr = 0
-usesOf x t (LCoPair a b) = usesOf x t a + usesOf x t b
-usesOf x t (Singleton s) = usesOf x t s
-usesOf _ _ Zero = 0
-usesOf x t (Plus a b) = usesOf x t a + usesOf x t b
-usesOf x t (LSwap s) = usesOf x t s
-usesOf x t (LCopowFold s) = usesOf x t s
-usesOf _ _ (LOp _) = 0
-usesOf x t (DMap s) = usesOf x t s
-usesOf x t (DtMap s) = usesOf x t s
-usesOf _ _ DFoldr = 0
-usesOf _ _ DtFoldr = 0
-usesOf x t (DIt d1t d2t) = usesOf x t d1t + usesOf x t d2t
-usesOf x t (DtIt d1t d2t) = usesOf x t d1t + usesOf x t d2t
-usesOf x t (LRec s) = usesOf x t s
-usesOf x t (LIt s) = usesOf x t s
+usesOf :: String -> TTerm a -> Integer
+usesOf x t = getSum (fold (usesOf' x t))
+
+-- | Count the uses of the components of a variable in an expression
+usesOf' :: (Num s, Monoid s) => String -> TTerm a -> Layout s
+usesOf' x (Var y _)
+  | x == y = LyLeaf 1
+  | otherwise = mempty
+usesOf' x (Lambda y _ e)
+  | x == y = mempty
+  | otherwise = usesOf' x e
+usesOf' x (App f a) = usesOf' x f <> usesOf' x a
+usesOf' _ Unit = mempty
+usesOf' x (Pair a b) = usesOf' x a <> usesOf' x b
+usesOf' x p@(Fst p') = fromMaybe (usesOf' x p') (usesOfPick x p)
+usesOf' x p@(Snd p') = fromMaybe (usesOf' x p') (usesOfPick x p)
+usesOf' x (Inl p) = usesOf' x p
+usesOf' x (Inr p) = usesOf' x p
+usesOf' x (Case p f g) = usesOf' x p <> usesOf' x f <> usesOf' x g
+usesOf' _ (Lift _ _) = mempty
+usesOf' x (Op _ a) = usesOf' x a
+usesOf' x (Map f y) = usesOf' x f <> usesOf' x y
+usesOf' _ Foldr = mempty
+usesOf' x (Rec s) = usesOf' x s
+usesOf' x (It s) = usesOf' x s
+usesOf' x (Sign s) = usesOf' x s
+usesOf' _ LId = mempty
+usesOf' x (LComp f g) = usesOf' x f <> usesOf' x g
+usesOf' x (LApp f a) = usesOf' x f <> usesOf' x a
+usesOf' x (LEval e) = usesOf' x e
+usesOf' _ LUnit = mempty
+usesOf' _ LFst = mempty
+usesOf' _ LSnd = mempty
+usesOf' x (LPair a b) = usesOf' x a <> usesOf' x b
+usesOf' _ LInl = mempty
+usesOf' _ LInr = mempty
+usesOf' x (LCoPair a b) = usesOf' x a <> usesOf' x b
+usesOf' x (Singleton s) = usesOf' x s
+usesOf' _ Zero = mempty
+usesOf' x (Plus a b) = usesOf' x a <> usesOf' x b
+usesOf' x (LSwap s) = usesOf' x s
+usesOf' x (LCopowFold s) = usesOf' x s
+usesOf' _ (LOp _) = mempty
+usesOf' x (DMap s) = usesOf' x s
+usesOf' x (DtMap s) = usesOf' x s
+usesOf' _ DFoldr = mempty
+usesOf' _ DtFoldr = mempty
+usesOf' x (DIt d1t d2t) = usesOf' x d1t <> usesOf' x d2t
+usesOf' x (DtIt d1t d2t) = usesOf' x d1t <> usesOf' x d2t
+usesOf' x (LRec s) = usesOf' x s
+usesOf' x (LIt s) = usesOf' x s
+
+usesOfPick :: (Num s, Monoid s) => String -> TTerm a -> Maybe (Layout s)
+usesOfPick x term = do
+    path <- getPath term
+    return (increment (reverse path))
+  where
+    getPath :: TTerm a -> Maybe [Pick]
+    getPath (Fst p) = (PickFst :) <$> getPath p
+    getPath (Snd p) = (PickSnd :) <$> getPath p
+    getPath (Var y _)
+      | x == y = Just []
+    getPath _ = Nothing
+
+    increment :: (Num s, Monoid s) => [Pick] -> Layout s
+    increment [] = LyLeaf 1
+    increment (PickFst : picks) = LyPair (increment picks) mempty
+    increment (PickSnd : picks) = LyPair mempty (increment picks)
+
+data Pick = PickFst | PickSnd
 
 allVars :: TTerm a -> [String]
 allVars (Var x _) = [x]

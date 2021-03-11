@@ -3,10 +3,13 @@
 -- | Simplify terms in the target language
 module Simplify
   ( simplifyTTerm
-  , usesOf
   ) where
 
-import           TargetLanguage (TTerm (..), substTt, usesOf)
+import           Data.Foldable (toList)
+import           Data.Monoid (Sum(..))
+
+import           TargetLanguage (TTerm (..), substTt, usesOf',
+                                 Layout (..), truncateLayoutWithExpr)
 import           Types
 
 -- | Simplify a TTerm
@@ -58,11 +61,19 @@ simplifyTTerm (DtIt d1t d2t) = DtIt (simplifyTTerm d1t) (simplifyTTerm d2t)
 simplifyTTerm (LRec t) = LRec (simplifyTTerm t)
 simplifyTTerm (LIt t) = LIt (simplifyTTerm t)
 
--- | Simplify the App TTerm
+-- | Simplify the App TTerm.
+-- We allow substituting Pair expressions where each element of the pair is
+-- individually only used once in the function body.
 simplifyApp :: (LT a, LT b) => TTerm (a -> b) -> TTerm a -> TTerm b
 simplifyApp (Lambda x t e) v@(Var _ _) = substTt x v t e
 simplifyApp (Lambda x t e) a
-  | usesOf x t e <= 1 = simplifyTTerm $ substTt x a t e
+  | let -- Count the usages of the components of 'a' in the body, 'e'
+        layout = usesOf' x e
+        -- Then truncate the resulting layout with the actual Pair structure of 'a'
+        count = getSum <$> truncateLayoutWithExpr layout a :: Layout Integer
+    -- Require that every component is used at most once
+  , all (<=1) (toList count)
+  = simplifyTTerm $ substTt x a t e
   | otherwise = App (Lambda x t e) a
 simplifyApp Zero _ = Zero
 simplifyApp f a = App f a
