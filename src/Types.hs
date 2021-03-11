@@ -47,7 +47,6 @@ module Types
   , lInr
   , lCoPair
   , Copower
-  , empty
   , singleton
   , Df1
   , Df2
@@ -86,9 +85,6 @@ newtype LEither a b =
   MkLEither (Maybe (Either a b)) 
 
 -- Methods for copowers
--- | Empty copower
-empty :: Copower a b
-empty = MkCopow []
 
 singleton :: a -> LFun b (Copower a b)
 singleton t = MkLFun $ \x -> MkCopow [(t, x)]
@@ -460,7 +456,7 @@ instance (LT a, LT b) => LT (a -> b) where
   showMe = error "This should never be used." -- This doesn't make sense.
 
 instance (LT a, LT b) => LT (Copower a b) where
-  zero = empty
+  zero = MkCopow []
   zeroF = error "This should never be used."
   zeroR = error "This should never be used."
   plus (MkCopow x) (MkCopow y) = MkCopow (x ++ y)
