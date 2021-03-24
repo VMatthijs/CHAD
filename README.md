@@ -1,5 +1,6 @@
 # CHAD: Combinatory Homomorphic Automatic Differentiation
 ![chad](https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/KilroySchematic.svg/1024px-KilroySchematic.svg.png)
+<span style="font-family:Papyrus; font-size:4em;">Wot, no tape </span>
 
 This project gives an implementation and extension of the automatic differentiation algorithm described in [[1]](https://arxiv.org/abs/2007.05283).
 
