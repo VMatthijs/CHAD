@@ -1,5 +1,9 @@
-# Sr. Cad: Structure Respecting, Combinatory Automatic Differentiation
-![sr.cad](https://canary.contestimg.wish.com/api/webimage/5cc11763cc9e8b5dcb6cba6e-19-large.jpg)
+# CHAD: Combinatory Homomorphic Automatic Differentiation
+![chad](https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/KilroySchematic.svg/1024px-KilroySchematic.svg.png)
+### <div align="center">Wot, no tape?</div>
+### <div align="center">Wot, no graph?</div>
+### <div align="center">Wot, no state?</div>
+### <div align="center">Wot, no continuations?</div>
 
 This project gives an implementation and extension of the automatic differentiation algorithm described in [[1]](https://arxiv.org/abs/2007.05283).
 
