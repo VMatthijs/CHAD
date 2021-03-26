@@ -65,7 +65,6 @@ import qualified Data.Vector.Unboxed.Sized as V (Unbox, Vector, foldr, init,
                                                  scanl, sum, toList, zip,
                                                  zipWith)
 import           GHC.TypeNats              (KnownNat, sameNat)
-import           System.IO.Unsafe          (unsafePerformIO)
 
 -- | Real scalars
 type Scal = Double
