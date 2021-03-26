@@ -15,14 +15,7 @@ import qualified Data.Vector.Unboxed.Sized as V (Unbox, foldr, map)
 import           GHC.TypeNats              (KnownNat)
 import           Operation                 (LinearOperation, Operation, evalLOp,
                                             evalOp, showLOp, showOp)
-import           Types                     as T (LEither, LFun, LT (..), Scal,
-                                                 Copower, Type, Vect, dFoldr, dIt,
-                                                 dtFoldr, dtIt, eqTy, lApp,
-                                                 lCoPair, lComp, lCopowFold, lEval,
-                                                 lFst, lId, lInl, lInr, lIt,
-                                                 lMap, lPair, lRec, lSnd, lSwap,
-                                                 lUnit, lZip, lZipWith,
-                                                 singleton)
+import           Types
 
 -- | Terms of the target language
 data TTerm t where
@@ -239,7 +232,7 @@ evalTt (LPair a b) = lPair (evalTt a) (evalTt b)
 evalTt LInl = lInl
 evalTt LInr = lInr
 evalTt (LCoPair a b) = lCoPair (evalTt a) (evalTt b)
-evalTt (Singleton t) = T.singleton (evalTt t)
+evalTt (Singleton t) = singleton (evalTt t)
 evalTt Zero = zero
 evalTt (Plus a b) = plus (evalTt a) (evalTt b)
 evalTt (LSwap t) = lSwap (evalTt t)
