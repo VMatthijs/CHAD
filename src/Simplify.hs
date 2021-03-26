@@ -12,15 +12,16 @@ import           Data.Monoid (Sum(..))
 
 import           TargetLanguage (TTerm (..), substTt, usesOf',
                                  Layout (..), truncateLayoutWithExpr)
+import           TargetLanguage.Env
 import           Types
 
 -- | Simplify a TTerm
 --   We do this by defining this function as some sort of fold,
 --   to make pattern matching easier.
-simplifyTTerm :: TTerm a -> TTerm a
+simplifyTTerm :: TTerm env a -> TTerm env a
 -- Source language extension
-simplifyTTerm (Var x t) = Var x t
-simplifyTTerm (Lambda x t e) = Lambda x t (simplifyTTerm e)
+simplifyTTerm (Var i) = Var i
+simplifyTTerm (Lambda t e) = Lambda t (simplifyTTerm e)
 simplifyTTerm (App f a) = simplifyApp (simplifyTTerm f) (simplifyTTerm a)
 simplifyTTerm Unit = Unit
 simplifyTTerm (Pair a b) = Pair (simplifyTTerm a) (simplifyTTerm b)
@@ -66,38 +67,38 @@ simplifyTTerm (LIt t) = LIt (simplifyTTerm t)
 -- | Simplify the App TTerm.
 -- We allow substituting Pair expressions where each element of the pair is
 -- individually only used once in the function body.
-simplifyApp :: (LT a, LT b) => TTerm (a -> b) -> TTerm a -> TTerm b
-simplifyApp (Lambda x t e) v@(Var _ _) = substTt x v t e
-simplifyApp (Lambda x t e) a
+simplifyApp :: (LT a, LT b) => TTerm env (a -> b) -> TTerm env a -> TTerm env b
+simplifyApp (Lambda _ e) (Var j) = substTt (Var j) e
+simplifyApp (Lambda t e) a
   | let -- Count the usages of the components of 'a' in the body, 'e'
-        layout = usesOf' x e
+        layout = usesOf' Z e
         -- Then truncate the resulting layout with the actual Pair structure of 'a'
         count = getSum <$> truncateLayoutWithExpr layout a :: Layout Integer
     -- Require that every component is used at most once
   , all (<=1) (toList count)
-  = simplifyTTerm $ substTt x a t e
-  | otherwise = App (Lambda x t e) a
+  = simplifyTTerm $ substTt a e
+  | otherwise = App (Lambda t e) a
 simplifyApp Zero _ = Zero
 simplifyApp f a = App f a
 
 -- | Simplify the Fst TTerm
-simplifyFst :: TTerm (a, b) -> TTerm a
+simplifyFst :: TTerm env (a, b) -> TTerm env a
 -- Fst of a pair can immediately be resolved
 simplifyFst (Pair t _) = t
 simplifyFst p          = Fst p
 
 -- | Simplify the Snd TTerm
-simplifySnd :: TTerm (a, b) -> TTerm b
+simplifySnd :: TTerm env (a, b) -> TTerm env b
 -- Snd of a pair can immediately be resolved
 simplifySnd (Pair _ s) = s
 simplifySnd p          = Snd p
 
 simplifyCase ::
      (LT a, LT b, LT c)
-  => TTerm (Either a b)
-  -> TTerm (a -> c)
-  -> TTerm (b -> c)
-  -> TTerm c
+  => TTerm env (Either a b)
+  -> TTerm env (a -> c)
+  -> TTerm env (b -> c)
+  -> TTerm env c
 simplifyCase (Inl p) f _ = simplifyTTerm $ App f p
 simplifyCase (Inr p) _ g = simplifyTTerm $ App g p
 simplifyCase x f g       = Case x (simplifyTTerm f) (simplifyTTerm g)
@@ -105,9 +106,9 @@ simplifyCase x f g       = Case x (simplifyTTerm f) (simplifyTTerm g)
 -- | Simplify the LComp TTerm
 simplifyLComp ::
      (LT a, LT b, LT c)
-  => TTerm (LFun a b)
-  -> TTerm (LFun b c)
-  -> TTerm (LFun a c)
+  => TTerm env (LFun a b)
+  -> TTerm env (LFun b c)
+  -> TTerm env (LFun a c)
 -- Remove LId
 simplifyLComp f LId                        = f
 simplifyLComp LId g                        = g
@@ -127,12 +128,12 @@ simplifyLComp _ Zero                       = Zero
 simplifyLComp f g                          = LComp f g
 
 -- | Simplify the LApp TTerm
-simplifyLApp :: (LT a, LT b) => TTerm (LFun a b) -> TTerm a -> TTerm b
+simplifyLApp :: (LT a, LT b) => TTerm env (LFun a b) -> TTerm env a -> TTerm env b
 simplifyLApp LId a = a
 simplifyLApp f a   = LApp f a
 
 -- | Simplify the Plus TTerm
-simplifyPlus :: LT a => TTerm a -> TTerm a -> TTerm a
+simplifyPlus :: LT a => TTerm env a -> TTerm env a -> TTerm env a
 simplifyPlus a Zero = a
 simplifyPlus Zero b = b
 simplifyPlus a b    = Plus a b

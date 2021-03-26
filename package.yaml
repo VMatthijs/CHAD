@@ -18,6 +18,7 @@ dependencies:
 - mtl
 - ghc-typelits-natnormalise
 - containers
+- some
 
 ghc-options:
 - -Wall

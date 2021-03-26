@@ -8,7 +8,7 @@ module SourceLanguage where
 import           Data.Vector.Unboxed.Sized as V (Unbox, foldr, map)
 
 import           GHC.TypeNats              (KnownNat)
-import           Helper                    ((&&&))
+import           Control.Arrow             ((&&&))
 import           Operation                 (Operation, evalOp)
 import           Types                     (Df1, Df2, Dr1, Dr2, LT, Scal, Vect)
 

@@ -1,254 +1,300 @@
-{-# LANGUAGE DataKinds  #-}
-{-# LANGUAGE GADTs      #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE GADTs         #-}
+{-# LANGUAGE LambdaCase    #-}
+{-# LANGUAGE RankNTypes    #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- | Definition of the target language
 module TargetLanguage where
 
 import           Data.Foldable (fold)
+import           Data.GADT.Compare (geq)
 import           Data.Maybe (fromMaybe)
 import           Data.Monoid (Sum(..))
-import qualified Data.Set                  as Set
+import           Data.Some
 
 import           Data.Type.Equality        ((:~:) (Refl))
 import qualified Data.Vector.Unboxed.Sized as V (Unbox, foldr, map)
 import           GHC.TypeNats              (KnownNat)
 import           Operation                 (LinearOperation, Operation, evalLOp,
                                             evalOp, showLOp, showOp)
+import           TargetLanguage.Env
 import           Types
 
 -- | Terms of the target language
-data TTerm t where
+data TTerm env t where
   -- Terms from source language
-  Var :: String -> Type a -> TTerm a
-  Lambda :: String -> Type a -> TTerm b -> TTerm (a -> b)
-  App :: (LT a, LT b) => TTerm (a -> b) -> TTerm a -> TTerm b
-  Unit :: TTerm ()
-  Pair :: TTerm a -> TTerm b -> TTerm (a, b)
-  Fst :: TTerm (a, b) -> TTerm a
-  Snd :: TTerm (a, b) -> TTerm b
-  Inl :: (LT a, LT b) => TTerm a -> TTerm (Either a b)
-  Inr :: (LT a, LT b) => TTerm b -> TTerm (Either a b)
+  Var :: Idx env a -> TTerm env a
+  Lambda :: Type a -> TTerm (a ': env) b -> TTerm env (a -> b)
+  App :: (LT a, LT b) => TTerm env (a -> b) -> TTerm env a -> TTerm env b
+  Unit :: TTerm env ()
+  Pair :: TTerm env a -> TTerm env b -> TTerm env (a, b)
+  Fst :: TTerm env (a, b) -> TTerm env a
+  Snd :: TTerm env (a, b) -> TTerm env b
+  Inl :: (LT a, LT b) => TTerm env a -> TTerm env (Either a b)
+  Inr :: (LT a, LT b) => TTerm env b -> TTerm env (Either a b)
   Case
     :: (LT a, LT b, LT c)
-    => TTerm (Either a b)
-    -> TTerm (a -> c)
-    -> TTerm (b -> c)
-    -> TTerm c
-  It :: TTerm ((a, b) -> Either c b) -> TTerm ((a, b) -> c)
-  Rec :: TTerm ((a, b) -> b) -> TTerm (a -> b) -- Should we work with a representation that is variable binding instead?
-  Sign :: TTerm Scal -> TTerm (Either () ())
-  Lift :: a -> Type a -> TTerm a
+    => TTerm env (Either a b)
+    -> TTerm env (a -> c)
+    -> TTerm env (b -> c)
+    -> TTerm env c
+  It :: TTerm env ((a, b) -> Either c b) -> TTerm env ((a, b) -> c)
+  Rec :: TTerm env ((a, b) -> b) -> TTerm env (a -> b) -- Should we work with a representation that is variable binding instead?
+  Sign :: TTerm env Scal -> TTerm env (Either () ())
+  Lift :: a -> Type a -> TTerm env a
   -- | Operators
-  Op :: Operation a b -> TTerm a -> TTerm b
-  Map :: TTerm (Scal -> Scal) -> TTerm (Vect n) -> TTerm (Vect n)
-  Foldr :: (LT a, KnownNat n) => TTerm ((((Scal, a) -> a, a), Vect n) -> a)
+  Op :: Operation a b -> TTerm env a -> TTerm env b
+  Map :: TTerm env (Scal -> Scal) -> TTerm env (Vect n) -> TTerm env (Vect n)
+  Foldr :: (LT a, KnownNat n) => TTerm env ((((Scal, a) -> a, a), Vect n) -> a)
   -- Target language extension
   -- | Linear operation
-  LOp :: LT b => LinearOperation a b c -> TTerm (a -> LFun b c)
+  LOp :: LT b => LinearOperation a b c -> TTerm env (a -> LFun b c)
   -- Linear functions
-  LId :: TTerm (LFun a a)
+  LId :: TTerm env (LFun a a)
   LComp
     :: (LT a, LT b, LT c)
-    => TTerm (LFun a b)
-    -> TTerm (LFun b c)
-    -> TTerm (LFun a c)
-  LApp :: (LT a, LT b) => TTerm (LFun a b) -> TTerm a -> TTerm b
-  LEval :: TTerm a -> TTerm (LFun (a -> b) b)
+    => TTerm env (LFun a b)
+    -> TTerm env (LFun b c)
+    -> TTerm env (LFun a c)
+  LApp :: (LT a, LT b) => TTerm env (LFun a b) -> TTerm env a -> TTerm env b
+  LEval :: TTerm env a -> TTerm env (LFun (a -> b) b)
   -- Tuples
-  LUnit :: TTerm (LFun a ())
-  LFst :: TTerm (LFun (a, b) a)
-  LSnd :: TTerm (LFun (a, b) b)
+  LUnit :: TTerm env (LFun a ())
+  LFst :: TTerm env (LFun (a, b) a)
+  LSnd :: TTerm env (LFun (a, b) b)
   LPair
     :: (LT a, LT b, LT c)
-    => TTerm (LFun a b)
-    -> TTerm (LFun a c)
-    -> TTerm (LFun a (b, c))
+    => TTerm env (LFun a b)
+    -> TTerm env (LFun a c)
+    -> TTerm env (LFun a (b, c))
   -- Variants
-  LInl :: TTerm (LFun a (LEither a b))
-  LInr :: TTerm (LFun b (LEither a b))
+  LInl :: TTerm env (LFun a (LEither a b))
+  LInr :: TTerm env (LFun b (LEither a b))
   LCoPair
     :: LT c
-    => TTerm (LFun a c)
-    -> TTerm (LFun b c)
-    -> TTerm (LFun (LEither a b) c)
+    => TTerm env (LFun a c)
+    -> TTerm env (LFun b c)
+    -> TTerm env (LFun (LEither a b) c)
   -- | Singleton
-  Singleton :: TTerm b -> TTerm (LFun c (Copower b c))
+  Singleton :: TTerm env b -> TTerm env (LFun c (Copower b c))
   -- Zero
-  Zero :: LT a => TTerm a
+  Zero :: LT a => TTerm env a
   -- Plus
-  Plus :: LT a => TTerm a -> TTerm a -> TTerm a
+  Plus :: LT a => TTerm env a -> TTerm env a -> TTerm env a
   -- Swap
   LSwap
-    :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun c (b -> d))
+    :: (LT b, LT c, LT d) => TTerm env (b -> LFun c d) -> TTerm env (LFun c (b -> d))
   -- | Copower-elimination
   LCopowFold
-    :: (LT b, LT c, LT d) => TTerm (b -> LFun c d) -> TTerm (LFun (Copower b c) d)
+    :: (LT b, LT c, LT d) => TTerm env (b -> LFun c d) -> TTerm env (LFun (Copower b c) d)
   -- Map derivatives
   DMap
     :: KnownNat n
-    => TTerm (Scal -> (Scal, LFun Scal Scal), Vect n)
-    -> TTerm (LFun (Scal -> Scal, Vect n) (Vect n))
+    => TTerm env (Scal -> (Scal, LFun Scal Scal), Vect n)
+    -> TTerm env (LFun (Scal -> Scal, Vect n) (Vect n))
   DtMap
     :: KnownNat n
-    => TTerm (Scal -> (Scal, LFun Scal Scal), Vect n)
-    -> TTerm (LFun (Vect n) (Copower Scal Scal, Vect n))
+    => TTerm env (Scal -> (Scal, LFun Scal Scal), Vect n)
+    -> TTerm env (LFun (Vect n) (Copower Scal Scal, Vect n))
   DFoldr
     :: (KnownNat n, V.Unbox a, V.Unbox b, LT b)
-    => TTerm ((((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n) -> LFun ( ( ( Scal
+    => TTerm env ((((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n) -> LFun ( ( ( Scal
                                                                             , a) -> b
                                                                           , b)
                                                                         , Vect n) b)
   DtFoldr
     :: (KnownNat n, V.Unbox a, V.Unbox b, LT b)
-    => TTerm ((((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n) -> LFun b ( ( Copower ( Scal
+    => TTerm env ((((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n) -> LFun b ( ( Copower ( Scal
                                                                                    , a) b
                                                                             , b)
                                                                           , Vect n))
   DIt
     :: (LT d2a, LT d2b, LT d2c)
-    => TTerm ((d1a, d1b) -> Either d1c d1b)
-    -> TTerm ((d1a, d1b) -> LFun (d2a, d2b) (LEither d2c d2b))
-    -> TTerm ((d1a, d1b) -> LFun (d2a, d2b) d2c)
+    => TTerm env ((d1a, d1b) -> Either d1c d1b)
+    -> TTerm env ((d1a, d1b) -> LFun (d2a, d2b) (LEither d2c d2b))
+    -> TTerm env ((d1a, d1b) -> LFun (d2a, d2b) d2c)
   DtIt
     :: (LT d2a, LT d2b, LT d2c)
-    => TTerm ((d1a, d1b) -> Either d1c d1b)
-    -> TTerm ((d1a, d1b) -> LFun (LEither d2c d2b) (d2a, d2b))
-    -> TTerm ((d1a, d1b) -> LFun d2c (d2a, d2b))
-  LRec :: TTerm (LFun (a, b) b) -> TTerm (LFun a b)
-  LIt :: (LT a, LT b) => TTerm (LFun b (a, b)) -> TTerm (LFun b a)
+    => TTerm env ((d1a, d1b) -> Either d1c d1b)
+    -> TTerm env ((d1a, d1b) -> LFun (LEither d2c d2b) (d2a, d2b))
+    -> TTerm env ((d1a, d1b) -> LFun d2c (d2a, d2b))
+  LRec :: TTerm env (LFun (a, b) b) -> TTerm env (LFun a b)
+  LIt :: (LT a, LT b) => TTerm env (LFun b (a, b)) -> TTerm env (LFun b a)
 
--- | Substitute variable for a TTerm
-substTt :: String -> TTerm u -> Type u -> TTerm t -> TTerm t
-substTt x v u (Var y t)
-  | x == y =
-    case eqTy u t of
-      Just Refl -> v
-      Nothing ->
-        error
-          ("Ill-typed substitution. Tried to match type " ++
-           show u ++ " with " ++ show t)
-  | otherwise = Var y t
-substTt x v u (Lambda y t e)
-  -- Substituting for variable x under λx. E does nothing
-  | x == y = Lambda y t e
-  -- When substituting F under λx. E where x occurs in F, we first need to
-  -- alpha-rename x to something unused in both E and F, and only afterwards
-  -- substitute normally.
-  | usesOf y v >= 1 =
-      let y' = freshVariable (allVars v ++ allVars e)
-      in Lambda y' t (substTt x v u (substTt y (Var y' t) t e))
-  -- Otherwise, we can substitute normally.
-  | otherwise = Lambda y t (substTt x v u e)
-substTt x v u (App f a) = App (substTt x v u f) (substTt x v u a)
-substTt _ _ _ Unit = Unit
-substTt x v u (Pair a b) = Pair (substTt x v u a) (substTt x v u b)
-substTt x v u (Fst p) = Fst (substTt x v u p)
-substTt x v u (Snd p) = Snd (substTt x v u p)
-substTt x v u (Inl t) = Inl (substTt x v u t)
-substTt x v u (Inr t) = Inr (substTt x v u t)
-substTt x v u (Case t l r) =
-  Case (substTt x v u t) (substTt x v u l) (substTt x v u r)
-substTt _ _ _ (Lift x t) = Lift x t
-substTt x v u (Op op y) = Op op (substTt x v u y)
-substTt x v u (Map f y) = Map (substTt x v u f) (substTt x v u y)
-substTt _ _ _ Foldr = Foldr
-substTt x v u (Rec t) = Rec (substTt x v u t)
-substTt x v u (It t) = It (substTt x v u t)
-substTt x v u (Sign t) = Sign (substTt x v u t)
+-- | Utility function for creating lambda expressions
+lambda :: LT a => TTerm (a ': env) t -> TTerm env (a -> t)
+lambda = Lambda inferType
+
+-- | Substitute variable with De Bruijn index zero in a 'TTerm'
+substTt :: TTerm env u -> TTerm (u ': env) t -> TTerm env t
+substTt v = substTt' Z v (Weaken $ \case Z -> error "substTt: replaced variable should've been replaced"
+                                         S i -> i)
+
+-- | Substitute given variable with the given environment weakening action in a
+-- 'TTerm'
+substTt' :: Idx env u -> TTerm env' u -> env :> env' -> TTerm env t -> TTerm env' t
+substTt' i v w (Var i')
+  | Just Refl <- geq i i' = v
+  | otherwise = Var (w >:> i')
+substTt' i v w (Lambda ty e) = Lambda ty (substTt' (S i) (sinkTt (wSucc wId) v) (wSink w) e)
+substTt' i v w (App f a) = App (substTt' i v w f) (substTt' i v w a)
+substTt' _ _ _ Unit = Unit
+substTt' i v w (Pair a b) = Pair (substTt' i v w a) (substTt' i v w b)
+substTt' i v w (Fst p) = Fst (substTt' i v w p)
+substTt' i v w (Snd p) = Snd (substTt' i v w p)
+substTt' i v w (Inl t) = Inl (substTt' i v w t)
+substTt' i v w (Inr t) = Inr (substTt' i v w t)
+substTt' i v w (Case t l r) =
+  Case (substTt' i v w t) (substTt' i v w l) (substTt' i v w r)
+substTt' _ _ _ (Lift x t) = Lift x t
+substTt' i v w (Op op y) = Op op (substTt' i v w y)
+substTt' i v w (Map f y) = Map (substTt' i v w f) (substTt' i v w y)
+substTt' _ _ _ Foldr = Foldr
+substTt' i v w (Rec t) = Rec (substTt' i v w t)
+substTt' i v w (It t) = It (substTt' i v w t)
+substTt' i v w (Sign t) = Sign (substTt' i v w t)
 -- Target language extension
-substTt _ _ _ LId = LId
-substTt x v u (LComp f g) = LComp (substTt x v u f) (substTt x v u g)
-substTt x v u (LApp f a) = LApp (substTt x v u f) (substTt x v u a)
-substTt x v u (LEval t) = LEval (substTt x v u t)
-substTt _ _ _ LUnit = LUnit
-substTt _ _ _ LFst = LFst
-substTt _ _ _ LSnd = LSnd
-substTt x v u (LPair a b) = LPair (substTt x v u a) (substTt x v u b)
-substTt _ _ _ LInl = LInl
-substTt _ _ _ LInr = LInr
-substTt x v u (LCoPair a b) = LCoPair (substTt x v u a) (substTt x v u b)
-substTt x v u (Singleton t) = Singleton (substTt x v u t)
-substTt _ _ _ Zero = Zero
-substTt x v u (Plus a b) = Plus (substTt x v u a) (substTt x v u b)
-substTt x v u (LSwap t) = LSwap (substTt x v u t)
-substTt x v u (LCopowFold t) = LCopowFold (substTt x v u t)
-substTt _ _ _ (LOp lop) = LOp lop
-substTt x v u (DMap t) = DMap (substTt x v u t)
-substTt x v u (DtMap t) = DtMap (substTt x v u t)
-substTt _ _ _ DFoldr = DFoldr
-substTt _ _ _ DtFoldr = DtFoldr
-substTt x v u (DIt d1t d2t) = DIt (substTt x v u d1t) (substTt x v u d2t)
-substTt x v u (DtIt d1t d2t) = DtIt (substTt x v u d1t) (substTt x v u d2t)
-substTt x v u (LRec t) = LRec (substTt x v u t)
-substTt x v u (LIt t) = LIt (substTt x v u t)
+substTt' _ _ _ LId = LId
+substTt' i v w (LComp f g) = LComp (substTt' i v w f) (substTt' i v w g)
+substTt' i v w (LApp f a) = LApp (substTt' i v w f) (substTt' i v w a)
+substTt' i v w (LEval t) = LEval (substTt' i v w t)
+substTt' _ _ _ LUnit = LUnit
+substTt' _ _ _ LFst = LFst
+substTt' _ _ _ LSnd = LSnd
+substTt' i v w (LPair a b) = LPair (substTt' i v w a) (substTt' i v w b)
+substTt' _ _ _ LInl = LInl
+substTt' _ _ _ LInr = LInr
+substTt' i v w (LCoPair a b) = LCoPair (substTt' i v w a) (substTt' i v w b)
+substTt' i v w (Singleton t) = Singleton (substTt' i v w t)
+substTt' _ _ _ Zero = Zero
+substTt' i v w (Plus a b) = Plus (substTt' i v w a) (substTt' i v w b)
+substTt' i v w (LSwap t) = LSwap (substTt' i v w t)
+substTt' i v w (LCopowFold t) = LCopowFold (substTt' i v w t)
+substTt' _ _ _ (LOp lop) = LOp lop
+substTt' i v w (DMap t) = DMap (substTt' i v w t)
+substTt' i v w (DtMap t) = DtMap (substTt' i v w t)
+substTt' _ _ _ DFoldr = DFoldr
+substTt' _ _ _ DtFoldr = DtFoldr
+substTt' i v w (DIt d1t d2t) = DIt (substTt' i v w d1t) (substTt' i v w d2t)
+substTt' i v w (DtIt d1t d2t) = DtIt (substTt' i v w d1t) (substTt' i v w d2t)
+substTt' i v w (LRec t) = LRec (substTt' i v w t)
+substTt' i v w (LIt t) = LIt (substTt' i v w t)
 
 -- | Evaluate the target language
-evalTt :: TTerm t -> t
+evalTt :: TTerm '[] t -> t
+evalTt = evalTt' VZ
+
+-- | Evaluate the target language in the given environment
+evalTt' :: Val env -> TTerm env t -> t
 -- Source language extension
-evalTt (Var _ _) = error "Free variable has no value"
-evalTt (Lambda x t e) = \v -> evalTt $ substTt x (Lift v t) t e
-evalTt (App f a) = evalTt f (evalTt a)
-evalTt Unit = ()
-evalTt (Pair a b) = (evalTt a, evalTt b)
-evalTt (Fst p) = fst $ evalTt p
-evalTt (Snd p) = snd $ evalTt p
-evalTt (Inl p) = Left $ evalTt p
-evalTt (Inr p) = Right $ evalTt p
-evalTt (Case p l r) =
-  case evalTt p of
-    Left q  -> evalTt l q
-    Right q -> evalTt r q
-evalTt (Lift x _) = x
-evalTt (Op op a) = evalOp op (evalTt a)
-evalTt (Map f x) = V.map (evalTt f) (evalTt x)
-evalTt Foldr = \((f, v), xs) -> V.foldr (\r a -> f (r, a)) v xs
-evalTt (Rec t) = fix (evalTt t)
+evalTt' env (Var i) = valProject env i
+evalTt' env (Lambda _ e) = \v -> evalTt' (VS v env) e
+evalTt' env (App f a) = evalTt' env f (evalTt' env a)
+evalTt' _   Unit = ()
+evalTt' env (Pair a b) = (evalTt' env a, evalTt' env b)
+evalTt' env (Fst p) = fst $ evalTt' env p
+evalTt' env (Snd p) = snd $ evalTt' env p
+evalTt' env (Inl p) = Left $ evalTt' env p
+evalTt' env (Inr p) = Right $ evalTt' env p
+evalTt' env (Case p l r) =
+  case evalTt' env p of
+    Left q  -> evalTt' env l q
+    Right q -> evalTt' env r q
+evalTt' _   (Lift x _) = x
+evalTt' env (Op op a) = evalOp op (evalTt' env a)
+evalTt' env (Map f x) = V.map (evalTt' env f) (evalTt' env x)
+evalTt' _   Foldr = \((f, v), xs) -> V.foldr (\r a -> f (r, a)) v xs
+evalTt' env (Rec t) = fix (evalTt' env t)
   where
     fix f a = f (a, fix f a)
-evalTt (It t) = fix (evalTt t)
+evalTt' env (It t) = fix (evalTt' env t)
   where
     fix f (a, b) =
       case f (a, b) of
         Left c   -> c
         Right b' -> fix f (a, b')
-evalTt (Sign t) =
-  let r = evalTt t
+evalTt' env (Sign t) =
+  let r = evalTt' env t
    in if r < 0
         then Left ()
         else if r > 0
                then Right ()
                else error "Tried to call real conditional at 0"
 -- Target language extension
-evalTt (LOp lop) = evalLOp lop
-evalTt LId = lId
-evalTt (LComp f g) = lComp (evalTt f) (evalTt g)
-evalTt (LEval t) = lEval (evalTt t)
-evalTt (LApp f a) = lApp (evalTt f) (evalTt a)
-evalTt LUnit = lUnit
-evalTt LFst = lFst
-evalTt LSnd = lSnd
-evalTt (LPair a b) = lPair (evalTt a) (evalTt b)
-evalTt LInl = lInl
-evalTt LInr = lInr
-evalTt (LCoPair a b) = lCoPair (evalTt a) (evalTt b)
-evalTt (Singleton t) = singleton (evalTt t)
-evalTt Zero = zero
-evalTt (Plus a b) = plus (evalTt a) (evalTt b)
-evalTt (LSwap t) = lSwap (evalTt t)
-evalTt (LCopowFold t) = lCopowFold (evalTt t)
-evalTt (DMap t) = plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith (snd . f) v))
+evalTt' _   (LOp lop) = evalLOp lop
+evalTt' _   LId = lId
+evalTt' env (LComp f g) = lComp (evalTt' env f) (evalTt' env g)
+evalTt' env (LEval t) = lEval (evalTt' env t)
+evalTt' env (LApp f a) = lApp (evalTt' env f) (evalTt' env a)
+evalTt' _   LUnit = lUnit
+evalTt' _   LFst = lFst
+evalTt' _   LSnd = lSnd
+evalTt' env (LPair a b) = lPair (evalTt' env a) (evalTt' env b)
+evalTt' _   LInl = lInl
+evalTt' _   LInr = lInr
+evalTt' env (LCoPair a b) = lCoPair (evalTt' env a) (evalTt' env b)
+evalTt' env (Singleton t) = singleton (evalTt' env t)
+evalTt' _   Zero = zero
+evalTt' env (Plus a b) = plus (evalTt' env a) (evalTt' env b)
+evalTt' env (LSwap t) = lSwap (evalTt' env t)
+evalTt' env (LCopowFold t) = lCopowFold (evalTt' env t)
+evalTt' env (DMap t) = plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith (snd . f) v))
   where
-    (f, v) = evalTt t
-evalTt (DtMap t) = lPair (lZip v) (lZipWith (snd . f) v)
+    (f, v) = evalTt' env t
+evalTt' env (DtMap t) = lPair (lZip v) (lZipWith (snd . f) v)
   where
-    (f, v) = evalTt t
-evalTt DFoldr = dFoldr
-evalTt DtFoldr = dtFoldr
-evalTt (DIt d1t d2t) = dIt (evalTt d1t) (evalTt d2t)
-evalTt (DtIt d1t d2t) = dtIt (evalTt d1t) (evalTt d2t)
-evalTt (LRec t) = lRec (evalTt t)
-evalTt (LIt t) = lIt (evalTt t)
+    (f, v) = evalTt' env t
+evalTt' _   DFoldr = dFoldr
+evalTt' _   DtFoldr = dtFoldr
+evalTt' env (DIt d1t d2t) = dIt (evalTt' env d1t) (evalTt' env d2t)
+evalTt' env (DtIt d1t d2t) = dtIt (evalTt' env d1t) (evalTt' env d2t)
+evalTt' env (LRec t) = lRec (evalTt' env t)
+evalTt' env (LIt t) = lIt (evalTt' env t)
+
+sinkTt :: env :> env' -> TTerm env t -> TTerm env' t
+sinkTt w (Var i) = Var (w >:> i)
+sinkTt w (Lambda ty e) = Lambda ty (sinkTt (wSink w) e)
+sinkTt w (App e1 e2) = App (sinkTt w e1) (sinkTt w e2)
+sinkTt _ Unit = Unit
+sinkTt w (Pair a b) = Pair (sinkTt w a) (sinkTt w b)
+sinkTt w (Fst p) = Fst (sinkTt w p)
+sinkTt w (Snd p) = Snd (sinkTt w p)
+sinkTt w (Inl p) = Inl (sinkTt w p)
+sinkTt w (Inr p) = Inr (sinkTt w p)
+sinkTt w (Case p g h) = Case (sinkTt w p) (sinkTt w g) (sinkTt w h)
+sinkTt _ (Lift x t) = Lift x t
+sinkTt w (Op op a) = Op op (sinkTt w a)
+sinkTt w (Map g y) = Map (sinkTt w g) (sinkTt w y)
+sinkTt _ Foldr = Foldr
+sinkTt w (Rec s) = Rec (sinkTt w s)
+sinkTt w (It s) = It (sinkTt w s)
+sinkTt w (Sign s) = Sign (sinkTt w s)
+sinkTt _ LId = LId
+sinkTt w (LComp g h) = LComp (sinkTt w g) (sinkTt w h)
+sinkTt w (LApp g a) = LApp (sinkTt w g) (sinkTt w a)
+sinkTt w (LEval e) = LEval (sinkTt w e)
+sinkTt _ LUnit = LUnit
+sinkTt _ LFst = LFst
+sinkTt _ LSnd = LSnd
+sinkTt w (LPair a b) = LPair (sinkTt w a) (sinkTt w b)
+sinkTt _ LInl = LInl
+sinkTt _ LInr = LInr
+sinkTt w (LCoPair a b) = LCoPair (sinkTt w a) (sinkTt w b)
+sinkTt w (Singleton s) = Singleton (sinkTt w s)
+sinkTt _ Zero = Zero
+sinkTt w (Plus a b) = Plus (sinkTt w a) (sinkTt w b)
+sinkTt w (LSwap s) = LSwap (sinkTt w s)
+sinkTt w (LCopowFold s) = LCopowFold (sinkTt w s)
+sinkTt _ (LOp op) = LOp op
+sinkTt w (DMap s) = DMap (sinkTt w s)
+sinkTt w (DtMap s) = DtMap (sinkTt w s)
+sinkTt _ DFoldr = DFoldr
+sinkTt _ DtFoldr = DtFoldr
+sinkTt w (DIt d1t d2t) = DIt (sinkTt w d1t) (sinkTt w d2t)
+sinkTt w (DtIt d1t d2t) = DtIt (sinkTt w d1t) (sinkTt w d2t)
+sinkTt w (LRec s) = LRec (sinkTt w s)
+sinkTt w (LIt s) = LIt (sinkTt w s)
 
 -- | Pretty print the target language
 --
@@ -256,10 +302,10 @@ evalTt (LIt t) = lIt (evalTt t)
 -- - application is 10
 -- - plus is 6
 -- - linear composition (;;) is 1
-printTt :: Int -> TTerm t -> ShowS
+printTt :: Int -> TTerm env t -> ShowS
 -- Source language extension
-printTt _ (Var x _) = showString x
-printTt d (Lambda x _ e) = showParen (d > 0) $ showString ("\\" ++ x) . showString " -> " . printTt 0 e
+printTt _ (Var i) = shows i
+printTt d (Lambda ty e) = showParen (d > 0) $ showString "λ(" . shows ty . showString ")." . printTt 0 e
 printTt d (App f a) = showParen (d > 10) $ printTt 10 f . showString " " . printTt 11 a
 printTt _ Unit = showString "()"
 printTt _ (Pair a b) = showString "(" . printTt 0 a . showString ", " . printTt 0 b . showString ")"
@@ -304,18 +350,15 @@ printTt d (DtIt d1t d2t) = showFunction d "DtIt" [Some d1t, Some d2t]
 printTt d (LRec t) = showFunction d "lrec" [Some t]
 printTt d (LIt t) = showFunction d "lit" [Some t]
 
-data Some f = forall a. Some (f a)
+data SomeTTerm = forall env t. SomeTTerm (TTerm env t)
 
-withSome :: (forall a. f a -> b) -> Some f -> b
-withSome f (Some x) = f x
-
-showFunction :: Int -> String -> [Some TTerm] -> ShowS
+showFunction :: Int -> String -> [Some (TTerm env)] -> ShowS
 showFunction d funcname args =
   showParen (d > 10) $
     showString funcname
-      . foldr (.) id (map (withSome (\t -> showString " " . printTt 11 t)) args)
+      . foldr (\(Some t) -> (.) (showString " " . printTt 11 t)) id args
 
-instance Show (TTerm a) where
+instance Show (TTerm env a) where
   showsPrec p = printTt p
 
 data Layout a = LyLeaf a | LyPair (Layout a) (Layout a)
@@ -339,76 +382,74 @@ instance Monoid a => Monoid (Layout a) where
   mempty = LyLeaf mempty
 
 -- Monoid is strictly speaking not necessary here with a more careful implementation
-truncateLayoutWithExpr :: Monoid s => Layout s -> TTerm a -> Layout s
+truncateLayoutWithExpr :: Monoid s => Layout s -> TTerm env a -> Layout s
 truncateLayoutWithExpr l@(LyLeaf _) _ = l
 truncateLayoutWithExpr (LyPair l1 l2) (Pair e1 e2) =
     LyPair (truncateLayoutWithExpr l1 e1) (truncateLayoutWithExpr l2 e2)
 truncateLayoutWithExpr l@(LyPair _ _) _ = LyLeaf (fold l)
 
 -- | Count the uses of a variable in an expression
-usesOf :: String -> TTerm a -> Integer
+usesOf :: Idx env t -> TTerm env a -> Integer
 usesOf x t = getSum (fold (usesOf' x t))
 
 -- | Count the uses of the components of a variable in an expression
-usesOf' :: (Num s, Monoid s) => String -> TTerm a -> Layout s
-usesOf' x (Var y _)
-  | x == y = LyLeaf 1
+usesOf' :: (Num s, Monoid s) => Idx env t -> TTerm env a -> Layout s
+usesOf' i (Var i')
+  | Just Refl <- geq i i' = LyLeaf 1
   | otherwise = mempty
-usesOf' x (Lambda y _ e)
-  | x == y = mempty
-  | otherwise = usesOf' x e
-usesOf' x (App f a) = usesOf' x f <> usesOf' x a
+usesOf' i (Lambda _ e) = usesOf' (S i) e
+usesOf' i (App f a) = usesOf' i f <> usesOf' i a
 usesOf' _ Unit = mempty
-usesOf' x (Pair a b) = usesOf' x a <> usesOf' x b
-usesOf' x p@(Fst p') = fromMaybe (usesOf' x p') (usesOfPick x p)
-usesOf' x p@(Snd p') = fromMaybe (usesOf' x p') (usesOfPick x p)
-usesOf' x (Inl p) = usesOf' x p
-usesOf' x (Inr p) = usesOf' x p
-usesOf' x (Case p f g) = usesOf' x p <> usesOf' x f <> usesOf' x g
+usesOf' i (Pair a b) = usesOf' i a <> usesOf' i b
+usesOf' i p@(Fst p') = fromMaybe (usesOf' i p') (usesOfPick i p)
+usesOf' i p@(Snd p') = fromMaybe (usesOf' i p') (usesOfPick i p)
+usesOf' i (Inl p) = usesOf' i p
+usesOf' i (Inr p) = usesOf' i p
+usesOf' i (Case p f g) = usesOf' i p <> usesOf' i f <> usesOf' i g
 usesOf' _ (Lift _ _) = mempty
-usesOf' x (Op _ a) = usesOf' x a
-usesOf' x (Map f y) = usesOf' x f <> usesOf' x y
+usesOf' i (Op _ a) = usesOf' i a
+usesOf' i (Map f y) = usesOf' i f <> usesOf' i y
 usesOf' _ Foldr = mempty
-usesOf' x (Rec s) = usesOf' x s
-usesOf' x (It s) = usesOf' x s
-usesOf' x (Sign s) = usesOf' x s
+usesOf' i (Rec s) = usesOf' i s
+usesOf' i (It s) = usesOf' i s
+usesOf' i (Sign s) = usesOf' i s
 usesOf' _ LId = mempty
-usesOf' x (LComp f g) = usesOf' x f <> usesOf' x g
-usesOf' x (LApp f a) = usesOf' x f <> usesOf' x a
-usesOf' x (LEval e) = usesOf' x e
+usesOf' i (LComp f g) = usesOf' i f <> usesOf' i g
+usesOf' i (LApp f a) = usesOf' i f <> usesOf' i a
+usesOf' i (LEval e) = usesOf' i e
 usesOf' _ LUnit = mempty
 usesOf' _ LFst = mempty
 usesOf' _ LSnd = mempty
-usesOf' x (LPair a b) = usesOf' x a <> usesOf' x b
+usesOf' i (LPair a b) = usesOf' i a <> usesOf' i b
 usesOf' _ LInl = mempty
 usesOf' _ LInr = mempty
-usesOf' x (LCoPair a b) = usesOf' x a <> usesOf' x b
-usesOf' x (Singleton s) = usesOf' x s
+usesOf' i (LCoPair a b) = usesOf' i a <> usesOf' i b
+usesOf' i (Singleton s) = usesOf' i s
 usesOf' _ Zero = mempty
-usesOf' x (Plus a b) = usesOf' x a <> usesOf' x b
-usesOf' x (LSwap s) = usesOf' x s
-usesOf' x (LCopowFold s) = usesOf' x s
+usesOf' i (Plus a b) = usesOf' i a <> usesOf' i b
+usesOf' i (LSwap s) = usesOf' i s
+usesOf' i (LCopowFold s) = usesOf' i s
 usesOf' _ (LOp _) = mempty
-usesOf' x (DMap s) = usesOf' x s
-usesOf' x (DtMap s) = usesOf' x s
+usesOf' i (DMap s) = usesOf' i s
+usesOf' i (DtMap s) = usesOf' i s
 usesOf' _ DFoldr = mempty
 usesOf' _ DtFoldr = mempty
-usesOf' x (DIt d1t d2t) = usesOf' x d1t <> usesOf' x d2t
-usesOf' x (DtIt d1t d2t) = usesOf' x d1t <> usesOf' x d2t
-usesOf' x (LRec s) = usesOf' x s
-usesOf' x (LIt s) = usesOf' x s
+usesOf' i (DIt d1t d2t) = usesOf' i d1t <> usesOf' i d2t
+usesOf' i (DtIt d1t d2t) = usesOf' i d1t <> usesOf' i d2t
+usesOf' i (LRec s) = usesOf' i s
+usesOf' i (LIt s) = usesOf' i s
 
-usesOfPick :: (Num s, Monoid s) => String -> TTerm a -> Maybe (Layout s)
-usesOfPick x term = do
-    path <- getPath term
+usesOfPick :: (Num s, Monoid s) => Idx env t -> TTerm env a -> Maybe (Layout s)
+usesOfPick i term = do
+    path <- getPath i term
     return (increment (reverse path))
   where
-    getPath :: TTerm a -> Maybe [Pick]
-    getPath (Fst p) = (PickFst :) <$> getPath p
-    getPath (Snd p) = (PickSnd :) <$> getPath p
-    getPath (Var y _)
-      | x == y = Just []
-    getPath _ = Nothing
+    getPath :: Idx env t -> TTerm env a -> Maybe [Pick]
+    getPath j (Fst p) = (PickFst :) <$> getPath j p
+    getPath j (Snd p) = (PickSnd :) <$> getPath j p
+    getPath j (Var j')
+      | Just Refl <- geq j j' = Just []
+    getPath _ _ = Nothing
 
     increment :: (Num s, Monoid s) => [Pick] -> Layout s
     increment [] = LyLeaf 1
@@ -416,53 +457,3 @@ usesOfPick x term = do
     increment (PickSnd : picks) = LyPair mempty (increment picks)
 
 data Pick = PickFst | PickSnd
-
-allVars :: TTerm a -> [String]
-allVars (Var x _) = [x]
-allVars (Lambda x _ e) = x : allVars e
-allVars (App e1 e2) = allVars e1 ++ allVars e2
-allVars Unit = []
-allVars (Pair e1 e2) = allVars e1 ++ allVars e2
-allVars (Fst e) = allVars e
-allVars (Snd e) = allVars e
-allVars (Inl e) = allVars e
-allVars (Inr e) = allVars e
-allVars (Case e1 e2 e3) = allVars e1 ++ allVars e2 ++ allVars e3
-allVars (It e) = allVars e
-allVars (Rec e) = allVars e
-allVars (Sign e) = allVars e
-allVars (Lift  _ _) = []
-allVars (Op  _ e) = allVars e
-allVars (Map e1 e2) = allVars e1 ++ allVars e2
-allVars Foldr = []
-allVars (LOp _) = []
-allVars LId = []
-allVars (LComp e1 e2) = allVars e1 ++ allVars e2
-allVars (LApp e1 e2) = allVars e1 ++ allVars e2
-allVars (LEval e) = allVars e
-allVars LUnit = []
-allVars LFst = []
-allVars LSnd = []
-allVars (LPair e1 e2) = allVars e1 ++ allVars e2
-allVars LInl = []
-allVars LInr = []
-allVars (LCoPair e1 e2) = allVars e1 ++ allVars e2
-allVars (Singleton e) = allVars e
-allVars Zero = []
-allVars (Plus e1 e2) = allVars e1 ++ allVars e2
-allVars (LSwap e) = allVars e
-allVars (LCopowFold e) = allVars e
-allVars (DMap e) = allVars e
-allVars (DtMap e) = allVars e
-allVars DFoldr = []
-allVars DtFoldr = []
-allVars (DIt e1 e2) = allVars e1 ++ allVars e2
-allVars (DtIt e1 e2) = allVars e1 ++ allVars e2
-allVars (LRec e) = allVars e
-allVars (LIt e) = allVars e
-
-freshVariable :: [String] -> String
-freshVariable taken =
-    head [name
-         | name <- map (('y' :) . show) [1::Int ..]
-         , name `Set.notMember` Set.fromList taken]
