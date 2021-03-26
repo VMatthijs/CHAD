@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeOperators          #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# LANGUAGE StandaloneDeriving     #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 -- | Different type definitions used in the language
 module Types
@@ -289,7 +290,7 @@ type family Df1 a = r | r -> a where
   Df1 () = ()
   Df1 (Either a b) = Either (Df1 a) (Df1 b)
 
-type family Df2 a = r | r -> a where
+type family Df2 a where
   Df2 Scal = Scal
   Df2 (Vect n) = Vect n
   Df2 (a -> b) = Df1 a -> Df2 b
@@ -306,7 +307,7 @@ type family Dr1 a = r | r -> a where
   Dr1 (Either a b) = Either (Dr1 a) (Dr1 b)
   Dr1 (a -> b) = Dr1 a -> (Dr1 b, LFun (Dr2 b) (Dr2 a))
 
-type family Dr2 a = r | r -> a where
+type family Dr2 a where
   Dr2 Scal = Scal
   Dr2 (Vect n) = Vect n
   Dr2 (a, b) = (Dr2 a, Dr2 b)
