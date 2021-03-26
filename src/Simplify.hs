@@ -1,6 +1,8 @@
 {-# LANGUAGE GADTs #-}
 
--- | Simplify terms in the target language
+-- | Simplify terms in the target language to aid legibility.
+--   This should only do simplifications that any basic compiler
+--   would also perform.
 module Simplify
   ( simplifyTTerm
   ) where
