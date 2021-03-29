@@ -1,13 +1,15 @@
+{-# LANGUAGE ConstraintKinds        #-}
 {-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE GADTs                  #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators          #-}
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE UndecidableInstances   #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 
 -- | Different type definitions used in the language
 module Types
@@ -56,6 +58,7 @@ module Types
   , Type(..)
   , eqTy
   , LT(..)
+  , LTall
   ) where
 
 import           Data.Proxy                (Proxy (Proxy))
@@ -518,3 +521,7 @@ instance (LT a, LT b) => LT (LEither a b) where
   showMe (MkLEither Nothing)          = "Nothing"
   showMe (MkLEither (Just (Left a)))  = "Left (" ++ showMe a ++ ")"
   showMe (MkLEither (Just (Right b))) = "Right (" ++ showMe b ++ ")"
+
+-- | Convenience constraint set that requires 'LT' on the type itself and all
+-- its mapped types under the AD maps.
+type LTall a = (LT a, LT (Df1 a), LT (Df2 a), LT (Dr1 a), LT (Dr2 a))
