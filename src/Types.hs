@@ -55,19 +55,15 @@ module Types
   , Df2
   , Dr1
   , Dr2
-  , Type(..)
-  , eqTy
   , LT(..)
   , LTall
   ) where
 
-import           Data.Proxy                (Proxy (Proxy))
-import           Data.Type.Equality        ((:~:) (Refl))
 import qualified Data.Vector.Unboxed.Sized as V (Unbox, Vector, foldr, init,
                                                  last, map, prescanr, replicate,
                                                  scanl, sum, toList, zip,
                                                  zipWith)
-import           GHC.TypeNats              (KnownNat, sameNat)
+import           GHC.TypeNats              (KnownNat)
 
 -- | Real scalars
 type Scal = Double
@@ -312,70 +308,21 @@ type family Dr2 a where
   Dr2 (Either a b) = LEither (Dr2 a) (Dr2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), but that requires dynamic types or explicit retainment of primals.
   Dr2 (a -> b) = Copower (Dr1 a) (Dr2 b)
 
-data Type a where
-  TScal :: Type Scal
-  TVect :: KnownNat n => Proxy n -> Type (Vect n)
-  TArrow :: Type a -> Type b -> Type (a -> b)
-  TPair :: Type a -> Type b -> Type (a, b)
-  TUnit :: Type ()
-  TEither :: Type a -> Type b -> Type (Either a b)
-  TLinFun :: Type a -> Type b -> Type (LFun a b)
-  TCopow :: Type a -> Type b -> Type (Copower a b)
-  TLEither :: Type a -> Type b -> Type (LEither a b)
-
-deriving instance Show (Type a)
-
-eqTy :: Type u -> Type v -> Maybe (u :~: v)
-eqTy (TVect n) (TVect m) =
-  case sameNat n m of
-    Just Refl -> Just Refl
-    Nothing   -> Nothing
-eqTy TUnit TUnit = Just Refl
-eqTy (TArrow u1 u2) (TArrow v1 v2) = do
-  Refl <- eqTy u1 v1
-  Refl <- eqTy u2 v2
-  return Refl
-eqTy (TPair u1 u2) (TPair v1 v2) = do
-  Refl <- eqTy u1 v1
-  Refl <- eqTy u2 v2
-  return Refl
-eqTy (TLinFun u1 u2) (TLinFun v1 v2) = do
-  Refl <- eqTy u1 v1
-  Refl <- eqTy u2 v2
-  return Refl
-eqTy (TCopow u1 u2) (TCopow v1 v2) = do
-  Refl <- eqTy u1 v1
-  Refl <- eqTy u2 v2
-  return Refl
-eqTy TScal TScal = return Refl
-eqTy (TEither u1 u2) (TEither v1 v2) = do
-  Refl <- eqTy u1 v1
-  Refl <- eqTy u2 v2
-  return Refl
-eqTy (TLEither u1 u2) (TLEither v1 v2) = do
-  Refl <- eqTy u1 v1
-  Refl <- eqTy u2 v2
-  return Refl
-eqTy _ _ = Nothing
-
 -- | Operators defined over multiple language types
 class LT a where
   zero :: a -- For automatic differentiation
   plus :: a -> a -> a -- For automatic differentiation
   isZero :: a -> Bool -- For reverse AD of recursion
-  inferType :: Type a -- For interpreter of target language
 
 instance LT () where
   zero = ()
   plus _ _ = ()
   isZero _ = True
-  inferType = TUnit
 
 instance (LT a, LT b) => LT (a, b) where
   zero = (zero, zero)
   plus a b = (fst a `plus` fst b, snd a `plus` snd b)
   isZero (a, b) = isZero a && isZero b
-  inferType = TPair inferType inferType
 
 instance (LT a, LT b) => LT (Either a b) where
   zero = error "This should never be used." -- This doesn't make sense.
@@ -384,37 +331,31 @@ instance (LT a, LT b) => LT (Either a b) where
   plus _ _                  = error "This should never be used." -- This doesn't make sense.
   isZero (Left a)  = isZero a
   isZero (Right b) = isZero b
-  inferType = TEither inferType inferType
 
 instance LT Scal where
   zero = 0
   plus = (+)
   isZero = (== zero)
-  inferType = TScal
 
 instance KnownNat n => LT (Vect n) where
   zero = V.replicate 0
   plus = V.zipWith (+)
   isZero = (== zero)
-  inferType = TVect (Proxy @n)
 
 instance (LT a, LT b) => LT (a -> b) where
   zero = const zero
   plus f g = \x -> plus (f x) (g x)
   isZero = error "This should never be used." -- undecidable
-  inferType = TArrow inferType inferType
 
 instance (LT a, LT b) => LT (Copower a b) where
   zero = MkCopow []
   plus (MkCopow x) (MkCopow y) = MkCopow (x ++ y)
   isZero (MkCopow xs) = all isZero (map snd xs)
-  inferType = TCopow inferType inferType
 
 instance (LT a, LT b) => LT (LFun a b) where
   zero = MkLFun zero
   plus = lPlus
   isZero = error "This should never be used." -- undecidable
-  inferType = TLinFun inferType inferType
 
 instance (LT a, LT b) => LT (LEither a b) where
   zero = MkLEither Nothing
@@ -428,7 +369,6 @@ instance (LT a, LT b) => LT (LEither a b) where
   isZero (MkLEither Nothing)          = True
   isZero (MkLEither (Just (Left a)))  = isZero a
   isZero (MkLEither (Just (Right b))) = isZero b
-  inferType = TLEither inferType inferType
 
 -- | Convenience constraint set that requires 'LT' on the type itself and all
 -- its mapped types under the AD maps.

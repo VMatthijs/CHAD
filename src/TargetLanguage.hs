@@ -42,7 +42,6 @@ data TTerm env t where
   It :: TTerm env ((a, b) -> Either c b) -> TTerm env ((a, b) -> c)
   Rec :: TTerm env ((a, b) -> b) -> TTerm env (a -> b) -- Should we work with a representation that is variable binding instead?
   Sign :: TTerm env Scal -> TTerm env (Either () ())
-  Lift :: a -> Type a -> TTerm env a
   -- | Operators
   Op :: Operation a b -> TTerm env a -> TTerm env b
   Map :: TTerm env (Scal -> Scal)
@@ -151,7 +150,6 @@ substTt' i v w (Inl t) = Inl (substTt' i v w t)
 substTt' i v w (Inr t) = Inr (substTt' i v w t)
 substTt' i v w (Case t l r) =
   Case (substTt' i v w t) (substTt' i v w l) (substTt' i v w r)
-substTt' _ _ _ (Lift x t) = Lift x t
 substTt' i v w (Op op y) = Op op (substTt' i v w y)
 substTt' i v w (Map f y) = Map (substTt' i v w f) (substTt' i v w y)
 substTt' i v w (Foldr f x t) = Foldr (substTt' i v w f) (substTt' i v w x) (substTt' i v w t)
@@ -205,7 +203,6 @@ evalTt' env (Case p l r) =
   case evalTt' env p of
     Left q  -> evalTt' env l q
     Right q -> evalTt' env r q
-evalTt' _   (Lift x _) = x
 evalTt' env (Op op a) = evalOp op (evalTt' env a)
 evalTt' env (Map f x) = V.map (evalTt' env f) (evalTt' env x)
 evalTt' env (Foldr f v xs) = V.foldr (\r a -> evalTt' env f (r, a)) (evalTt' env v) (evalTt' env xs)
@@ -266,7 +263,6 @@ sinkTt w (Snd p) = Snd (sinkTt w p)
 sinkTt w (Inl p) = Inl (sinkTt w p)
 sinkTt w (Inr p) = Inr (sinkTt w p)
 sinkTt w (Case p g h) = Case (sinkTt w p) (sinkTt w g) (sinkTt w h)
-sinkTt _ (Lift x t) = Lift x t
 sinkTt w (Op op a) = Op op (sinkTt w a)
 sinkTt w (Map g y) = Map (sinkTt w g) (sinkTt w y)
 sinkTt w (Foldr f v xs) = Foldr (sinkTt w f) (sinkTt w v) (sinkTt w xs)
@@ -319,7 +315,6 @@ printTt d (Inr p) = showFunction d "Inr" [Some p]
 printTt d (Case p l r) =
   showParen (d > 0) $
     showString "Case " . printTt 0 p . showString " in {" . printTt 0 l . showString " } { " . printTt 0 r . showString "}"
-printTt _ (Lift _ _) = error "Can't print lifted value"
 printTt d (Op op a) = showFunction d ("evalOp " ++ showOp op) [Some a]
 printTt d (Map f a) = showFunction d "map" [Some f, Some a]
 printTt d (Foldr f v xs) = showFunction d "foldr" [Some f, Some v, Some xs]
@@ -409,7 +404,6 @@ usesOf' i p@(Snd p') = fromMaybe (usesOf' i p') (usesOfPick i p)
 usesOf' i (Inl p) = usesOf' i p
 usesOf' i (Inr p) = usesOf' i p
 usesOf' i (Case p f g) = usesOf' i p <> usesOf' i f <> usesOf' i g
-usesOf' _ (Lift _ _) = mempty
 usesOf' i (Op _ a) = usesOf' i a
 usesOf' i (Map f y) = usesOf' i f <> usesOf' i y
 usesOf' i (Foldr f v xs) = usesOf' i f <> usesOf' i v <> usesOf' i xs

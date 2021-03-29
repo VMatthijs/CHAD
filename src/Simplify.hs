@@ -30,7 +30,6 @@ simplifyTTerm (Snd p) = simplifySnd (simplifyTTerm p)
 simplifyTTerm (Inl p) = Inl (simplifyTTerm p)
 simplifyTTerm (Inr p) = Inr (simplifyTTerm p)
 simplifyTTerm (Case p f g) = simplifyCase p f g
-simplifyTTerm (Lift x t) = Lift x t
 simplifyTTerm (Op op a) = Op op (simplifyTTerm a)
 simplifyTTerm (Map f a) = Map (simplifyTTerm f) (simplifyTTerm a)
 simplifyTTerm (Foldr f v xs) = Foldr (simplifyTTerm f) (simplifyTTerm v) (simplifyTTerm xs)
