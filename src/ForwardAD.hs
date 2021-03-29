@@ -80,7 +80,7 @@ d2 (SL.CoPair f g) =
 -- x := (f, v)
 -- y := (g, w)
 d2 SL.Map = lambda $ TL.DMap (TL.Var Z)
-d2 SL.Foldr = TL.DFoldr
+d2 SL.Foldr = lambda $ TL.DFoldr (TL.Var Z)
 -- Dop
 d2 (SL.Op (Constant _)) = TL.LOp DConstant
 d2 (SL.Op EAdd) = TL.LOp DEAdd

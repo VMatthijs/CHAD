@@ -85,7 +85,7 @@ d2 (SL.CoPair f g) =
 d2 SL.Map = lambda $ TL.DtMap (TL.Var Z)
 -- Foldr :: ((Scal, a) -> a, a, Vect n) -> a
 -- d2 Foldr :: ((Scal, D1 a) -> (D1 a, LFun (D2 a) (Scal, D2 a)), D1 a, Vect n) -> LFun (D2 a) (Copower (Scal, D1 a) (D2 a), D2 a ,Vect n)
-d2 SL.Foldr = TL.DtFoldr
+d2 SL.Foldr = lambda $ TL.DtFoldr (TL.Var Z)
 -- Dop^t
 d2 (SL.Op (Constant _)) = TL.LOp DConstantT
 d2 (SL.Op EAdd) = TL.LOp DEAddT

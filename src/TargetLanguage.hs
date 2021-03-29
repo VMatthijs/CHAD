@@ -99,16 +99,12 @@ data TTerm env t where
     -> TTerm env (LFun (Vect n) (Copower Scal Scal, Vect n))
   DFoldr
     :: (KnownNat n, V.Unbox a, V.Unbox b, LT b)
-    => TTerm env ((((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n) -> LFun ( ( ( Scal
-                                                                            , a) -> b
-                                                                          , b)
-                                                                        , Vect n) b)
+    => TTerm env ((((Scal, a) -> (a, LFun (Scal, b) b)), a), Vect n)
+    -> TTerm env (LFun (((Scal, a) -> b, b), Vect n) b)
   DtFoldr
     :: (KnownNat n, V.Unbox a, V.Unbox b, LT b)
-    => TTerm env ((((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n) -> LFun b ( ( Copower ( Scal
-                                                                                   , a) b
-                                                                            , b)
-                                                                          , Vect n))
+    => TTerm env (((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n)
+    -> TTerm env (LFun b ((Copower (Scal, a) b, b), Vect n))
   DIt
     :: (LT d2a, LT d2b, LT d2c)
     => TTerm env ((d1a, d1b) -> Either d1c d1b)
@@ -174,8 +170,8 @@ substTt' i v w (LCopowFold t) = LCopowFold (substTt' i v w t)
 substTt' _ _ _ (LOp lop) = LOp lop
 substTt' i v w (DMap t) = DMap (substTt' i v w t)
 substTt' i v w (DtMap t) = DtMap (substTt' i v w t)
-substTt' _ _ _ DFoldr = DFoldr
-substTt' _ _ _ DtFoldr = DtFoldr
+substTt' i v w (DFoldr t) = DFoldr (substTt' i v w t)
+substTt' i v w (DtFoldr t) = DtFoldr (substTt' i v w t)
 substTt' i v w (DIt d1t d2t) = DIt (substTt' i v w d1t) (substTt' i v w d2t)
 substTt' i v w (DtIt d1t d2t) = DtIt (substTt' i v w d1t) (substTt' i v w d2t)
 substTt' i v w (LRec t) = LRec (substTt' i v w t)
@@ -245,8 +241,8 @@ evalTt' env (DMap t) = plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith (snd . f
 evalTt' env (DtMap t) = lPair (lZip v) (lZipWith (snd . f) v)
   where
     (f, v) = evalTt' env t
-evalTt' _   DFoldr = dFoldr
-evalTt' _   DtFoldr = dtFoldr
+evalTt' env (DFoldr t) = dFoldr (evalTt' env t)
+evalTt' env (DtFoldr t) = dtFoldr (evalTt' env t)
 evalTt' env (DIt d1t d2t) = dIt (evalTt' env d1t) (evalTt' env d2t)
 evalTt' env (DtIt d1t d2t) = dtIt (evalTt' env d1t) (evalTt' env d2t)
 evalTt' env (LRec t) = lRec (evalTt' env t)
@@ -289,8 +285,8 @@ sinkTt w (LCopowFold s) = LCopowFold (sinkTt w s)
 sinkTt _ (LOp op) = LOp op
 sinkTt w (DMap s) = DMap (sinkTt w s)
 sinkTt w (DtMap s) = DtMap (sinkTt w s)
-sinkTt _ DFoldr = DFoldr
-sinkTt _ DtFoldr = DtFoldr
+sinkTt w (DFoldr t) = DFoldr (sinkTt w t)
+sinkTt w (DtFoldr t) = DtFoldr (sinkTt w t)
 sinkTt w (DIt d1t d2t) = DIt (sinkTt w d1t) (sinkTt w d2t)
 sinkTt w (DtIt d1t d2t) = DtIt (sinkTt w d1t) (sinkTt w d2t)
 sinkTt w (LRec s) = LRec (sinkTt w s)
@@ -343,8 +339,8 @@ printTt d (LSwap t) = showFunction d "lswap" [Some t]
 printTt d (LCopowFold t) = showFunction d "lcopowfold" [Some t]
 printTt d (DMap t) = showFunction d "DMap" [Some t]
 printTt d (DtMap t) = showFunction d "DtMap" [Some t]
-printTt _ DFoldr = showString "DFoldr"
-printTt _ DtFoldr = showString "DtFoldr"
+printTt d (DFoldr t) = showFunction d "DFoldr" [Some t]
+printTt d (DtFoldr t) = showFunction d "DtFoldr" [Some t]
 printTt d (DIt d1t d2t) = showFunction d "DIt" [Some d1t, Some d2t]
 printTt d (DtIt d1t d2t) = showFunction d "DtIt" [Some d1t, Some d2t]
 printTt d (LRec t) = showFunction d "lrec" [Some t]
@@ -432,8 +428,8 @@ usesOf' i (LCopowFold s) = usesOf' i s
 usesOf' _ (LOp _) = mempty
 usesOf' i (DMap s) = usesOf' i s
 usesOf' i (DtMap s) = usesOf' i s
-usesOf' _ DFoldr = mempty
-usesOf' _ DtFoldr = mempty
+usesOf' i (DFoldr s) = usesOf' i s
+usesOf' i (DtFoldr s) = usesOf' i s
 usesOf' i (DIt d1t d2t) = usesOf' i d1t <> usesOf' i d2t
 usesOf' i (DtIt d1t d2t) = usesOf' i d1t <> usesOf' i d2t
 usesOf' i (LRec s) = usesOf' i s
