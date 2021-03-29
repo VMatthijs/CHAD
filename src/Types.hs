@@ -298,7 +298,7 @@ type family Df2 a where
   Df2 (a -> b) = Df1 a -> Df2 b
   Df2 (a, b) = (Df2 a, Df2 b)
   Df2 () = ()
-  Df2 (Either a b) = LEither (Df2 a) (Df2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), which is possible as long as we use zeroR and zeroF.
+  Df2 (Either a b) = LEither (Df2 a) (Df2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), but that requires dynamic types or explicit retainment of primals.
 
 -- Reverse mode AD type families
 type family Dr1 a = r | r -> a where
@@ -314,7 +314,7 @@ type family Dr2 a where
   Dr2 (Vect n) = Vect n
   Dr2 (a, b) = (Dr2 a, Dr2 b)
   Dr2 () = ()
-  Dr2 (Either a b) = LEither (Dr2 a) (Dr2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), which is possible as long as we use zeroR and zeroF.
+  Dr2 (Either a b) = LEither (Dr2 a) (Dr2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), but that requires dynamic types or explicit retainment of primals.
   Dr2 (a -> b) = Copower (Dr1 a) (Dr2 b)
 
 data Type a where
@@ -366,8 +366,6 @@ eqTy _ _ = Nothing
 -- | Operators defined over multiple language types
 class LT a where
   zero :: a -- For automatic differentiation
-  zeroF :: Df1 a -> Df2 a -- TODO: Better, for types of varying dimension like unsized vectors or variants.
-  zeroR :: Dr1 a -> Dr2 a -- TODO: Better, for types of varying dimension like unsized vectors or variants.
   plus :: a -> a -> a -- For automatic differentiation
   isZero :: a -> Bool -- For reverse AD of recursion
   inferType :: Type a -- For interpreter of target language
@@ -378,8 +376,6 @@ class LT a where
 
 instance LT () where
   zero = ()
-  zeroF = const ()
-  zeroR = const ()
   plus _ _ = ()
   isZero _ = True
   inferType = TUnit
@@ -390,8 +386,6 @@ instance LT () where
 
 instance (LT a, LT b) => LT (a, b) where
   zero = (zero, zero)
-  zeroF (a, b) = (zeroF a, zeroF b)
-  zeroR (a, b) = (zeroR a, zeroR b)
   plus a b = (fst a `plus` fst b, snd a `plus` snd b)
   isZero (a, b) = isZero a && isZero b
   inferType = TPair inferType inferType
@@ -402,10 +396,6 @@ instance (LT a, LT b) => LT (a, b) where
 
 instance (LT a, LT b) => LT (Either a b) where
   zero = error "This should never be used." -- This doesn't make sense.
-  zeroF (Left a)  = MkLEither (Just (Left (zeroF a)))
-  zeroF (Right b) = MkLEither (Just (Right (zeroF b)))
-  zeroR (Left a)  = MkLEither (Just (Left (zeroR a)))
-  zeroR (Right b) = MkLEither (Just (Right (zeroR b)))
   plus (Left a) (Left a')   = Left (a `plus` a')
   plus (Right a) (Right a') = Right (a `plus` a')
   plus _ _                  = error "This should never be used." -- This doesn't make sense.
@@ -424,8 +414,6 @@ instance (LT a, LT b) => LT (Either a b) where
 
 instance LT Scal where
   zero = 0
-  zeroF = const zero
-  zeroR = const zero
   plus = (+)
   isZero = (== zero)
   inferType = TScal
@@ -436,8 +424,6 @@ instance LT Scal where
 
 instance KnownNat n => LT (Vect n) where
   zero = V.replicate 0
-  zeroF = const zero
-  zeroR = const zero
   plus = V.zipWith (+)
   isZero = (== zero)
   inferType = TVect (Proxy @n)
@@ -448,8 +434,6 @@ instance KnownNat n => LT (Vect n) where
 
 instance (LT a, LT b) => LT (a -> b) where
   zero = const zero
-  zeroF f a = snd (f a) `lApp` (zeroF a)
-  zeroR _ = MkCopow []
   plus f g = \x -> plus (f x) (g x)
   isZero = error "This should never be used." -- undecidable
   inferType = TArrow inferType inferType
@@ -460,8 +444,6 @@ instance (LT a, LT b) => LT (a -> b) where
 
 instance (LT a, LT b) => LT (Copower a b) where
   zero = MkCopow []
-  zeroF = error "This should never be used."
-  zeroR = error "This should never be used."
   plus (MkCopow x) (MkCopow y) = MkCopow (x ++ y)
   isZero (MkCopow xs) = all isZero (map snd xs)
   inferType = TCopow inferType inferType
@@ -473,8 +455,6 @@ instance (LT a, LT b) => LT (Copower a b) where
 
 instance (LT a, LT b) => LT (LFun a b) where
   zero = MkLFun zero
-  zeroF = error "This should never be used."
-  zeroR = error "This should never be used."
   plus = lPlus
   isZero = error "This should never be used." -- undecidable
   inferType = TLinFun inferType inferType
@@ -485,8 +465,6 @@ instance (LT a, LT b) => LT (LFun a b) where
 
 instance (LT a, LT b) => LT (LEither a b) where
   zero = MkLEither Nothing
-  zeroF = error "This should never be used."
-  zeroR = error "This should never be used."
   plus (MkLEither Nothing) b = b
   plus a (MkLEither Nothing) = a
   plus (MkLEither (Just (Left a))) (MkLEither (Just (Left a'))) =
