@@ -42,6 +42,11 @@ class LT a => FinDiff a where
 
     genWithPrimal :: a -> Gen a
 
+    -- Helper methods for finite differencing on numeric-like types
+    scalProd :: Scal -> a -> a
+    scalDiv :: a -> Scal -> a
+    minus :: a -> a -> a
+
 instance FinDiff Scal where
     type Element Scal = Scal
     oneHotVecs _ = [1]
@@ -49,6 +54,9 @@ instance FinDiff Scal where
     rebuild' _ [] = error "rebuild: Invalid length"
     dotprod = (*)
     genWithPrimal _ = arbitrary
+    scalProd = (*)
+    scalDiv = (/)
+    minus = (-)
 
 instance KnownNat n => FinDiff (Vect n) where
     type Element (Vect n) = Scal
@@ -67,6 +75,10 @@ instance KnownNat n => FinDiff (Vect n) where
 
     genWithPrimal _ = genVect
 
+    scalProd r = V.map (* r)
+    scalDiv v r = V.map (/ r) v
+    minus = V.zipWith (-)
+
 instance (FinDiff a, FinDiff b, Element a ~ Element b, Element a ~ Scal) => FinDiff (a, b) where
     type Element (a, b) = Element a
 
@@ -81,12 +93,19 @@ instance (FinDiff a, FinDiff b, Element a ~ Element b, Element a ~ Scal) => FinD
 
     genWithPrimal (x, y) = (,) <$> genWithPrimal x <*> genWithPrimal y
 
+    scalProd r a = (scalProd r (fst a), scalProd r (snd a))
+    scalDiv a r = (scalDiv (fst a) r, scalDiv (snd a) r)
+    minus a b = (fst a `minus` fst b, snd a `minus` snd b)
+
 instance FinDiff () where
     type Element () = ()
     oneHotVecs _ = [()]
     rebuild' _ l = ((), l)
     dotprod _ _ = ()
     genWithPrimal _ = return ()
+    scalProd _ _ = ()
+    scalDiv _ _ = ()
+    minus _ _ = ()
 
 instance KnownNat n => Arbitrary (Vect n) where
     arbitrary = genVect
@@ -134,7 +153,7 @@ instance (Approx a, Approx b) => Approx (a, b) where
             (ok2, errs2) = b `isApprox'` y
         in (ok1 && ok2, "(" ++ errs1 ++ ", " ++ errs2 ++ ")")
 
-evalFwdFinDiff :: (LT a, LT b) => SL.STerm a b -> a -> a -> b
+evalFwdFinDiff :: (FinDiff a, FinDiff b) => SL.STerm a b -> a -> a -> b
 evalFwdFinDiff f x y =
   (SL.evalSt f (x `plus` (delta `scalProd` y)) `minus` SL.evalSt f x) `scalDiv`
   delta
@@ -177,7 +196,7 @@ propFwd1 sterm arg =
         resAD = TL.evalTt (F.d1 sterm) arg
     in resEval `isApproxQC` resAD
 
-propFwd2 :: (Approx b, LT a, LT b, a ~ Df1 a, a ~ Df2 a, b ~ Df2 b)
+propFwd2 :: (Approx b, FinDiff a, FinDiff b, a ~ Df1 a, a ~ Df2 a, b ~ Df2 b)
          => SL.STerm a b -> a -> a -> Property
 propFwd2 sterm arg dir =
     let resFD = evalFwdFinDiff sterm arg dir

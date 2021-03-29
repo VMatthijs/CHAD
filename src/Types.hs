@@ -156,9 +156,9 @@ lMapTuple f g = MkLFun $ \(a, b) -> (lApp f a, lApp g b)
 lAdd :: LT a => LFun (a, a) a
 lAdd = MkLFun $ uncurry plus
 
--- | Subtraction is linear
-lSubt :: LT a => LFun (a, a) a
-lSubt = MkLFun $ uncurry minus
+-- | Scalar subtraction is linear
+lSubt :: LFun (Scal, Scal) Scal
+lSubt = MkLFun $ uncurry (-)
 
 -- | Multiplication linear in second argument
 lProd :: Num a => (a -> LFun a a)
@@ -186,15 +186,6 @@ lCopowFold f = MkLFun $ g
 
 lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
 lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
-
-lMinus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
-lMinus (MkLFun f) (MkLFun g) = MkLFun $ \x -> minus (f x) (g x)
-
-lScalProd :: (LT b) => Scal -> LFun a b -> LFun a b
-lScalProd r (MkLFun g) = MkLFun $ \x -> scalProd r (g x)
-
-lScalDiv :: (LT b) => LFun a b -> Scal -> LFun a b
-lScalDiv (MkLFun g) r = MkLFun $ \x -> scalDiv (g x) r
 
 lMap :: KnownNat n => Vect n -> LFun (Scal -> Scal) (Vect n)
 lMap x = MkLFun $ \g -> V.map g x
@@ -369,30 +360,18 @@ class LT a where
   plus :: a -> a -> a -- For automatic differentiation
   isZero :: a -> Bool -- For reverse AD of recursion
   inferType :: Type a -- For interpreter of target language
-  scalProd :: Scal -> a -> a -- For finite differencing
-  scalDiv :: a -> Scal -> a -- For finite differencing
-  minus :: a -> a -> a -- For finite differencing
-  showMe :: a -> String -- for debugging
 
 instance LT () where
   zero = ()
   plus _ _ = ()
   isZero _ = True
   inferType = TUnit
-  scalProd _ _ = ()
-  scalDiv _ _ = ()
-  minus _ _ = ()
-  showMe = show
 
 instance (LT a, LT b) => LT (a, b) where
   zero = (zero, zero)
   plus a b = (fst a `plus` fst b, snd a `plus` snd b)
   isZero (a, b) = isZero a && isZero b
   inferType = TPair inferType inferType
-  scalProd r a = (scalProd r (fst a), scalProd r (snd a))
-  scalDiv a r = (scalDiv (fst a) r, scalDiv (snd a) r)
-  minus a b = (fst a `minus` fst b, snd a `minus` snd b)
-  showMe (a, b) = "(" ++ showMe a ++ ", " ++ showMe b ++ ")"
 
 instance (LT a, LT b) => LT (Either a b) where
   zero = error "This should never be used." -- This doesn't make sense.
@@ -402,66 +381,36 @@ instance (LT a, LT b) => LT (Either a b) where
   isZero (Left a)  = isZero a
   isZero (Right b) = isZero b
   inferType = TEither inferType inferType
-  scalProd r (Left a)  = Left (scalProd r a)
-  scalProd r (Right a) = Right (scalProd r a)
-  scalDiv (Left a) r  = Left (scalDiv a r)
-  scalDiv (Right a) r = Right (scalDiv a r)
-  minus (Left a) (Left a')   = Left (a `minus` a')
-  minus (Right a) (Right a') = Right (a `minus` a')
-  minus _ _                  = error "This should never be used." -- This doesn't make sense.
-  showMe (Left a)  = "Left (" ++ showMe a ++ ")"
-  showMe (Right a) = "Right (" ++ showMe a ++ ")"
 
 instance LT Scal where
   zero = 0
   plus = (+)
   isZero = (== zero)
   inferType = TScal
-  scalProd = (*)
-  scalDiv = (/)
-  minus = (-)
-  showMe = show
 
 instance KnownNat n => LT (Vect n) where
   zero = V.replicate 0
   plus = V.zipWith (+)
   isZero = (== zero)
   inferType = TVect (Proxy @n)
-  scalProd r = V.map (* r)
-  scalDiv v r = V.map (/ r) v
-  minus = V.zipWith (-)
-  showMe = show
 
 instance (LT a, LT b) => LT (a -> b) where
   zero = const zero
   plus f g = \x -> plus (f x) (g x)
   isZero = error "This should never be used." -- undecidable
   inferType = TArrow inferType inferType
-  scalProd r f = \x -> scalProd r (f x)
-  scalDiv f r = \x -> scalDiv (f x) r
-  minus f g = \x -> minus (f x) (g x)
-  showMe = error "This should never be used." -- This doesn't make sense.
 
 instance (LT a, LT b) => LT (Copower a b) where
   zero = MkCopow []
   plus (MkCopow x) (MkCopow y) = MkCopow (x ++ y)
   isZero (MkCopow xs) = all isZero (map snd xs)
   inferType = TCopow inferType inferType
-  scalProd = error "This should never be used." -- This doesn't make sense.
-  scalDiv = error "This should never be used." -- This doesn't make sense.
-  minus = error "This should never be used." -- This doesn't make sense.
-  showMe (MkCopow xs) =
-    "[" ++ (foldr (\x acc -> showMe x ++ ", " ++ acc) "" xs) ++ "]"
 
 instance (LT a, LT b) => LT (LFun a b) where
   zero = MkLFun zero
   plus = lPlus
   isZero = error "This should never be used." -- undecidable
   inferType = TLinFun inferType inferType
-  scalProd = lScalProd
-  scalDiv = lScalDiv
-  minus = lMinus
-  showMe = error "This should never be used." -- This doesn't make sense.
 
 instance (LT a, LT b) => LT (LEither a b) where
   zero = MkLEither Nothing
@@ -476,29 +425,6 @@ instance (LT a, LT b) => LT (LEither a b) where
   isZero (MkLEither (Just (Left a)))  = isZero a
   isZero (MkLEither (Just (Right b))) = isZero b
   inferType = TLEither inferType inferType
-  scalProd _ (MkLEither Nothing) = MkLEither Nothing
-  scalProd r (MkLEither (Just (Left a))) =
-    MkLEither (Just (Left (scalProd r a)))
-  scalProd r (MkLEither (Just (Right b))) =
-    MkLEither (Just (Right (scalProd r b)))
-  scalDiv (MkLEither Nothing) _ = MkLEither Nothing
-  scalDiv (MkLEither (Just (Left a))) r = MkLEither (Just (Left (scalDiv a r)))
-  scalDiv (MkLEither (Just (Right b))) r =
-    MkLEither (Just (Right (scalDiv b r)))
-  minus (MkLEither Nothing) (MkLEither Nothing) = MkLEither Nothing
-  minus (MkLEither Nothing) (MkLEither (Just (Left a))) =
-    MkLEither (Just (Left (zero `minus` a)))
-  minus (MkLEither Nothing) (MkLEither (Just (Right b))) =
-    MkLEither (Just (Right (zero `minus` b)))
-  minus a (MkLEither Nothing) = a
-  minus (MkLEither (Just (Left a))) (MkLEither (Just (Left a'))) =
-    MkLEither (Just (Left (a `minus` a')))
-  minus (MkLEither (Just (Right b))) (MkLEither (Just (Right b'))) =
-    MkLEither (Just (Right (b `minus` b')))
-  minus _ _ = error "This should never be used." -- This doesn't make sense.
-  showMe (MkLEither Nothing)          = "Nothing"
-  showMe (MkLEither (Just (Left a)))  = "Left (" ++ showMe a ++ ")"
-  showMe (MkLEither (Just (Right b))) = "Right (" ++ showMe b ++ ")"
 
 -- | Convenience constraint set that requires 'LT' on the type itself and all
 -- its mapped types under the AD maps.
