@@ -8,12 +8,12 @@ import qualified SourceLanguage           as SL
 import qualified TargetLanguage           as TL
 import           TargetLanguage           (lambda)
 import           TargetLanguage.Env       (Idx (..))
-import           Types                    (Dr1, Dr2, LFun, LT (inferType))
+import           Types                    (Dr1, Dr2, LFun)
 
 d1 :: SL.STerm a b -> TL.TTerm env (Dr1 a -> Dr1 b)
 d1 SL.Id = lambda $ TL.Var Z
 d1 (SL.Comp f g) = lambda $ TL.App (d1 g) (TL.App (d1 f) (TL.Var Z))
-d1 SL.Unit = TL.Lambda inferType TL.Unit
+d1 SL.Unit = lambda TL.Unit
 d1 (SL.Pair t s) = lambda $ TL.Pair (TL.App (d1 t) (TL.Var Z)) (TL.App (d1 s) (TL.Var Z))
 d1 SL.Fst = lambda $ TL.Fst (TL.Var Z)
 d1 SL.Snd = lambda $ TL.Snd (TL.Var Z)
@@ -71,8 +71,8 @@ d2 (SL.Curry t) =
   let d2tTt = TL.App (d2 t) (TL.Pair (TL.Var (S Z)) (TL.Var Z))
       cur = TL.LCopowFold $ lambda $ d2tTt
   in lambda $ TL.LComp cur TL.LFst
-d2 SL.Inl = lambda $ TL.LCoPair TL.LId TL.Zero -- Note, we could make this more type safe by doing a dynamic check in TL.LFst to make sure the second component is 0.
-d2 SL.Inr = lambda $ TL.LCoPair TL.Zero TL.LId -- Note, we could make this more type safe by doing a dynamic check in TL.LSnd to make sure the first component is 0.
+d2 SL.Inl = lambda $ TL.LCoPair TL.LId TL.Zero
+d2 SL.Inr = lambda $ TL.LCoPair TL.Zero TL.LId
 d2 (SL.CoPair f g) =
   lambda $
     TL.Case
