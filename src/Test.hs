@@ -134,6 +134,13 @@ instance (Approx a, Approx b) => Approx (a, b) where
             (ok2, errs2) = b `isApprox'` y
         in (ok1 && ok2, "(" ++ errs1 ++ ", " ++ errs2 ++ ")")
 
+evalFwdFinDiff :: (LT a, LT b) => SL.STerm a b -> a -> a -> b
+evalFwdFinDiff f x y =
+  (SL.evalSt f (x `plus` (delta `scalProd` y)) `minus` SL.evalSt f x) `scalDiv`
+  delta
+  where
+    delta = 0.0000001
+
 propAll :: (Arbitrary a, Arbitrary b, Show a
            ,LT a, LT b
            ,Approx a, Approx b, FinDiff a, FinDiff b, Element a ~ Element b
@@ -173,7 +180,7 @@ propFwd1 sterm arg =
 propFwd2 :: (Approx b, LT a, LT b, a ~ Df1 a, a ~ Df2 a, b ~ Df2 b)
          => SL.STerm a b -> a -> a -> Property
 propFwd2 sterm arg dir =
-    let resFD = E.evalFwdFinDiff sterm arg dir
+    let resFD = evalFwdFinDiff sterm arg dir
         resAD = lApp (TL.evalTt (F.d2 sterm) arg) dir
     in resFD `isApproxQC` resAD
 
@@ -193,7 +200,7 @@ propRev2 :: (FinDiff a, FinDiff b, Element a ~ Element b, Approx a, Show b, a ~ 
          => SL.STerm a b -> a -> (b -> Gen b) -> Property
 propRev2 sterm arg adjgen =
     forAll (adjgen (SL.evalSt sterm arg)) $ \adjoint ->
-        let fdvals = [dotprod adjoint (E.evalFwdFinDiff sterm arg v) | v <- oneHotVecs arg]
+        let fdvals = [dotprod adjoint (evalFwdFinDiff sterm arg v) | v <- oneHotVecs arg]
             resFD = rebuild arg fdvals
             resAD = lApp (TL.evalTt (R.d2 sterm) arg) adjoint
         in resFD `isApproxQC` resAD
