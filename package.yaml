@@ -8,20 +8,30 @@ copyright:           "2021 Philip de Bruin, Pieter Knops, Danny de Jong"
 
 extra-source-files:
 - README.md
-- Examples.hs
 
 description:         Please see the README <https://github.com/PhiliPdB/ad-on-higher-order-functions/blob/master/README.md>
 
 dependencies:
 - base >= 4.7 && < 5
-- vector-sized
-- mtl
-- ghc-typelits-natnormalise
-- containers
-- some
 
 ghc-options:
 - -Wall
 
 library:
   source-dirs: src
+  dependencies:
+  - vector-sized
+  - mtl
+  - ghc-typelits-natnormalise
+  - containers
+  - some
+  - tasty
+  - tasty-quickcheck
+
+tests:
+  ad-test:
+    main: test/Main.hs
+    dependencies:
+    - ad-on-higher-order-functions
+    ghc-options:
+    - -O2 -threaded -rtsopts "-with-rtsopts=-qg -N4 -A10M"

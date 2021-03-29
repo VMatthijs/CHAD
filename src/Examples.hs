@@ -5,23 +5,19 @@
 module Examples where
 
 import           Data.Maybe                (fromMaybe)
-import qualified Data.Vector.Unboxed.Sized as V (Unbox, Vector, fromList, map,
-                                                 replicate)
+import qualified Data.Vector.Unboxed.Sized as V (Unbox, Vector, fromList, map)
 import           Prelude                   hiding (replicate)
 
-import           Control.Monad.State.Lazy  (State, modify, runState)
 import qualified ForwardAD                 as F
 import           GHC.TypeNats              (KnownNat)
-import           Helper
 import           Operation                 (Operation (..))
 import qualified ReverseAD                 as R
-import           Simplify                  (simplifyTTerm)
 import qualified SourceLanguage            as SL
 import qualified TargetLanguage            as TL
 import           Types
 
 -- | Helper function to evaluate a derivative
-evalDerivative :: (LT b, LT c) => TL.TTerm (a -> LFun b c) -> a -> b -> c
+evalDerivative :: (LT b, LT c) => TL.TTerm '[] (a -> LFun b c) -> a -> b -> c
 evalDerivative f a = lApp (TL.evalTt f a)
 
 -- | Helper function to create a vector from a list
@@ -68,10 +64,10 @@ quadratic c = SL.Comp (SL.Pair (cX c) xSquared) (SL.Op EScalAdd)
 
 -- Map the quadratic function over an input vector
 mapQuadratic :: Double -> SL.STerm (Vect 3) (Vect 3)
-mapQuadratic c = SL.Comp pair SL.Map
+mapQuadratic c = SL.Comp pair' SL.Map
   where
     mapOp = SL.Curry $ SL.Comp SL.Snd (quadratic c)
-    pair = SL.Pair mapOp SL.Id
+    pair' = SL.Pair mapOp SL.Id
 
 evalFwdDerivative ::
      ( LT a
@@ -89,7 +85,7 @@ evalFwdDerivative ::
   -> Df1 a
   -> Df2 a
   -> Df2 b
-evalFwdDerivative f = evalDerivative (runAD F.d2 f)
+evalFwdDerivative f = evalDerivative (F.d2 f)
 
 evalRevDerivative ::
      ( LT a
@@ -107,7 +103,7 @@ evalRevDerivative ::
   -> Dr1 a
   -> Dr2 b
   -> Dr2 a
-evalRevDerivative f = evalDerivative (runAD R.d2 f)
+evalRevDerivative f = evalDerivative (R.d2 f)
 
 evalFwdFinDiff :: (LT a, LT b) => SL.STerm a b -> a -> a -> b
 evalFwdFinDiff f x y =
@@ -117,7 +113,7 @@ evalFwdFinDiff f x y =
     delta = 0.0000001
 
 evalRevFinDiff :: (LT a, LT b) => SL.STerm a b -> Dr1 a -> Dr2 b -> Dr2 a
-evalRevFinDiff f = undefined
+evalRevFinDiff _f = undefined
 
 evalFwd ::
      ( LT a
@@ -134,7 +130,7 @@ evalFwd ::
   => SL.STerm a b
   -> Df1 a
   -> Df1 b
-evalFwd f = TL.evalTt (runAD F.d1 f)
+evalFwd f = TL.evalTt (F.d1 f)
 
 evalRev ::
      ( LT a
@@ -151,7 +147,7 @@ evalRev ::
   => SL.STerm a b
   -> Dr1 a
   -> Dr1 b
-evalRev f = TL.evalTt (runAD R.d1 f)
+evalRev f = TL.evalTt (R.d1 f)
 
 fwdDerMapQuadratic :: Vect 3 -> Vect 3 -> Vect 3
 fwdDerMapQuadratic = evalFwdDerivative (mapQuadratic 42) --OK
