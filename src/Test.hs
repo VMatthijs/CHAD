@@ -221,7 +221,10 @@ floorf :: RealFrac a => a -> a
 floorf x = fromIntegral (floor x :: Integer)
 
 main :: IO ()
-main = defaultMain $ testGroup "AD" [localOption (QuickCheckTests 5000) fastTests, localOption (QuickCheckTests 500) slowTests, localOption (QuickCheckTests 50) superSlowTests]
+main = defaultMain $ testGroup "AD"
+          [localOption (QuickCheckTests 10000) fastTests
+          ,localOption (QuickCheckTests 1000) slowTests
+          ,localOption (QuickCheckTests 100) superSlowTests]
 
 fastTests :: TestTree
 fastTests = testGroup "Fast"
@@ -237,14 +240,14 @@ fastTests = testGroup "Fast"
     ,testProperty "mapQuadratic" (\c -> propAll (E.mapQuadratic c))
     -- foldProd: For small inputs, finite differencing is still accurate enough
     ,testProperty "foldProd-small"
-        (propAll' (genVect :: Gen (Vect 5))
+        (propAll' (genVect :: Gen (Vect 4))
                   (resize 1 . genWithPrimal)
                   (const arbitrarySizedFractional)
                   (const id)
                   E.foldProd)
     -- foldProd: For larger inputs, we only compare forward AD versus reverse AD
     ,testProperty "foldProd-noFD"
-        (propFwdVsRev' (genVect :: Gen (Vect 5))
+        (propFwdVsRev' (genVect :: Gen (Vect 8))
                        arbitrarySizedFractional
                        E.foldProd)
     ,testProperty "foldProd2" (propAll E.foldProd2)
@@ -279,12 +282,12 @@ slowTests = testGroup "Slow"
 superSlowTests :: TestTree
 superSlowTests = testGroup "Super slow"
     [testProperty "tree"
-        (propAll' (choose (-2, 15) `suchThat` (\x -> x /= floorf x))
+        (propAll' (choose (-2, 10) `suchThat` (\x -> x /= floorf x))
                   (\_ -> choose (0.1, 0.5)) (\_ -> choose (0.1, 0.5))
                   (const id)
                   E.tree)
     ,testProperty "treeExtra"
-        (propAll' ((,) <$> (choose (-2, 15) `suchThat` (\x -> x /= floorf x)) <*> arbitrarySizedFractional)
+        (propAll' ((,) <$> (choose (-2, 10) `suchThat` (\x -> x /= floorf x)) <*> arbitrarySizedFractional)
                   (\_ -> (,) <$> choose (0.1, 0.5) <*> arbitrarySizedFractional)
                   (\_ -> choose (0.1, 0.5))
                   (const id)

@@ -34,4 +34,4 @@ tests:
     dependencies:
     - ad-on-higher-order-functions
     ghc-options:
-    - -O2 -threaded -rtsopts "-with-rtsopts=-qg -N4 -A10M"
+    - -O2 -threaded -rtsopts "-with-rtsopts=-qg -N6 -A10M"

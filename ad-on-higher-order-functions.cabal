@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7102608f70f9e9b0845e495cd2df05467d6dfbf09745b09b650fe4ac00cc4275
+-- hash: 491142bb06d24bbeaec05bd1382174f0b226264aa916b6bb69b4a72a5c5fa87d
 
 name:           ad-on-higher-order-functions
 version:        0.1.0.0
@@ -57,7 +57,7 @@ test-suite ad-test
   main-is: test/Main.hs
   other-modules:
       Paths_ad_on_higher_order_functions
-  ghc-options: -Wall -O2 -threaded -rtsopts "-with-rtsopts=-qg -N4 -A10M"
+  ghc-options: -Wall -O2 -threaded -rtsopts "-with-rtsopts=-qg -N6 -A10M"
   build-depends:
       ad-on-higher-order-functions
     , base >=4.7 && <5
