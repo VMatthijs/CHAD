@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 88736c5eee510445dd02d4e951514219eb1dcafba7d66a15de3b59eb75ba93c3
+-- hash: 444ba3125d74e2c7570f53ee9dc4375e4655ef19783c01bcbda35d1eb379ca76
 
 name:           ad-on-higher-order-functions
 version:        0.1.0.0
@@ -28,7 +28,6 @@ source-repository head
 library
   exposed-modules:
       ForwardAD
-      Helper
       Operation
       ReverseAD
       Simplify
