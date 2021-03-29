@@ -1,15 +1,15 @@
-name:                ad-on-higher-order-functions
+name:                CHAD
 version:             0.1.0.0
-github:              "PhiliPdB/ad-on-higher-order-functions"
+github:              "VMatthijs/CHAD"
 license:             BSD3
-author:              "Philip de Bruin, Pieter Knops, Danny de Jong"
-maintainer:          "Philip de Bruin <p.debruin@students.uu.nl>, Pieter Knops <p.d.knops@students.uu.nl>, Danny de Jong <g.j.dejong2@students.uu.nl>"
-copyright:           "2021 Philip de Bruin, Pieter Knops, Danny de Jong"
+author:              "CHAD Contributors"
+maintainer:          "Tom Smeding <t.j.smeding@uu.nl>, Matthijs Vákár <m.i.l.vakar@uu.nl"
+copyright:           "2021 Philip de Bruin, Pieter Knops, Danny de Jong, Tom Smeding, Matthijs Vákár"
 
 extra-source-files:
 - README.md
 
-description:         Please see the README <https://github.com/PhiliPdB/ad-on-higher-order-functions/blob/master/README.md>
+description:         Please see the README
 
 dependencies:
 - base >= 4.7 && < 5
