@@ -4,16 +4,16 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 491142bb06d24bbeaec05bd1382174f0b226264aa916b6bb69b4a72a5c5fa87d
+-- hash: 3deb19a1b9e60f7ccf26e63d0d678947cc36a20002928415066aa2076d04c0be
 
-name:           ad-on-higher-order-functions
+name:           CHAD
 version:        0.1.0.0
-description:    Please see the README <https://github.com/PhiliPdB/ad-on-higher-order-functions/blob/master/README.md>
-homepage:       https://github.com/PhiliPdB/ad-on-higher-order-functions#readme
-bug-reports:    https://github.com/PhiliPdB/ad-on-higher-order-functions/issues
-author:         Philip de Bruin, Pieter Knops, Danny de Jong
-maintainer:     Philip de Bruin <p.debruin@students.uu.nl>, Pieter Knops <p.d.knops@students.uu.nl>, Danny de Jong <g.j.dejong2@students.uu.nl>
-copyright:      2021 Philip de Bruin, Pieter Knops, Danny de Jong
+description:    Please see the README
+homepage:       https://github.com/VMatthijs/CHAD#readme
+bug-reports:    https://github.com/VMatthijs/CHAD/issues
+author:         CHAD Contributors
+maintainer:     Tom Smeding <t.j.smeding@uu.nl>, Matthijs Vákár <m.i.l.vakar@uu.nl>
+copyright:      2021 Philip de Bruin, Pieter Knops, Danny de Jong, Tom Smeding, Matthijs Vákár
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -22,7 +22,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/PhiliPdB/ad-on-higher-order-functions
+  location: https://github.com/VMatthijs/CHAD
 
 library
   exposed-modules:
@@ -37,7 +37,7 @@ library
       Test
       Types
   other-modules:
-      Paths_ad_on_higher_order_functions
+      Paths_CHAD
   hs-source-dirs:
       src
   ghc-options: -Wall
@@ -56,9 +56,9 @@ test-suite ad-test
   type: exitcode-stdio-1.0
   main-is: test/Main.hs
   other-modules:
-      Paths_ad_on_higher_order_functions
+      Paths_CHAD
   ghc-options: -Wall -O2 -threaded -rtsopts "-with-rtsopts=-qg -N6 -A10M"
   build-depends:
-      ad-on-higher-order-functions
+      CHAD
     , base >=4.7 && <5
   default-language: Haskell2010
