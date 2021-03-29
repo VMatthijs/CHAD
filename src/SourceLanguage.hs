@@ -87,7 +87,6 @@ data STerm a b where
     => STerm (a, b) b
     -> STerm a b
 
---     -- | Foldr
 -- | Evaluate the source language
 evalSt :: STerm a b -> a -> b
 evalSt Id = id
