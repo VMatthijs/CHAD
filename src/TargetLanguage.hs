@@ -45,8 +45,14 @@ data TTerm env t where
   Lift :: a -> Type a -> TTerm env a
   -- | Operators
   Op :: Operation a b -> TTerm env a -> TTerm env b
-  Map :: TTerm env (Scal -> Scal) -> TTerm env (Vect n) -> TTerm env (Vect n)
-  Foldr :: (LT a, KnownNat n) => TTerm env ((((Scal, a) -> a, a), Vect n) -> a)
+  Map :: TTerm env (Scal -> Scal)
+      -> TTerm env (Vect n)
+      -> TTerm env (Vect n)
+  Foldr :: (LT a, KnownNat n)
+        => TTerm env ((Scal, a) -> a)
+        -> TTerm env a
+        -> TTerm env (Vect n)
+        -> TTerm env a
   -- Target language extension
   -- | Linear operation
   LOp :: LT b => LinearOperation a b c -> TTerm env (a -> LFun b c)
@@ -91,19 +97,25 @@ data TTerm env t where
   -- Map derivatives
   DMap
     :: KnownNat n
-    => TTerm env (Scal -> (Scal, LFun Scal Scal), Vect n)
+    => TTerm env (Scal -> (Scal, LFun Scal Scal))
+    -> TTerm env (Vect n)
     -> TTerm env (LFun (Scal -> Scal, Vect n) (Vect n))
   DtMap
     :: KnownNat n
-    => TTerm env (Scal -> (Scal, LFun Scal Scal), Vect n)
+    => TTerm env (Scal -> (Scal, LFun Scal Scal))
+    -> TTerm env (Vect n)
     -> TTerm env (LFun (Vect n) (Copower Scal Scal, Vect n))
   DFoldr
     :: (KnownNat n, V.Unbox a, V.Unbox b, LT b)
-    => TTerm env ((((Scal, a) -> (a, LFun (Scal, b) b)), a), Vect n)
+    => TTerm env (((Scal, a) -> (a, LFun (Scal, b) b)))
+    -> TTerm env a
+    -> TTerm env (Vect n)
     -> TTerm env (LFun (((Scal, a) -> b, b), Vect n) b)
   DtFoldr
     :: (KnownNat n, V.Unbox a, V.Unbox b, LT b)
-    => TTerm env (((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n)
+    => TTerm env ((Scal, a) -> (a, LFun b (Scal, b)))
+    -> TTerm env a
+    -> TTerm env (Vect n)
     -> TTerm env (LFun b ((Copower (Scal, a) b, b), Vect n))
   DIt
     :: (LT d2a, LT d2b, LT d2c)
@@ -146,7 +158,7 @@ substTt' i v w (Case t l r) =
 substTt' _ _ _ (Lift x t) = Lift x t
 substTt' i v w (Op op y) = Op op (substTt' i v w y)
 substTt' i v w (Map f y) = Map (substTt' i v w f) (substTt' i v w y)
-substTt' _ _ _ Foldr = Foldr
+substTt' i v w (Foldr f x t) = Foldr (substTt' i v w f) (substTt' i v w x) (substTt' i v w t)
 substTt' i v w (Rec t) = Rec (substTt' i v w t)
 substTt' i v w (It t) = It (substTt' i v w t)
 substTt' i v w (Sign t) = Sign (substTt' i v w t)
@@ -168,10 +180,10 @@ substTt' i v w (Plus a b) = Plus (substTt' i v w a) (substTt' i v w b)
 substTt' i v w (LSwap t) = LSwap (substTt' i v w t)
 substTt' i v w (LCopowFold t) = LCopowFold (substTt' i v w t)
 substTt' _ _ _ (LOp lop) = LOp lop
-substTt' i v w (DMap t) = DMap (substTt' i v w t)
-substTt' i v w (DtMap t) = DtMap (substTt' i v w t)
-substTt' i v w (DFoldr t) = DFoldr (substTt' i v w t)
-substTt' i v w (DtFoldr t) = DtFoldr (substTt' i v w t)
+substTt' i v w (DMap f x) = DMap (substTt' i v w f) (substTt' i v w x)
+substTt' i v w (DtMap f x) = DtMap (substTt' i v w f) (substTt' i v w x)
+substTt' i v w (DFoldr f x t) = DFoldr (substTt' i v w f) (substTt' i v w x) (substTt' i v w t)
+substTt' i v w (DtFoldr f x t) = DtFoldr (substTt' i v w f) (substTt' i v w x) (substTt' i v w t)
 substTt' i v w (DIt d1t d2t) = DIt (substTt' i v w d1t) (substTt' i v w d2t)
 substTt' i v w (DtIt d1t d2t) = DtIt (substTt' i v w d1t) (substTt' i v w d2t)
 substTt' i v w (LRec t) = LRec (substTt' i v w t)
@@ -200,7 +212,7 @@ evalTt' env (Case p l r) =
 evalTt' _   (Lift x _) = x
 evalTt' env (Op op a) = evalOp op (evalTt' env a)
 evalTt' env (Map f x) = V.map (evalTt' env f) (evalTt' env x)
-evalTt' _   Foldr = \((f, v), xs) -> V.foldr (\r a -> f (r, a)) v xs
+evalTt' env (Foldr f v xs) = V.foldr (\r a -> evalTt' env f (r, a)) (evalTt' env v) (evalTt' env xs)
 evalTt' env (Rec t) = fix (evalTt' env t)
   where
     fix f a = f (a, fix f a)
@@ -235,14 +247,13 @@ evalTt' _   Zero = zero
 evalTt' env (Plus a b) = plus (evalTt' env a) (evalTt' env b)
 evalTt' env (LSwap t) = lSwap (evalTt' env t)
 evalTt' env (LCopowFold t) = lCopowFold (evalTt' env t)
-evalTt' env (DMap t) = plus (lComp lFst (lMap v)) (lComp lSnd (lZipWith (snd . f) v))
-  where
-    (f, v) = evalTt' env t
-evalTt' env (DtMap t) = lPair (lZip v) (lZipWith (snd . f) v)
-  where
-    (f, v) = evalTt' env t
-evalTt' env (DFoldr t) = dFoldr (evalTt' env t)
-evalTt' env (DtFoldr t) = dtFoldr (evalTt' env t)
+evalTt' env (DMap f v) =
+    plus (lComp lFst (lMap v')) (lComp lSnd (lZipWith (snd . evalTt' env f) v'))
+  where v' = evalTt' env v
+evalTt' env (DtMap f v) = lPair (lZip v') (lZipWith (snd . evalTt' env f) v')
+  where v' = evalTt' env v
+evalTt' env (DFoldr f v xs) = dFoldr (evalTt' env f) (evalTt' env v) (evalTt' env xs)
+evalTt' env (DtFoldr f v xs) = dtFoldr (evalTt' env f) (evalTt' env v) (evalTt' env xs)
 evalTt' env (DIt d1t d2t) = dIt (evalTt' env d1t) (evalTt' env d2t)
 evalTt' env (DtIt d1t d2t) = dtIt (evalTt' env d1t) (evalTt' env d2t)
 evalTt' env (LRec t) = lRec (evalTt' env t)
@@ -262,7 +273,7 @@ sinkTt w (Case p g h) = Case (sinkTt w p) (sinkTt w g) (sinkTt w h)
 sinkTt _ (Lift x t) = Lift x t
 sinkTt w (Op op a) = Op op (sinkTt w a)
 sinkTt w (Map g y) = Map (sinkTt w g) (sinkTt w y)
-sinkTt _ Foldr = Foldr
+sinkTt w (Foldr f v xs) = Foldr (sinkTt w f) (sinkTt w v) (sinkTt w xs)
 sinkTt w (Rec s) = Rec (sinkTt w s)
 sinkTt w (It s) = It (sinkTt w s)
 sinkTt w (Sign s) = Sign (sinkTt w s)
@@ -283,10 +294,10 @@ sinkTt w (Plus a b) = Plus (sinkTt w a) (sinkTt w b)
 sinkTt w (LSwap s) = LSwap (sinkTt w s)
 sinkTt w (LCopowFold s) = LCopowFold (sinkTt w s)
 sinkTt _ (LOp op) = LOp op
-sinkTt w (DMap s) = DMap (sinkTt w s)
-sinkTt w (DtMap s) = DtMap (sinkTt w s)
-sinkTt w (DFoldr t) = DFoldr (sinkTt w t)
-sinkTt w (DtFoldr t) = DtFoldr (sinkTt w t)
+sinkTt w (DMap f xs) = DMap (sinkTt w f) (sinkTt w xs)
+sinkTt w (DtMap f xs) = DtMap (sinkTt w f) (sinkTt w xs)
+sinkTt w (DFoldr f v xs) = DFoldr (sinkTt w f) (sinkTt w v) (sinkTt w xs)
+sinkTt w (DtFoldr f v xs) = DtFoldr (sinkTt w f) (sinkTt w v) (sinkTt w xs)
 sinkTt w (DIt d1t d2t) = DIt (sinkTt w d1t) (sinkTt w d2t)
 sinkTt w (DtIt d1t d2t) = DtIt (sinkTt w d1t) (sinkTt w d2t)
 sinkTt w (LRec s) = LRec (sinkTt w s)
@@ -315,7 +326,7 @@ printTt d (Case p l r) =
 printTt _ (Lift _ _) = error "Can't print lifted value"
 printTt d (Op op a) = showFunction d ("evalOp " ++ showOp op) [Some a]
 printTt d (Map f a) = showFunction d "map" [Some f, Some a]
-printTt _ Foldr = showString "foldr"
+printTt d (Foldr f v xs) = showFunction d "foldr" [Some f, Some v, Some xs]
 printTt d (Rec t) = showFunction d "rec" [Some t]
 printTt d (It t) = showFunction d "it" [Some t]
 printTt d (Sign t) = showFunction d "sign" [Some t]
@@ -337,10 +348,10 @@ printTt _ Zero = showString "0F"
 printTt d (Plus f g) = showParen (d > 6) $ printTt 6 f . showString " + " . printTt 6 g
 printTt d (LSwap t) = showFunction d "lswap" [Some t]
 printTt d (LCopowFold t) = showFunction d "lcopowfold" [Some t]
-printTt d (DMap t) = showFunction d "DMap" [Some t]
-printTt d (DtMap t) = showFunction d "DtMap" [Some t]
-printTt d (DFoldr t) = showFunction d "DFoldr" [Some t]
-printTt d (DtFoldr t) = showFunction d "DtFoldr" [Some t]
+printTt d (DMap f xs) = showFunction d "DMap" [Some f, Some xs]
+printTt d (DtMap f xs) = showFunction d "DtMap" [Some f, Some xs]
+printTt d (DFoldr f v xs) = showFunction d "DFoldr" [Some f, Some v, Some xs]
+printTt d (DtFoldr f v xs) = showFunction d "DtFoldr" [Some f, Some v, Some xs]
 printTt d (DIt d1t d2t) = showFunction d "DIt" [Some d1t, Some d2t]
 printTt d (DtIt d1t d2t) = showFunction d "DtIt" [Some d1t, Some d2t]
 printTt d (LRec t) = showFunction d "lrec" [Some t]
@@ -405,7 +416,7 @@ usesOf' i (Case p f g) = usesOf' i p <> usesOf' i f <> usesOf' i g
 usesOf' _ (Lift _ _) = mempty
 usesOf' i (Op _ a) = usesOf' i a
 usesOf' i (Map f y) = usesOf' i f <> usesOf' i y
-usesOf' _ Foldr = mempty
+usesOf' i (Foldr f v xs) = usesOf' i f <> usesOf' i v <> usesOf' i xs
 usesOf' i (Rec s) = usesOf' i s
 usesOf' i (It s) = usesOf' i s
 usesOf' i (Sign s) = usesOf' i s
@@ -426,10 +437,10 @@ usesOf' i (Plus a b) = usesOf' i a <> usesOf' i b
 usesOf' i (LSwap s) = usesOf' i s
 usesOf' i (LCopowFold s) = usesOf' i s
 usesOf' _ (LOp _) = mempty
-usesOf' i (DMap s) = usesOf' i s
-usesOf' i (DtMap s) = usesOf' i s
-usesOf' i (DFoldr s) = usesOf' i s
-usesOf' i (DtFoldr s) = usesOf' i s
+usesOf' i (DMap f xs) = usesOf' i f <> usesOf' i xs
+usesOf' i (DtMap f xs) = usesOf' i f <> usesOf' i xs
+usesOf' i (DFoldr f v xs) = usesOf' i f <> usesOf' i v <> usesOf' i xs
+usesOf' i (DtFoldr f v xs) = usesOf' i f <> usesOf' i v <> usesOf' i xs
 usesOf' i (DIt d1t d2t) = usesOf' i d1t <> usesOf' i d2t
 usesOf' i (DtIt d1t d2t) = usesOf' i d1t <> usesOf' i d2t
 usesOf' i (LRec s) = usesOf' i s

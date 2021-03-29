@@ -33,14 +33,10 @@ d1 SL.Map =
            (TL.Snd (TL.Var Z))
 d1 SL.Foldr =
   lambda $
-    TL.Foldr `TL.App`
-    TL.Pair
-      (TL.Pair
-         (lambda $
-            TL.Fst
-              (TL.Fst (TL.Fst (TL.Var (S Z))) `TL.App` (TL.Var Z)))
-         (TL.Snd (TL.Fst (TL.Var Z))))
-      (TL.Snd (TL.Var Z))
+    TL.Foldr (lambda $ TL.Fst $
+                TL.Fst (TL.Fst (TL.Var (S Z))) `TL.App` (TL.Var Z))
+             (TL.Snd (TL.Fst (TL.Var Z)))
+             (TL.Snd (TL.Var Z))
 d1 (SL.Rec t) = TL.Rec (d1 t)
 d1 (SL.It t) = TL.It (d1 t)
 d1 SL.Sign = lambda $ TL.Sign (TL.Var Z)
@@ -79,8 +75,12 @@ d2 (SL.CoPair f g) =
 -- Map
 -- x := (f, v)
 -- y := (g, w)
-d2 SL.Map = lambda $ TL.DMap (TL.Var Z)
-d2 SL.Foldr = lambda $ TL.DFoldr (TL.Var Z)
+d2 SL.Map = lambda $ TL.DMap (TL.Fst (TL.Var Z)) (TL.Snd (TL.Var Z))
+d2 SL.Foldr =
+  lambda $ TL.DFoldr
+             (TL.Fst (TL.Fst (TL.Var Z)))
+             (TL.Snd (TL.Fst (TL.Var Z)))
+             (TL.Snd (TL.Var Z))
 -- Dop
 d2 (SL.Op (Constant _)) = TL.LOp DConstant
 d2 (SL.Op EAdd) = TL.LOp DEAdd

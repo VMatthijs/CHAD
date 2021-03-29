@@ -38,13 +38,10 @@ d1 SL.Map =
 -- d1 Foldr :: ((Scal, D1 a) -> (D1 a, LFun (D2 a) (Scal, D2 a)), D1 a, Vect n) -> D1 a
 d1 SL.Foldr =
   lambda $
-    TL.Foldr `TL.App`
-    TL.Pair
-      (TL.Pair
-         (lambda $ TL.Fst $
-            TL.Fst (TL.Fst (TL.Var (S Z))) `TL.App` TL.Var Z)
-         (TL.Snd (TL.Fst (TL.Var Z))))
-      (TL.Snd (TL.Var Z))
+    TL.Foldr (lambda $ TL.Fst $
+                TL.Fst (TL.Fst (TL.Var (S Z))) `TL.App` TL.Var Z)
+             (TL.Snd (TL.Fst (TL.Var Z)))
+             (TL.Snd (TL.Var Z))
 d1 (SL.Rec t) = TL.Rec (d1 t)
 d1 (SL.It t) = TL.It (d1 t)
 d1 SL.Sign = lambda $ TL.Sign (TL.Var Z)
@@ -82,10 +79,14 @@ d2 (SL.CoPair f g) =
 -- Map
 -- Map :: (Scal -> Scal, Vect n) -> Vect n
 -- d2 Map :: (Scal -> (Scal, LFun Scal Scal), Vect n) -> LFun (Vect n) (Copower Scal Scal, Vect n)
-d2 SL.Map = lambda $ TL.DtMap (TL.Var Z)
+d2 SL.Map = lambda $ TL.DtMap (TL.Fst (TL.Var Z)) (TL.Snd (TL.Var Z))
 -- Foldr :: ((Scal, a) -> a, a, Vect n) -> a
 -- d2 Foldr :: ((Scal, D1 a) -> (D1 a, LFun (D2 a) (Scal, D2 a)), D1 a, Vect n) -> LFun (D2 a) (Copower (Scal, D1 a) (D2 a), D2 a ,Vect n)
-d2 SL.Foldr = lambda $ TL.DtFoldr (TL.Var Z)
+d2 SL.Foldr =
+  lambda $ TL.DtFoldr
+             (TL.Fst (TL.Fst (TL.Var Z)))
+             (TL.Snd (TL.Fst (TL.Var Z)))
+             (TL.Snd (TL.Var Z))
 -- Dop^t
 d2 (SL.Op (Constant _)) = TL.LOp DConstantT
 d2 (SL.Op EAdd) = TL.LOp DEAddT

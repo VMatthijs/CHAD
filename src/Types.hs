@@ -192,9 +192,11 @@ lMap x = MkLFun $ \g -> V.map g x
 
 dFoldr ::
      (KnownNat n, V.Unbox a, V.Unbox b, LT b)
-  => (((Scal, a) -> (a, LFun (Scal, b) b), a), Vect n)
+  => ((Scal, a) -> (a, LFun (Scal, b) b))
+  -> a
+  -> (Vect n)
   -> LFun (((Scal, a) -> b, b), Vect n) b
-dFoldr ((f, i), v) =
+dFoldr f i v =
   MkLFun $ \((f', i'), v') ->
     let s = V.prescanr (curry (fst . f)) i v
         vvps = V.zip v (V.zip v' s)
@@ -204,9 +206,11 @@ dFoldr ((f, i), v) =
 
 dtFoldr ::
      (V.Unbox a, V.Unbox b, LT b)
-  => (((Scal, a) -> (a, LFun b (Scal, b)), a), Vect n)
+  => ((Scal, a) -> (a, LFun b (Scal, b)))
+  -> a
+  -> (Vect n)
   -> LFun b ((Copower (Scal, a) b, b), Vect n)
-dtFoldr ((f, i), v) =
+dtFoldr f i v =
   MkLFun $ \w ->
     let s = V.prescanr (curry (fst . f)) i v
         vs = V.zip v s
