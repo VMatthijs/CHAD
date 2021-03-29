@@ -52,7 +52,7 @@ data STerm a b where
   -- nor 'b' contain function types.
   Op
     :: ( LTall a, LTall b
-       , a ~ Df1 a, b ~ Df1 b, a ~ Dr1 a, b ~ Dr1 b)
+       , a ~ Df1 a, b ~ Df1 b, a ~ Dr1 a, b ~ Dr1 b) -- these constraints essentially tell us that a and b are first-order types
     => Operation a b
     -> STerm a b
   -- | Map
