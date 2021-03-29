@@ -11,7 +11,7 @@ import           GHC.TypeNats              (KnownNat)
 import           Control.Arrow             ((&&&))
 import           Operation                 (Operation, evalOp)
 import           Types                     (Df1, Df2, Dr1, Dr2, Scal, Vect,
-                                            LTall)
+                                            LTall, DZ)
 
 -- | Terms of the source language
 data STerm a b where
@@ -83,7 +83,7 @@ data STerm a b where
     -> STerm (a, b) c
   Sign :: STerm Scal (Either () ())
   Rec
-    :: (LTall a, LTall b)
+    :: (LTall a, LTall b, DZ (Dr2 b))
     => STerm (a, b) b
     -> STerm a b
 

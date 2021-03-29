@@ -127,7 +127,7 @@ data TTerm env t where
     -> TTerm env ((d1a, d1b) -> LFun (LEither d2c d2b) (d2a, d2b))
     -> TTerm env ((d1a, d1b) -> LFun d2c (d2a, d2b))
   LRec :: TTerm env (LFun (a, b) b) -> TTerm env (LFun a b)
-  LIt :: (LT a, LT b) => TTerm env (LFun b (a, b)) -> TTerm env (LFun b a)
+  LIt :: (LT a, DZ b) => TTerm env (LFun b (a, b)) -> TTerm env (LFun b a)
 
 -- | Substitute variable with De Bruijn index zero in a 'TTerm'
 substTt :: TTerm env u -> TTerm (u ': env) t -> TTerm env t

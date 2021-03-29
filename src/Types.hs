@@ -56,6 +56,7 @@ module Types
   , Dr1
   , Dr2
   , LT(..)
+  , DZ(..)
   , LTall
   ) where
 
@@ -266,7 +267,7 @@ lRec (MkLFun g) = MkLFun $ lrec g
   where
     lrec f a = f (a, lrec f a)
 
-lIt :: (LT a, LT b) => LFun b (a, b) -> LFun b a
+lIt :: (LT a, DZ b) => LFun b (a, b) -> LFun b a
 lIt f =
   MkLFun $ \b ->
     if isZero b -- Note that this will be decidable in practice as b will not contain any function types (being a Dr2 type)!
@@ -312,50 +313,40 @@ type family Dr2 a where
 class LT a where
   zero :: a -- For automatic differentiation
   plus :: a -> a -> a -- For automatic differentiation
-  isZero :: a -> Bool -- For reverse AD of recursion
 
 instance LT () where
   zero = ()
   plus _ _ = ()
-  isZero _ = True
 
 instance (LT a, LT b) => LT (a, b) where
   zero = (zero, zero)
   plus a b = (fst a `plus` fst b, snd a `plus` snd b)
-  isZero (a, b) = isZero a && isZero b
 
 instance (LT a, LT b) => LT (Either a b) where
   zero = error "This should never be used." -- This doesn't make sense.
   plus (Left a) (Left a')   = Left (a `plus` a')
   plus (Right a) (Right a') = Right (a `plus` a')
   plus _ _                  = error "This should never be used." -- This doesn't make sense.
-  isZero (Left a)  = isZero a
-  isZero (Right b) = isZero b
 
 instance LT Scal where
   zero = 0
   plus = (+)
-  isZero = (== zero)
 
 instance KnownNat n => LT (Vect n) where
   zero = V.replicate 0
   plus = V.zipWith (+)
-  isZero = (== zero)
 
 instance (LT a, LT b) => LT (a -> b) where
   zero = const zero
   plus f g = \x -> plus (f x) (g x)
-  isZero = error "This should never be used." -- undecidable
 
 instance (LT a, LT b) => LT (Copower a b) where
   zero = MkCopow []
   plus (MkCopow x) (MkCopow y) = MkCopow (x ++ y)
-  isZero (MkCopow xs) = all isZero (map snd xs)
 
 instance (LT a, LT b) => LT (LFun a b) where
   zero = MkLFun zero
   plus = lPlus
-  isZero = error "This should never be used." -- undecidable
 
 instance (LT a, LT b) => LT (LEither a b) where
   zero = MkLEither Nothing
@@ -366,6 +357,30 @@ instance (LT a, LT b) => LT (LEither a b) where
   plus (MkLEither (Just (Right b))) (MkLEither (Just (Right b'))) =
     MkLEither (Just (Right (b `plus` b')))
   plus _ _ = error "This should never be used." -- This doesn't make sense.
+
+-- | Decidable Zero: types for which it is decidable whether a value of that
+-- type equals zero.
+-- This class is only used for reverse AD of recursion.
+class LT a => DZ a where
+  -- TODO: superclass constraint should be the class that has 'zero', not full 'LT'
+  isZero :: a -> Bool
+
+instance DZ () where
+  isZero _ = True
+
+instance (DZ a, DZ b) => DZ (a, b) where
+  isZero (a, b) = isZero a && isZero b
+
+instance DZ Scal where
+  isZero = (== zero)
+
+instance KnownNat n => DZ (Vect n) where
+  isZero = (== zero)
+
+instance (DZ a, DZ b) => DZ (Copower a b) where
+  isZero (MkCopow xs) = all isZero (map snd xs)
+
+instance (DZ a, DZ b) => DZ (LEither a b) where
   isZero (MkLEither Nothing)          = True
   isZero (MkLEither (Just (Left a)))  = isZero a
   isZero (MkLEither (Just (Right b))) = isZero b
