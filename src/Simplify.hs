@@ -21,7 +21,7 @@ import           Types
 simplifyTTerm :: TTerm env a -> TTerm env a
 -- Source language extension
 simplifyTTerm (Var i) = Var i
-simplifyTTerm (Lambda t e) = Lambda t (simplifyTTerm e)
+simplifyTTerm (Lambda e) = Lambda (simplifyTTerm e)
 simplifyTTerm (App f a) = simplifyApp (simplifyTTerm f) (simplifyTTerm a)
 simplifyTTerm Unit = Unit
 simplifyTTerm (Pair a b) = Pair (simplifyTTerm a) (simplifyTTerm b)
@@ -68,8 +68,8 @@ simplifyTTerm (LIt t) = LIt (simplifyTTerm t)
 -- We allow substituting Pair expressions where each element of the pair is
 -- individually only used once in the function body.
 simplifyApp :: (LT a, LT b) => TTerm env (a -> b) -> TTerm env a -> TTerm env b
-simplifyApp (Lambda _ e) (Var j) = substTt (Var j) e
-simplifyApp (Lambda t e) a
+simplifyApp (Lambda e) (Var j) = substTt (Var j) e
+simplifyApp (Lambda e) a
   | let -- Count the usages of the components of 'a' in the body, 'e'
         layout = usesOf' Z e
         -- Then truncate the resulting layout with the actual Pair structure of 'a'
@@ -77,7 +77,7 @@ simplifyApp (Lambda t e) a
     -- Require that every component is used at most once
   , all (<=1) (toList count)
   = simplifyTTerm $ substTt a e
-  | otherwise = App (Lambda t e) a
+  | otherwise = App (Lambda e) a
 simplifyApp Zero _ = Zero
 simplifyApp f a = App f a
 

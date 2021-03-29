@@ -25,7 +25,7 @@ import           Types
 data TTerm env t where
   -- Terms from source language
   Var :: Idx env a -> TTerm env a
-  Lambda :: Type a -> TTerm (a ': env) b -> TTerm env (a -> b)
+  Lambda :: LT a => TTerm (a ': env) b -> TTerm env (a -> b)
   App :: (LT a, LT b) => TTerm env (a -> b) -> TTerm env a -> TTerm env b
   Unit :: TTerm env ()
   Pair :: TTerm env a -> TTerm env b -> TTerm env (a, b)
@@ -130,10 +130,6 @@ data TTerm env t where
   LRec :: TTerm env (LFun (a, b) b) -> TTerm env (LFun a b)
   LIt :: (LT a, LT b) => TTerm env (LFun b (a, b)) -> TTerm env (LFun b a)
 
--- | Utility function for creating lambda expressions
-lambda :: LT a => TTerm (a ': env) t -> TTerm env (a -> t)
-lambda = Lambda inferType
-
 -- | Substitute variable with De Bruijn index zero in a 'TTerm'
 substTt :: TTerm env u -> TTerm (u ': env) t -> TTerm env t
 substTt v = substTt' Z v (Weaken $ \case Z -> error "substTt: replaced variable should've been replaced"
@@ -145,7 +141,7 @@ substTt' :: Idx env u -> TTerm env' u -> env :> env' -> TTerm env t -> TTerm env
 substTt' i v w (Var i')
   | Just Refl <- geq i i' = v
   | otherwise = Var (w >:> i')
-substTt' i v w (Lambda ty e) = Lambda ty (substTt' (S i) (sinkTt (wSucc wId) v) (wSink w) e)
+substTt' i v w (Lambda e) = Lambda (substTt' (S i) (sinkTt (wSucc wId) v) (wSink w) e)
 substTt' i v w (App f a) = App (substTt' i v w f) (substTt' i v w a)
 substTt' _ _ _ Unit = Unit
 substTt' i v w (Pair a b) = Pair (substTt' i v w a) (substTt' i v w b)
@@ -197,7 +193,7 @@ evalTt = evalTt' VZ
 evalTt' :: Val env -> TTerm env t -> t
 -- Source language extension
 evalTt' env (Var i) = valProject env i
-evalTt' env (Lambda _ e) = \v -> evalTt' (VS v env) e
+evalTt' env (Lambda e) = \v -> evalTt' (VS v env) e
 evalTt' env (App f a) = evalTt' env f (evalTt' env a)
 evalTt' _   Unit = ()
 evalTt' env (Pair a b) = (evalTt' env a, evalTt' env b)
@@ -261,7 +257,7 @@ evalTt' env (LIt t) = lIt (evalTt' env t)
 
 sinkTt :: env :> env' -> TTerm env t -> TTerm env' t
 sinkTt w (Var i) = Var (w >:> i)
-sinkTt w (Lambda ty e) = Lambda ty (sinkTt (wSink w) e)
+sinkTt w (Lambda e) = Lambda (sinkTt (wSink w) e)
 sinkTt w (App e1 e2) = App (sinkTt w e1) (sinkTt w e2)
 sinkTt _ Unit = Unit
 sinkTt w (Pair a b) = Pair (sinkTt w a) (sinkTt w b)
@@ -312,7 +308,7 @@ sinkTt w (LIt s) = LIt (sinkTt w s)
 printTt :: Int -> TTerm env t -> ShowS
 -- Source language extension
 printTt _ (Var i) = shows i
-printTt d (Lambda ty e) = showParen (d > 0) $ showString "λ(" . shows ty . showString ")." . printTt 0 e
+printTt d (Lambda e) = showParen (d > 0) $ showString "λ. " . printTt 0 e
 printTt d (App f a) = showParen (d > 10) $ printTt 10 f . showString " " . printTt 11 a
 printTt _ Unit = showString "()"
 printTt _ (Pair a b) = showString "(" . printTt 0 a . showString ", " . printTt 0 b . showString ")"
@@ -404,7 +400,7 @@ usesOf' :: (Num s, Monoid s) => Idx env t -> TTerm env a -> Layout s
 usesOf' i (Var i')
   | Just Refl <- geq i i' = LyLeaf 1
   | otherwise = mempty
-usesOf' i (Lambda _ e) = usesOf' (S i) e
+usesOf' i (Lambda e) = usesOf' (S i) e
 usesOf' i (App f a) = usesOf' i f <> usesOf' i a
 usesOf' _ Unit = mempty
 usesOf' i (Pair a b) = usesOf' i a <> usesOf' i b
