@@ -324,7 +324,7 @@ sinkTt _ (Error s)        = Error s
 -- - linear composition (;;) is 1
 printTt :: Int -> TTerm env t -> ShowS
 -- Source language extension
-printTt _ (Var i) = shows i
+printTt d (Var i) = showsPrec d i
 printTt d (Lambda e) = showParen (d > 0) $ showString "λ. " . printTt 0 e
 printTt d (App f a) =
   showParen (d > 10) $ printTt 10 f . showString " " . printTt 11 a
