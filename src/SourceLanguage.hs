@@ -55,8 +55,7 @@ data STerm a b where
   -- codomain are equal to the original types. This means in essence that 'a'
   -- nor 'b' contain function types.
   Op
-    :: (a ~ Df1 a, b ~ Df1 b, a ~ Dr1 a, b ~ Dr1 b,
-        LT2 b)
+    :: (a ~ Df1 a, b ~ Df1 b, a ~ Dr1 a, b ~ Dr1 b)
     => Operation a b
     -> STerm a b
   -- | Map

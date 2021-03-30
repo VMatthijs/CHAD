@@ -1,6 +1,7 @@
-{-# LANGUAGE DataKinds    #-}
-{-# LANGUAGE GADTs        #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs            #-}
+{-# LANGUAGE TypeFamilies     #-}
 
 -- | Definition of the different supported operators
 module Operation where
@@ -9,14 +10,14 @@ import           Data.Vector.Unboxed.Sized (sum, zipWith)
 import           GHC.TypeNats              (KnownNat)
 import           Prelude                   hiding (sum, zipWith)
 
-import           Types                     (LFun, LT, Scal, Vect, lAdd, lComp,
-                                            lDup, lExpand, lId, lMapTuple,
-                                            lNegate, lPair, lProd, lSubt, lSum,
-                                            lZipWith, zero)
+import           Types                     (LFun, LT, LT2, Scal, Vect, lAdd,
+                                            lComp, lDup, lExpand, lId,
+                                            lMapTuple, lNegate, lPair, lProd,
+                                            lSubt, lSum, lZipWith, zero)
 
 -- | Possible operators in the source language
 data Operation a b where
-  Constant :: (Show b, LT b) => b -> Operation () b
+  Constant :: (Show b, LT b, LT2 b) => b -> Operation () b
   EAdd :: KnownNat n => Operation (Vect n, Vect n) (Vect n)
   EProd :: KnownNat n => Operation (Vect n, Vect n) (Vect n)
   EScalAdd :: Operation (Scal, Scal) Scal
