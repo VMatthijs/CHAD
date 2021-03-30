@@ -11,8 +11,8 @@ import Data.Type.Equality ((:~:)(Refl))
 
 -- | Typed De Bruijn index
 data Idx env t where
-    Z :: Idx (t ': env) t
-    S :: Idx env t -> Idx (s ': env) t
+  Z :: Idx (t ': env) t
+  S :: Idx env t -> Idx (s ': env) t
 
 -- | Forget type information from a De Bruijn index and realise it as an integer
 idxToInt :: Idx env t -> Int
@@ -20,14 +20,14 @@ idxToInt Z = 0
 idxToInt (S i) = succ (idxToInt i)
 
 instance Show (Idx env t) where
-    showsPrec d idx = showParen (d > 10) $ showString ("Idx " ++ show (idxToInt idx))
+  showsPrec d idx = showParen (d > 10) $ showString ("Idx " ++ show (idxToInt idx))
 
 instance GEq (Idx env) where
-    geq Z Z = Just Refl
-    geq (S i) (S i')
-      | Just Refl <- geq i i'
-      = Just Refl
-    geq _ _ = Nothing
+  geq Z Z = Just Refl
+  geq (S i) (S i')
+    | Just Refl <- geq i i'
+    = Just Refl
+  geq _ _ = Nothing
 
 -- | Valuation; the environment in an interpreter
 data Val env where

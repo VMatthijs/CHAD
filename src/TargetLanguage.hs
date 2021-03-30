@@ -89,9 +89,7 @@ data TTerm env t
   Plus :: LT a => TTerm env a -> TTerm env a -> TTerm env a
   -- Swap
   LSwap
-    :: (LT c, LT d)
-    => TTerm env (b -> LFun c d)
-    -> TTerm env (LFun c (b -> d))
+    :: (LT c, LT d) => TTerm env (b -> LFun c d) -> TTerm env (LFun c (b -> d))
   -- | Copower-elimination
   LCopowFold
     :: (LT c, LT d)

@@ -67,7 +67,7 @@ d2 SL.Ev =
    in TL.Lambda $ TL.LPair (TL.Singleton y) z
 d2 (SL.Curry t) =
   let d2tTt = TL.App (d2 t) (TL.Pair (TL.Var (S Z)) (TL.Var Z))
-      cur = TL.LCopowFold $ TL.Lambda $ d2tTt
+      cur = TL.LCopowFold $ TL.Lambda d2tTt
    in TL.Lambda $ TL.LComp cur TL.LFst
 d2 SL.Inl =
   TL.Lambda $

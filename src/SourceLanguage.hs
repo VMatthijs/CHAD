@@ -7,49 +7,28 @@ module SourceLanguage where
 
 import           Data.Vector.Unboxed.Sized as V (Unbox, foldr, map)
 
-import           GHC.TypeNats              (KnownNat)
 import           Control.Arrow             ((&&&))
+import           GHC.TypeNats              (KnownNat)
 import           Operation                 (Operation, evalOp)
-import           Types                     (Df1, Df2, Dr1, Dr2, Scal, Vect,
-                                            LT2, DZ)
+import           Types                     (DZ, Df1, Df2, Dr1, Dr2, LT2, Scal,
+                                            Vect)
 
 -- | Terms of the source language
 data STerm a b where
   -- | Identity function
-  Id
-    :: LT2 a
-    => STerm a a
+  Id :: LT2 a => STerm a a
   -- | Composition
   --   Read as: f; g
-  Comp
-    :: (LT2 a, LT2 b, LT2 c)
-    => STerm a b
-    -> STerm b c
-    -> STerm a c
+  Comp :: (LT2 a, LT2 b, LT2 c) => STerm a b -> STerm b c -> STerm a c
   -- Product tuples
-  Unit
-    :: (LT2 a)
-    => STerm a ()
-  Pair
-    :: (LT2 a, LT2 b, LT2 c)
-    => STerm a b
-    -> STerm a c
-    -> STerm a (b, c)
-  Fst
-    :: (LT2 a, LT2 b)
-    => STerm (a, b) a
-  Snd
-    :: (LT2 a, LT2 b)
-    => STerm (a, b) b
+  Unit :: (LT2 a) => STerm a ()
+  Pair :: (LT2 a, LT2 b, LT2 c) => STerm a b -> STerm a c -> STerm a (b, c)
+  Fst :: (LT2 a, LT2 b) => STerm (a, b) a
+  Snd :: (LT2 a, LT2 b) => STerm (a, b) b
   -- | Evaluation
-  Ev
-    :: (LT2 a, LT2 b)
-    => STerm (a -> b, a) b
+  Ev :: (LT2 a, LT2 b) => STerm (a -> b, a) b
   -- | Curry
-  Curry
-    :: (LT2 a, LT2 b, LT2 c)
-    => STerm (a, b) c
-    -> STerm a (b -> c)
+  Curry :: (LT2 a, LT2 b, LT2 c) => STerm (a, b) c -> STerm a (b -> c)
   -- | Operators
   -- For operators we also require that the primal images of the domain and
   -- codomain are equal to the original types. This means in essence that 'a'
@@ -61,30 +40,21 @@ data STerm a b where
   -- | Map
   Map :: KnownNat n => STerm (Scal -> Scal, Vect n) (Vect n)
   Foldr
-    :: (V.Unbox (Df1 a), V.Unbox (Df2 a), V.Unbox (Dr1 a), V.Unbox (Dr2 a),
-        KnownNat n,
-        LT2 a)
+    :: ( V.Unbox (Df1 a)
+       , V.Unbox (Df2 a)
+       , V.Unbox (Dr1 a)
+       , V.Unbox (Dr2 a)
+       , KnownNat n
+       , LT2 a
+       )
     => STerm (((Scal, a) -> a, a), Vect n) a
-  Inl
-    :: (LT2 a, LT2 b)
-    => STerm a (Either a b)
-  Inr
-    :: (LT2 a, LT2 b)
-    => STerm b (Either a b)
+  Inl :: (LT2 a, LT2 b) => STerm a (Either a b)
+  Inr :: (LT2 a, LT2 b) => STerm b (Either a b)
   CoPair
-    :: (LT2 a, LT2 b, LT2 c)
-    => STerm b a
-    -> STerm c a
-    -> STerm (Either b c) a
-  It
-    :: (LT2 a, LT2 b, LT2 c)
-    => STerm (a, b) (Either c b)
-    -> STerm (a, b) c
+    :: (LT2 a, LT2 b, LT2 c) => STerm b a -> STerm c a -> STerm (Either b c) a
+  It :: (LT2 a, LT2 b, LT2 c) => STerm (a, b) (Either c b) -> STerm (a, b) c
   Sign :: STerm Scal (Either () ())
-  Rec
-    :: (LT2 a, LT2 b, DZ (Dr2 b))
-    => STerm (a, b) b
-    -> STerm a b
+  Rec :: (LT2 a, LT2 b, DZ (Dr2 b)) => STerm (a, b) b -> STerm a b
 
 -- | Evaluate the source language
 evalSt :: STerm a b -> a -> b
@@ -98,7 +68,7 @@ evalSt Ev = uncurry ($)
 evalSt (Curry a) = curry $ evalSt a
 evalSt (Op op) = evalOp op
 evalSt Map = \(f, v) -> V.map f v
-evalSt Foldr = \((f, v), xs) -> V.foldr (\r a -> f (r, a)) v xs
+evalSt Foldr = \((f, v), xs) -> V.foldr (curry f) v xs
 evalSt (Rec t) = fix (evalSt t)
   where
     fix f a = f (a, fix f a)

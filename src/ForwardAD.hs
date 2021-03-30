@@ -36,7 +36,7 @@ d1 SL.Map =
 d1 SL.Foldr =
   TL.Lambda $
   TL.Foldr
-    (TL.Lambda $ TL.Fst $ TL.Fst (TL.Fst (TL.Var (S Z))) `TL.App` (TL.Var Z))
+    (TL.Lambda $ TL.Fst $ TL.Fst (TL.Fst (TL.Var (S Z))) `TL.App` TL.Var Z)
     (TL.Snd (TL.Fst (TL.Var Z)))
     (TL.Snd (TL.Var Z))
 d1 (SL.Rec t) = TL.Rec (d1 t)

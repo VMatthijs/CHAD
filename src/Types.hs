@@ -1,14 +1,12 @@
-{-# LANGUAGE ConstraintKinds        #-}
-{-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TypeApplications       #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE TypeOperators          #-}
-{-# LANGUAGE StandaloneDeriving     #-}
-{-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE ConstraintKinds         #-}
+{-# LANGUAGE DataKinds               #-}
+{-# LANGUAGE FlexibleContexts        #-}
+{-# LANGUAGE FlexibleInstances       #-}
+{-# LANGUAGE GADTs                   #-}
+{-# LANGUAGE ScopedTypeVariables     #-}
+{-# LANGUAGE TypeFamilyDependencies  #-}
+{-# LANGUAGE TypeOperators           #-}
+{-# LANGUAGE UndecidableInstances    #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 
@@ -84,10 +82,9 @@ newtype LFun a b =
 
 -- | Linear coproduct
 newtype LEither a b =
-  MkLEither (Maybe (Either a b)) 
+  MkLEither (Maybe (Either a b))
 
 -- Methods for copowers
-
 singleton :: LT b => a -> LFun b (Copower a b)
 singleton t = MkLFun $ \x -> MkCopow [(t, x)]
 
@@ -136,7 +133,7 @@ lZip :: Vect n -> LFun (Vect n) (Copower Scal Scal)
 lZip x = MkLFun $ \y -> MkCopow $ V.toList $ V.zip x y
 
 -- | Linear unit
-lUnit :: LT a => LFun a () 
+lUnit :: LT a => LFun a ()
 lUnit = MkLFun (const ())
 
 -- | Pair two functions
@@ -144,7 +141,11 @@ lPair :: (LT a, LT b, LT c) => LFun a b -> LFun a c -> LFun a (b, c)
 lPair a b = MkLFun $ \x -> (lApp a x, lApp b x)
 
 -- | Map a tuple
-lMapTuple :: (LT a, LT b, LT a', LT b') => LFun a a' -> LFun b b' -> LFun (a, b) (a', b')
+lMapTuple ::
+     (LT a, LT b, LT a', LT b')
+  => LFun a a'
+  -> LFun b b'
+  -> LFun (a, b) (a', b')
 lMapTuple f g = MkLFun $ \(a, b) -> (lApp f a, lApp g b)
 
 -- | Addition is linear
@@ -177,7 +178,8 @@ lSwap t = MkLFun $ \x y -> lApp (t y) x
 lCopowFold :: (LT b, LT c) => (a -> LFun b c) -> LFun (Copower a b) c
 lCopowFold f = MkLFun g
   where
-    g (MkCopow abs') = foldr (\(a, b) acc -> (f a `lApp` b) `plus` acc) zero abs'
+    g (MkCopow abs') =
+      foldr (\(a, b) acc -> (f a `lApp` b) `plus` acc) zero abs'
 
 lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
 lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
@@ -310,7 +312,9 @@ type family Dr2 a where
 -- | "Linear types": types with the structure of a symmetric monoid under
 -- arithmetic addition. These types are used as tangent and adjoint types in
 -- automatic differentiation.
-class LTctx a => LT a where
+class LTctx a =>
+      LT a
+  where
   zero :: a
   plus :: a -> a -> a
 
@@ -329,41 +333,49 @@ class LTctx a => LT a where
 type family LTctx a :: Constraint
 
 type instance LTctx () = ()
+
 instance LT () where
   zero = ()
   plus _ _ = ()
 
 type instance LTctx (a, b) = (LT a, LT b)
+
 instance (LT a, LT b) => LT (a, b) where
   zero = (zero, zero)
   plus a b = (fst a `plus` fst b, snd a `plus` snd b)
 
 type instance LTctx Scal = ()
+
 instance LT Scal where
   zero = 0
   plus = (+)
 
 type instance LTctx (Vect n) = ()
+
 instance KnownNat n => LT (Vect n) where
   zero = V.replicate zero
   plus = V.zipWith plus
 
 type instance LTctx (a -> b) = LT b
+
 instance LT b => LT (a -> b) where
   zero = const zero
   plus f g = \x -> plus (f x) (g x)
 
 type instance LTctx (Copower a b) = LT b
+
 instance LT b => LT (Copower a b) where
   zero = MkCopow []
   plus (MkCopow x) (MkCopow y) = MkCopow (x ++ y)
 
 type instance LTctx (LFun a b) = LT b
+
 instance (LT a, LT b) => LT (LFun a b) where
   zero = MkLFun (const zero)
   plus = lPlus
 
 type instance LTctx (LEither a b) = (LT a, LT b)
+
 instance (LT a, LT b) => LT (LEither a b) where
   zero = MkLEither Nothing
   plus (MkLEither Nothing) b = b
@@ -378,7 +390,9 @@ instance (LT a, LT b) => LT (LEither a b) where
 -- type equals zero. This class requires that the type has a zero in the first
 -- place.
 -- This class is only used for reverse AD of recursion.
-class LT a => DZ a where
+class LT a =>
+      DZ a
+  where
   isZero :: a -> Bool
 
 instance DZ () where
