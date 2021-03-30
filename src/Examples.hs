@@ -19,7 +19,7 @@ fromList' = fromMaybe (error "Incorrect vector size") . V.fromList
 
 -- Constant
 constant ::
-     (LTall a, LTall b, Show b, b ~ Df1 b, b ~ Dr1 b) => b -> SL.STerm a b
+     (LT b, LT2 a, LT2 b, Show b, b ~ Df1 b, b ~ Dr1 b) => b -> SL.STerm a b
 constant c = SL.Comp SL.Unit (SL.Op (Constant c))
 
 -- c * x

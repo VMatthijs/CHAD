@@ -58,7 +58,7 @@ module Types
   , Dr2
   , LT(..)
   , DZ(..)
-  , LTall
+  , LT2
   ) where
 
 import           Data.Kind                 (Constraint)
@@ -98,7 +98,7 @@ lInl = MkLFun (MkLEither . Just . Left)
 lInr :: (LT a, LT b) => LFun b (LEither a b)
 lInr = MkLFun (MkLEither . Just . Right)
 
-lCoPair :: LT c => LFun a c -> LFun b c -> LFun (LEither a b) c
+lCoPair :: (LT a, LT b, LT c) => LFun a c -> LFun b c -> LFun (LEither a b) c
 lCoPair (MkLFun f) (MkLFun g) = MkLFun h
   where
     h (MkLEither Nothing)          = zero
@@ -115,17 +115,17 @@ lNegate = MkLFun (\x -> -x)
 lDup :: LT a => LFun a (a, a)
 lDup = MkLFun $ \a -> (a, a)
 
-lComp :: (LT b, LT c) => LFun a b -> LFun b c -> LFun a c
+lComp :: (LT a, LT b, LT c) => LFun a b -> LFun b c -> LFun a c
 lComp (MkLFun f) (MkLFun g) = MkLFun $ g . f
 
-lApp :: LT b => LFun a b -> a -> b
+lApp :: (LT a, LT b) => LFun a b -> a -> b
 lApp (MkLFun f) = f
 
 lEval :: LT b => a -> LFun (a -> b) b
 lEval x = MkLFun (\f -> f x)
 
 -- | Linear uncurry
-lUncurry :: LT c => (a -> LFun b c) -> LFun (a, b) c
+lUncurry :: (LT a, LT b, LT c) => (a -> LFun b c) -> LFun (a, b) c
 lUncurry f = MkLFun $ uncurry (lApp . f)
 
 -- | Linear zipWith
@@ -136,15 +136,15 @@ lZip :: Vect n -> LFun (Vect n) (Copower Scal Scal)
 lZip x = MkLFun $ \y -> MkCopow $ V.toList $ V.zip x y
 
 -- | Linear unit
-lUnit :: LFun a () 
+lUnit :: LT a => LFun a () 
 lUnit = MkLFun (const ())
 
 -- | Pair two functions
-lPair :: (LT b, LT c) => LFun a b -> LFun a c -> LFun a (b, c)
+lPair :: (LT a, LT b, LT c) => LFun a b -> LFun a c -> LFun a (b, c)
 lPair a b = MkLFun $ \x -> (lApp a x, lApp b x)
 
 -- | Map a tuple
-lMapTuple :: (LT a', LT b') => LFun a a' -> LFun b b' -> LFun (a, b) (a', b')
+lMapTuple :: (LT a, LT b, LT a', LT b') => LFun a a' -> LFun b b' -> LFun (a, b) (a', b')
 lMapTuple f g = MkLFun $ \(a, b) -> (lApp f a, lApp g b)
 
 -- | Addition is linear
@@ -165,21 +165,21 @@ lSum = MkLFun V.sum
 lExpand :: KnownNat n => LFun Scal (Vect n)
 lExpand = MkLFun V.replicate
 
-lFst :: LT a => LFun (a, b) a
+lFst :: (LT a, LT b) => LFun (a, b) a
 lFst = MkLFun fst
 
-lSnd :: LT b => LFun (a, b) b
+lSnd :: (LT a, LT b) => LFun (a, b) b
 lSnd = MkLFun snd
 
-lSwap :: LT c => (a -> LFun b c) -> LFun b (a -> c)
+lSwap :: (LT b, LT c) => (a -> LFun b c) -> LFun b (a -> c)
 lSwap t = MkLFun $ \x y -> lApp (t y) x
 
-lCopowFold :: LT c => (a -> LFun b c) -> LFun (Copower a b) c
+lCopowFold :: (LT b, LT c) => (a -> LFun b c) -> LFun (Copower a b) c
 lCopowFold f = MkLFun g
   where
     g (MkCopow abs') = foldr (\(a, b) acc -> (f a `lApp` b) `plus` acc) zero abs'
 
-lPlus :: LT b => LFun a b -> LFun a b -> LFun a b
+lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
 lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
 
 lMap :: KnownNat n => Vect n -> LFun (Scal -> Scal) (Vect n)
@@ -215,7 +215,7 @@ dtFoldr f i v =
         , V.map (fst . uncurry (lApp . snd . f)) vssvs)
 
 dIt ::
-     (LT d2b, LT d2c)
+     (LT d2a, LT d2b, LT d2c)
   => ((d1a, d1b) -> Either d1c d1b)
   -> ((d1a, d1b) -> LFun (d2a, d2b) (LEither d2c d2b))
   -> ((d1a, d1b) -> LFun (d2a, d2b) d2c)
@@ -260,7 +260,7 @@ scanIt f (c, a) =
       let as = scanIt f (c, a')
        in a : as
 
-lRec :: LT b => LFun (a, b) b -> LFun a b
+lRec :: (LT a, LT b) => LFun (a, b) b -> LFun a b
 lRec (MkLFun g) = MkLFun $ lrec g
   where
     lrec f a = f (a, lrec f a)
@@ -268,7 +268,7 @@ lRec (MkLFun g) = MkLFun $ lrec g
 lIt :: (LT a, LT b, DZ b) => LFun b (a, b) -> LFun b a
 lIt f =
   MkLFun $ \b ->
-    if isZero b -- Note that this will be decidable in practice as b will not contain any function types (being a Dr2 type)!
+    if isZero b
       then zero
       else let (a, b') = f `lApp` b
             in plus a (lIt f `lApp` b')
@@ -359,7 +359,7 @@ instance LT b => LT (Copower a b) where
   plus (MkCopow x) (MkCopow y) = MkCopow (x ++ y)
 
 type instance LTctx (LFun a b) = LT b
-instance LT b => LT (LFun a b) where
+instance (LT a, LT b) => LT (LFun a b) where
   zero = MkLFun (const zero)
   plus = lPlus
 
@@ -401,6 +401,5 @@ instance (DZ a, DZ b) => DZ (LEither a b) where
   isZero (MkLEither (Just (Left a)))  = isZero a
   isZero (MkLEither (Just (Right b))) = isZero b
 
--- | Convenience constraint set that requires 'LT' on the type itself and all
--- its mapped types under the AD maps.
-type LTall a = (LT a, LT (Df1 a), LT (Df2 a), LT (Dr1 a), LT (Dr2 a))
+-- | Convenience constraint set that requires 'LT' on the types of (co)tangents
+type LT2 a = (LT (Df2 a), LT (Dr2 a))

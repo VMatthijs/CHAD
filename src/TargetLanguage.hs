@@ -58,18 +58,18 @@ data TTerm env t
   -- Linear functions
   LId :: LT a => TTerm env (LFun a a)
   LComp
-    :: (LT b, LT c)
+    :: (LT a, LT b, LT c)
     => TTerm env (LFun a b)
     -> TTerm env (LFun b c)
     -> TTerm env (LFun a c)
-  LApp :: LT b => TTerm env (LFun a b) -> TTerm env a -> TTerm env b
+  LApp :: (LT a, LT b) => TTerm env (LFun a b) -> TTerm env a -> TTerm env b
   LEval :: LT b => TTerm env a -> TTerm env (LFun (a -> b) b)
   -- Tuples
-  LUnit :: TTerm env (LFun a ())
-  LFst :: LT a => TTerm env (LFun (a, b) a)
-  LSnd :: LT b => TTerm env (LFun (a, b) b)
+  LUnit :: LT a => TTerm env (LFun a ())
+  LFst :: (LT a, LT b) => TTerm env (LFun (a, b) a)
+  LSnd :: (LT a, LT b) => TTerm env (LFun (a, b) b)
   LPair
-    :: (LT b, LT c)
+    :: (LT a, LT b, LT c)
     => TTerm env (LFun a b)
     -> TTerm env (LFun a c)
     -> TTerm env (LFun a (b, c))
@@ -77,7 +77,7 @@ data TTerm env t
   LInl :: (LT a, LT b) => TTerm env (LFun a (LEither a b))
   LInr :: (LT a, LT b) => TTerm env (LFun b (LEither a b))
   LCoPair
-    :: LT c
+    :: (LT a, LT b, LT c)
     => TTerm env (LFun a c)
     -> TTerm env (LFun b c)
     -> TTerm env (LFun (LEither a b) c)
@@ -89,12 +89,12 @@ data TTerm env t
   Plus :: LT a => TTerm env a -> TTerm env a -> TTerm env a
   -- Swap
   LSwap
-    :: LT d
+    :: (LT c, LT d)
     => TTerm env (b -> LFun c d)
     -> TTerm env (LFun c (b -> d))
   -- | Copower-elimination
   LCopowFold
-    :: LT d
+    :: (LT c, LT d)
     => TTerm env (b -> LFun c d)
     -> TTerm env (LFun (Copower b c) d)
   -- Map derivatives
@@ -121,7 +121,7 @@ data TTerm env t
     -> TTerm env (Vect n)
     -> TTerm env (LFun b ((Copower (Scal, a) b, b), Vect n))
   DIt
-    :: (LT d2b, LT d2c)
+    :: (LT d2a, LT d2b, LT d2c)
     => TTerm env ((d1a, d1b) -> Either d1c d1b)
     -> TTerm env ((d1a, d1b) -> LFun (d2a, d2b) (LEither d2c d2b))
     -> TTerm env ((d1a, d1b) -> LFun (d2a, d2b) d2c)
@@ -130,7 +130,7 @@ data TTerm env t
     => TTerm env ((d1a, d1b) -> Either d1c d1b)
     -> TTerm env ((d1a, d1b) -> LFun (LEither d2c d2b) (d2a, d2b))
     -> TTerm env ((d1a, d1b) -> LFun d2c (d2a, d2b))
-  LRec :: LT b => TTerm env (LFun (a, b) b) -> TTerm env (LFun a b)
+  LRec :: (LT a, LT b) => TTerm env (LFun (a, b) b) -> TTerm env (LFun a b)
   LIt :: (LT a, DZ b) => TTerm env (LFun b (a, b)) -> TTerm env (LFun b a)
   Error :: String -> TTerm env a
 

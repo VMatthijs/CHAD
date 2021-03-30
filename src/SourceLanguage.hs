@@ -11,50 +11,43 @@ import           GHC.TypeNats              (KnownNat)
 import           Control.Arrow             ((&&&))
 import           Operation                 (Operation, evalOp)
 import           Types                     (Df1, Df2, Dr1, Dr2, Scal, Vect,
-                                            LT, DZ)
+                                            LT2, DZ)
 
 -- | Terms of the source language
 data STerm a b where
   -- | Identity function
   Id
-    :: (LT (Df2 a),
-        LT (Dr2 a))
+    :: LT2 a
     => STerm a a
   -- | Composition
   --   Read as: f; g
   Comp
-    :: (LT (Dr2 a), LT (Dr2 b),
-        LT (Df2 b), LT (Df2 c))
+    :: (LT2 a, LT2 b, LT2 c)
     => STerm a b
     -> STerm b c
     -> STerm a c
   -- Product tuples
   Unit
-    :: (LT (Dr2 a))
+    :: (LT2 a)
     => STerm a ()
   Pair
-    :: (LT (Df2 b), LT (Df2 c),
-        LT (Dr2 a), LT (Dr2 b), LT (Dr2 c))
+    :: (LT2 a, LT2 b, LT2 c)
     => STerm a b
     -> STerm a c
     -> STerm a (b, c)
   Fst
-    :: (LT (Df2 a),
-        LT (Dr2 a), LT (Dr2 b))
+    :: (LT2 a, LT2 b)
     => STerm (a, b) a
   Snd
-    :: (LT (Df2 b),
-        LT (Dr2 a), LT (Dr2 b))
+    :: (LT2 a, LT2 b)
     => STerm (a, b) b
   -- | Evaluation
   Ev
-    :: (LT (Df2 a), LT (Df2 b),
-        LT (Dr2 a), LT (Dr2 b))
+    :: (LT2 a, LT2 b)
     => STerm (a -> b, a) b
   -- | Curry
   Curry
-    :: (LT (Df2 a), LT (Df2 b), LT (Df2 c),
-        LT (Dr2 b), LT (Dr2 a))
+    :: (LT2 a, LT2 b, LT2 c)
     => STerm (a, b) c
     -> STerm a (b -> c)
   -- | Operators
@@ -63,7 +56,7 @@ data STerm a b where
   -- nor 'b' contain function types.
   Op
     :: (a ~ Df1 a, b ~ Df1 b, a ~ Dr1 a, b ~ Dr1 b,
-        LT (Df2 b))
+        LT2 b)
     => Operation a b
     -> STerm a b
   -- | Map
@@ -71,32 +64,26 @@ data STerm a b where
   Foldr
     :: (V.Unbox (Df1 a), V.Unbox (Df2 a), V.Unbox (Dr1 a), V.Unbox (Dr2 a),
         KnownNat n,
-        LT (Df2 a),
-        LT (Dr2 a))
+        LT2 a)
     => STerm (((Scal, a) -> a, a), Vect n) a
   Inl
-    :: (LT (Df2 a), LT (Df2 b),
-        LT (Dr2 a))
+    :: (LT2 a, LT2 b)
     => STerm a (Either a b)
   Inr
-    :: (LT (Df2 a), LT (Df2 b),
-        LT (Dr2 b))
+    :: (LT2 a, LT2 b)
     => STerm b (Either a b)
   CoPair
-    :: (LT (Df2 a),
-        LT (Dr2 b), LT (Dr2 c))
+    :: (LT2 a, LT2 b, LT2 c)
     => STerm b a
     -> STerm c a
     -> STerm (Either b c) a
   It
-    :: (LT (Df2 b), LT (Df2 c),
-        LT (Dr2 a), LT (Dr2 b), LT (Dr2 c))
+    :: (LT2 a, LT2 b, LT2 c)
     => STerm (a, b) (Either c b)
     -> STerm (a, b) c
   Sign :: STerm Scal (Either () ())
   Rec
-    :: (LT (Df2 b),
-        LT (Dr2 a), DZ (Dr2 b))
+    :: (LT2 a, LT2 b, DZ (Dr2 b))
     => STerm (a, b) b
     -> STerm a b
 

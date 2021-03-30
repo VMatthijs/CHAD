@@ -46,7 +46,7 @@ evalOp Sum          = sum
 -- | D op and D op^t of the Operators in the source language
 data LinearOperation a b c where
   DConstant :: LT b => LinearOperation () () b
-  DConstantT :: LinearOperation () b ()
+  DConstantT :: LT b => LinearOperation () b ()
   DEAdd
     :: KnownNat n => LinearOperation (Vect n, Vect n) (Vect n, Vect n) (Vect n)
   DEAddT

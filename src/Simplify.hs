@@ -106,7 +106,7 @@ simplifyCase x f g       = Case x (simplifyTTerm f) (simplifyTTerm g)
 
 -- | Simplify the LComp TTerm
 simplifyLComp ::
-     (LT b, LT c)
+     (LT a, LT b, LT c)
   => TTerm env (LFun a b)
   -> TTerm env (LFun b c)
   -> TTerm env (LFun a c)
@@ -130,7 +130,7 @@ simplifyLComp f g                          = LComp f g
 
 -- | Simplify the LApp TTerm
 simplifyLApp ::
-     LT b => TTerm env (LFun a b) -> TTerm env a -> TTerm env b
+     (LT a, LT b) => TTerm env (LFun a b) -> TTerm env a -> TTerm env b
 simplifyLApp LId a = a
 simplifyLApp f a   = LApp f a
 
