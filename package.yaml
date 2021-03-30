@@ -32,6 +32,6 @@ tests:
   ad-test:
     main: test/Main.hs
     dependencies:
-    - ad-on-higher-order-functions
+    - CHAD
     ghc-options:
     - -O2 -threaded -rtsopts "-with-rtsopts=-qg -N6 -A10M"
