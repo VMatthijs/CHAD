@@ -54,7 +54,7 @@ data TTerm env t
     -> TTerm env a
   -- Target language extension
   -- | Linear operation
-  LOp :: LinearOperation a b c -> TTerm env (a -> LFun b c)
+  LOp :: (LT b, LT c) => LinearOperation a b c -> TTerm env (a -> LFun b c)
   -- Linear functions
   LId :: LT a => TTerm env (LFun a a)
   LComp
