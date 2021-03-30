@@ -82,7 +82,8 @@ foldProd2 =
     v = fromList' [1, 2, 3]
 
 realCase ::
-     (LTall a, LTall b)
+     (LT (Df2 a), LT (Df2 b),
+      LT (Dr2 a), LT (Dr2 b))
   => SL.STerm a (Either () ())
   -> SL.STerm a b
   -> SL.STerm a b

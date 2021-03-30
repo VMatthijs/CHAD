@@ -11,39 +11,50 @@ import           GHC.TypeNats              (KnownNat)
 import           Control.Arrow             ((&&&))
 import           Operation                 (Operation, evalOp)
 import           Types                     (Df1, Df2, Dr1, Dr2, Scal, Vect,
-                                            LTall, DZ)
+                                            LT, DZ)
 
 -- | Terms of the source language
 data STerm a b where
   -- | Identity function
-  Id :: LTall a => STerm a a
+  Id
+    :: (LT (Df2 a),
+        LT (Dr2 a))
+    => STerm a a
   -- | Composition
   --   Read as: f; g
   Comp
-    :: (LTall a, LTall b, LTall c)
+    :: (LT (Dr2 a), LT (Dr2 b),
+        LT (Df2 b), LT (Df2 c))
     => STerm a b
     -> STerm b c
     -> STerm a c
   -- Product tuples
-  Unit :: LTall a => STerm a ()
+  Unit
+    :: (LT (Dr2 a))
+    => STerm a ()
   Pair
-    :: (LTall a, LTall b, LTall c)
+    :: (LT (Df2 b), LT (Df2 c),
+        LT (Dr2 a), LT (Dr2 b), LT (Dr2 c))
     => STerm a b
     -> STerm a c
     -> STerm a (b, c)
   Fst
-    :: (LTall a, LTall b)
+    :: (LT (Df2 a),
+        LT (Dr2 a), LT (Dr2 b))
     => STerm (a, b) a
   Snd
-    :: (LTall a, LTall b)
+    :: (LT (Df2 b),
+        LT (Dr2 a), LT (Dr2 b))
     => STerm (a, b) b
   -- | Evaluation
   Ev
-    :: (LTall a, LTall b)
+    :: (LT (Df2 a), LT (Df2 b),
+        LT (Dr2 a), LT (Dr2 b))
     => STerm (a -> b, a) b
   -- | Curry
   Curry
-    :: (LTall a, LTall b, LTall c)
+    :: (LT (Df2 a), LT (Df2 b), LT (Df2 c),
+        LT (Dr2 b), LT (Dr2 a))
     => STerm (a, b) c
     -> STerm a (b -> c)
   -- | Operators
@@ -51,39 +62,41 @@ data STerm a b where
   -- codomain are equal to the original types. This means in essence that 'a'
   -- nor 'b' contain function types.
   Op
-    :: ( LTall a, LTall b
-       , a ~ Df1 a, b ~ Df1 b, a ~ Dr1 a, b ~ Dr1 b)
+    :: (a ~ Df1 a, b ~ Df1 b, a ~ Dr1 a, b ~ Dr1 b,
+        LT (Df2 b))
     => Operation a b
     -> STerm a b
   -- | Map
   Map :: KnownNat n => STerm (Scal -> Scal, Vect n) (Vect n)
   Foldr
-    :: ( LTall a
-       , V.Unbox (Df1 a)
-       , V.Unbox (Df2 a)
-       , V.Unbox (Dr1 a)
-       , V.Unbox (Dr2 a)
-       , KnownNat n
-       )
+    :: (V.Unbox (Df1 a), V.Unbox (Df2 a), V.Unbox (Dr1 a), V.Unbox (Dr2 a),
+        KnownNat n,
+        LT (Df2 a),
+        LT (Dr2 a))
     => STerm (((Scal, a) -> a, a), Vect n) a
   Inl
-    :: (LTall a, LTall b)
+    :: (LT (Df2 a), LT (Df2 b),
+        LT (Dr2 a))
     => STerm a (Either a b)
   Inr
-    :: (LTall a, LTall b)
+    :: (LT (Df2 a), LT (Df2 b),
+        LT (Dr2 b))
     => STerm b (Either a b)
   CoPair
-    :: (LTall a, LTall b, LTall c)
+    :: (LT (Df2 a),
+        LT (Dr2 b), LT (Dr2 c))
     => STerm b a
     -> STerm c a
     -> STerm (Either b c) a
   It
-    :: (LTall a, LTall b, LTall c)
+    :: (LT (Df2 b), LT (Df2 c),
+        LT (Dr2 a), LT (Dr2 b), LT (Dr2 c))
     => STerm (a, b) (Either c b)
     -> STerm (a, b) c
   Sign :: STerm Scal (Either () ())
   Rec
-    :: (LTall a, LTall b, DZ (Dr2 b))
+    :: (LT (Df2 b),
+        LT (Dr2 a), DZ (Dr2 b))
     => STerm (a, b) b
     -> STerm a b
 

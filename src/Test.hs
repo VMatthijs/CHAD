@@ -4,6 +4,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableSuperClasses #-}  -- for LT
 {-# OPTIONS -Wno-orphans #-}  -- for Arbitrary
 module Test where
 

@@ -27,17 +27,16 @@ data TTerm env t
   -- Terms from source language
       where
   Var :: Idx env a -> TTerm env a
-  Lambda :: LT a => TTerm (a ': env) b -> TTerm env (a -> b)
-  App :: (LT a, LT b) => TTerm env (a -> b) -> TTerm env a -> TTerm env b
+  Lambda :: TTerm (a ': env) b -> TTerm env (a -> b)
+  App :: TTerm env (a -> b) -> TTerm env a -> TTerm env b
   Unit :: TTerm env ()
   Pair :: TTerm env a -> TTerm env b -> TTerm env (a, b)
   Fst :: TTerm env (a, b) -> TTerm env a
   Snd :: TTerm env (a, b) -> TTerm env b
-  Inl :: (LT a, LT b) => TTerm env a -> TTerm env (Either a b)
-  Inr :: (LT a, LT b) => TTerm env b -> TTerm env (Either a b)
+  Inl :: TTerm env a -> TTerm env (Either a b)
+  Inr :: TTerm env b -> TTerm env (Either a b)
   Case
-    :: (LT a, LT b, LT c)
-    => TTerm env (Either a b)
+    :: TTerm env (Either a b)
     -> TTerm env (a -> c)
     -> TTerm env (b -> c)
     -> TTerm env c
@@ -48,54 +47,54 @@ data TTerm env t
   Op :: Operation a b -> TTerm env a -> TTerm env b
   Map :: TTerm env (Scal -> Scal) -> TTerm env (Vect n) -> TTerm env (Vect n)
   Foldr
-    :: (LT a, KnownNat n)
+    :: KnownNat n
     => TTerm env ((Scal, a) -> a)
     -> TTerm env a
     -> TTerm env (Vect n)
     -> TTerm env a
   -- Target language extension
   -- | Linear operation
-  LOp :: LT b => LinearOperation a b c -> TTerm env (a -> LFun b c)
+  LOp :: LinearOperation a b c -> TTerm env (a -> LFun b c)
   -- Linear functions
-  LId :: TTerm env (LFun a a)
+  LId :: LT a => TTerm env (LFun a a)
   LComp
-    :: (LT a, LT b, LT c)
+    :: (LT b, LT c)
     => TTerm env (LFun a b)
     -> TTerm env (LFun b c)
     -> TTerm env (LFun a c)
-  LApp :: (LT a, LT b) => TTerm env (LFun a b) -> TTerm env a -> TTerm env b
-  LEval :: TTerm env a -> TTerm env (LFun (a -> b) b)
+  LApp :: LT b => TTerm env (LFun a b) -> TTerm env a -> TTerm env b
+  LEval :: LT b => TTerm env a -> TTerm env (LFun (a -> b) b)
   -- Tuples
   LUnit :: TTerm env (LFun a ())
-  LFst :: TTerm env (LFun (a, b) a)
-  LSnd :: TTerm env (LFun (a, b) b)
+  LFst :: LT a => TTerm env (LFun (a, b) a)
+  LSnd :: LT b => TTerm env (LFun (a, b) b)
   LPair
-    :: (LT a, LT b, LT c)
+    :: (LT b, LT c)
     => TTerm env (LFun a b)
     -> TTerm env (LFun a c)
     -> TTerm env (LFun a (b, c))
   -- Variants
-  LInl :: TTerm env (LFun a (LEither a b))
-  LInr :: TTerm env (LFun b (LEither a b))
+  LInl :: (LT a, LT b) => TTerm env (LFun a (LEither a b))
+  LInr :: (LT a, LT b) => TTerm env (LFun b (LEither a b))
   LCoPair
     :: LT c
     => TTerm env (LFun a c)
     -> TTerm env (LFun b c)
     -> TTerm env (LFun (LEither a b) c)
   -- | Singleton
-  Singleton :: TTerm env b -> TTerm env (LFun c (Copower b c))
+  Singleton :: LT c => TTerm env b -> TTerm env (LFun c (Copower b c))
   -- Zero
   Zero :: LT a => TTerm env a
   -- Plus
   Plus :: LT a => TTerm env a -> TTerm env a -> TTerm env a
   -- Swap
   LSwap
-    :: (LT b, LT c, LT d)
+    :: LT d
     => TTerm env (b -> LFun c d)
     -> TTerm env (LFun c (b -> d))
   -- | Copower-elimination
   LCopowFold
-    :: (LT b, LT c, LT d)
+    :: LT d
     => TTerm env (b -> LFun c d)
     -> TTerm env (LFun (Copower b c) d)
   -- Map derivatives
@@ -122,7 +121,7 @@ data TTerm env t
     -> TTerm env (Vect n)
     -> TTerm env (LFun b ((Copower (Scal, a) b, b), Vect n))
   DIt
-    :: (LT d2a, LT d2b, LT d2c)
+    :: (LT d2b, LT d2c)
     => TTerm env ((d1a, d1b) -> Either d1c d1b)
     -> TTerm env ((d1a, d1b) -> LFun (d2a, d2b) (LEither d2c d2b))
     -> TTerm env ((d1a, d1b) -> LFun (d2a, d2b) d2c)
@@ -131,7 +130,7 @@ data TTerm env t
     => TTerm env ((d1a, d1b) -> Either d1c d1b)
     -> TTerm env ((d1a, d1b) -> LFun (LEither d2c d2b) (d2a, d2b))
     -> TTerm env ((d1a, d1b) -> LFun d2c (d2a, d2b))
-  LRec :: TTerm env (LFun (a, b) b) -> TTerm env (LFun a b)
+  LRec :: LT b => TTerm env (LFun (a, b) b) -> TTerm env (LFun a b)
   LIt :: (LT a, DZ b) => TTerm env (LFun b (a, b)) -> TTerm env (LFun b a)
   Error :: String -> TTerm env a
 

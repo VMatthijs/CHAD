@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 
 -- | Different type definitions used in the language
@@ -60,6 +61,7 @@ module Types
   , LTall
   ) where
 
+import           Data.Kind                 (Constraint)
 import qualified Data.Vector.Unboxed.Sized as V (Unbox, Vector, foldr, init,
                                                  last, map, prescanr, replicate,
                                                  scanl, sum, toList, zip,
@@ -86,14 +88,14 @@ newtype LEither a b =
 
 -- Methods for copowers
 
-singleton :: a -> LFun b (Copower a b)
+singleton :: LT b => a -> LFun b (Copower a b)
 singleton t = MkLFun $ \x -> MkCopow [(t, x)]
 
 -- Methods for linear coproducts
-lInl :: LFun a (LEither a b)
+lInl :: (LT a, LT b) => LFun a (LEither a b)
 lInl = MkLFun (MkLEither . Just . Left)
 
-lInr :: LFun b (LEither a b)
+lInr :: (LT a, LT b) => LFun b (LEither a b)
 lInr = MkLFun (MkLEither . Just . Right)
 
 lCoPair :: LT c => LFun a c -> LFun b c -> LFun (LEither a b) c
@@ -104,26 +106,26 @@ lCoPair (MkLFun f) (MkLFun g) = MkLFun h
     h (MkLEither (Just (Right b))) = g b
 
 -- Methods for linear functions
-lId :: LFun a a
+lId :: LT a => LFun a a
 lId = MkLFun id
 
 lNegate :: LFun Scal Scal
 lNegate = MkLFun (\x -> -x)
 
-lDup :: LFun a (a, a)
+lDup :: LT a => LFun a (a, a)
 lDup = MkLFun $ \a -> (a, a)
 
-lComp :: LFun a b -> LFun b c -> LFun a c
+lComp :: (LT b, LT c) => LFun a b -> LFun b c -> LFun a c
 lComp (MkLFun f) (MkLFun g) = MkLFun $ g . f
 
-lApp :: LFun a b -> a -> b
+lApp :: LT b => LFun a b -> a -> b
 lApp (MkLFun f) = f
 
-lEval :: a -> LFun (a -> b) b
+lEval :: LT b => a -> LFun (a -> b) b
 lEval x = MkLFun (\f -> f x)
 
 -- | Linear uncurry
-lUncurry :: (LT a, LT b, LT c) => (a -> LFun b c) -> LFun (a, b) c
+lUncurry :: LT c => (a -> LFun b c) -> LFun (a, b) c
 lUncurry f = MkLFun $ uncurry (lApp . f)
 
 -- | Linear zipWith
@@ -138,15 +140,11 @@ lUnit :: LFun a ()
 lUnit = MkLFun (const ())
 
 -- | Pair two functions
-lPair :: (LT a, LT b, LT c) => LFun a b -> LFun a c -> LFun a (b, c)
+lPair :: (LT b, LT c) => LFun a b -> LFun a c -> LFun a (b, c)
 lPair a b = MkLFun $ \x -> (lApp a x, lApp b x)
 
 -- | Map a tuple
-lMapTuple ::
-     (LT a, LT a', LT b, LT b')
-  => LFun a a'
-  -> LFun b b'
-  -> LFun (a, b) (a', b')
+lMapTuple :: (LT a', LT b') => LFun a a' -> LFun b b' -> LFun (a, b) (a', b')
 lMapTuple f g = MkLFun $ \(a, b) -> (lApp f a, lApp g b)
 
 -- | Addition is linear
@@ -158,30 +156,30 @@ lSubt :: LFun (Scal, Scal) Scal
 lSubt = MkLFun $ uncurry (-)
 
 -- | Multiplication linear in second argument
-lProd :: Num a => (a -> LFun a a)
+lProd :: (LT a, Num a) => a -> LFun a a
 lProd x = MkLFun $ \y -> x * y
 
 lSum :: LFun (Vect n) Scal
 lSum = MkLFun V.sum
 
 lExpand :: KnownNat n => LFun Scal (Vect n)
-lExpand = MkLFun $ \a -> V.replicate a
+lExpand = MkLFun V.replicate
 
-lFst :: LFun (a, b) a
+lFst :: LT a => LFun (a, b) a
 lFst = MkLFun fst
 
-lSnd :: LFun (a, b) b
+lSnd :: LT b => LFun (a, b) b
 lSnd = MkLFun snd
 
-lSwap :: (LT a, LT b, LT c) => (a -> LFun b c) -> LFun b (a -> c)
+lSwap :: LT c => (a -> LFun b c) -> LFun b (a -> c)
 lSwap t = MkLFun $ \x y -> lApp (t y) x
 
-lCopowFold :: (LT b, LT c) => (a -> LFun b c) -> LFun (Copower a b) c
-lCopowFold f = MkLFun $ g
+lCopowFold :: LT c => (a -> LFun b c) -> LFun (Copower a b) c
+lCopowFold f = MkLFun g
   where
     g (MkCopow abs') = foldr (\(a, b) acc -> (f a `lApp` b) `plus` acc) zero abs'
 
-lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
+lPlus :: LT b => LFun a b -> LFun a b -> LFun a b
 lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
 
 lMap :: KnownNat n => Vect n -> LFun (Scal -> Scal) (Vect n)
@@ -191,7 +189,7 @@ dFoldr ::
      (KnownNat n, V.Unbox a, V.Unbox b, LT b)
   => ((Scal, a) -> (a, LFun (Scal, b) b))
   -> a
-  -> (Vect n)
+  -> Vect n
   -> LFun (((Scal, a) -> b, b), Vect n) b
 dFoldr f i v =
   MkLFun $ \((f', i'), v') ->
@@ -205,7 +203,7 @@ dtFoldr ::
      (V.Unbox a, V.Unbox b, LT b)
   => ((Scal, a) -> (a, LFun b (Scal, b)))
   -> a
-  -> (Vect n)
+  -> Vect n
   -> LFun b ((Copower (Scal, a) b, b), Vect n)
 dtFoldr f i v =
   MkLFun $ \w ->
@@ -217,7 +215,7 @@ dtFoldr f i v =
         , V.map (fst . uncurry (lApp . snd . f)) vssvs)
 
 dIt ::
-     (LT d2a, LT d2b, LT d2c)
+     (LT d2b, LT d2c)
   => ((d1a, d1b) -> Either d1c d1b)
   -> ((d1a, d1b) -> LFun (d2a, d2b) (LEither d2c d2b))
   -> ((d1a, d1b) -> LFun (d2a, d2b) d2c)
@@ -262,12 +260,12 @@ scanIt f (c, a) =
       let as = scanIt f (c, a')
        in a : as
 
-lRec :: LFun (a, b) b -> LFun a b
+lRec :: LT b => LFun (a, b) b -> LFun a b
 lRec (MkLFun g) = MkLFun $ lrec g
   where
     lrec f a = f (a, lrec f a)
 
-lIt :: (LT a, DZ b) => LFun b (a, b) -> LFun b a
+lIt :: (LT a, LT b, DZ b) => LFun b (a, b) -> LFun b a
 lIt f =
   MkLFun $ \b ->
     if isZero b -- Note that this will be decidable in practice as b will not contain any function types (being a Dr2 type)!
@@ -309,45 +307,63 @@ type family Dr2 a where
   Dr2 (Either a b) = LEither (Dr2 a) (Dr2 b) -- TODO: better to work with Either (Dr2 a) (Dr2 b), but that requires dynamic types or explicit retainment of primals.
   Dr2 (a -> b) = Copower (Dr1 a) (Dr2 b)
 
--- | Operators defined over multiple language types
-class LT a where
-  zero :: a -- For automatic differentiation
-  plus :: a -> a -> a -- For automatic differentiation
+-- | "Linear types": types with the structure of a symmetric monoid under
+-- arithmetic addition. These types are used as tangent and adjoint types in
+-- automatic differentiation.
+class LTctx a => LT a where
+  zero :: a
+  plus :: a -> a -> a
 
+-- This type family is used to provide bidirectional typeclass inference. The
+-- trick is gleaned from:
+--   https://github.com/ghc-proposals/ghc-proposals/pull/284#issuecomment-542322728
+-- The idea is that normally, 'LT b' of course implies 'LT (a -> b)', but the
+-- inverse cannot be inferred because type class instances need not be
+-- injective. This type family explicitly requires the context 'LT b' on the
+-- instance for 'LT (a -> b)', and due to the rules for injectivity of type
+-- family, this is allowed.
+-- At the time of writing, this is used in exactly one place: the case for Zero
+-- in simplifyLComp in Simplify.hs.
+--
+-- The superclass constraint 'LTctx a =>' on 'LT' requires UndecidableSuperClasses.
+type family LTctx a :: Constraint
+
+type instance LTctx () = ()
 instance LT () where
   zero = ()
   plus _ _ = ()
 
+type instance LTctx (a, b) = (LT a, LT b)
 instance (LT a, LT b) => LT (a, b) where
   zero = (zero, zero)
   plus a b = (fst a `plus` fst b, snd a `plus` snd b)
 
-instance (LT a, LT b) => LT (Either a b) where
-  zero = error "This should never be used." -- This doesn't make sense.
-  plus (Left a) (Left a')   = Left (a `plus` a')
-  plus (Right a) (Right a') = Right (a `plus` a')
-  plus _ _                  = error "This should never be used." -- This doesn't make sense.
-
+type instance LTctx Scal = ()
 instance LT Scal where
   zero = 0
   plus = (+)
 
+type instance LTctx (Vect n) = ()
 instance KnownNat n => LT (Vect n) where
-  zero = V.replicate 0
-  plus = V.zipWith (+)
+  zero = V.replicate zero
+  plus = V.zipWith plus
 
-instance (LT a, LT b) => LT (a -> b) where
+type instance LTctx (a -> b) = LT b
+instance LT b => LT (a -> b) where
   zero = const zero
   plus f g = \x -> plus (f x) (g x)
 
-instance (LT a, LT b) => LT (Copower a b) where
+type instance LTctx (Copower a b) = LT b
+instance LT b => LT (Copower a b) where
   zero = MkCopow []
   plus (MkCopow x) (MkCopow y) = MkCopow (x ++ y)
 
-instance (LT a, LT b) => LT (LFun a b) where
-  zero = MkLFun zero
+type instance LTctx (LFun a b) = LT b
+instance LT b => LT (LFun a b) where
+  zero = MkLFun (const zero)
   plus = lPlus
 
+type instance LTctx (LEither a b) = (LT a, LT b)
 instance (LT a, LT b) => LT (LEither a b) where
   zero = MkLEither Nothing
   plus (MkLEither Nothing) b = b
@@ -359,10 +375,10 @@ instance (LT a, LT b) => LT (LEither a b) where
   plus _ _ = error "This should never be used." -- This doesn't make sense.
 
 -- | Decidable Zero: types for which it is decidable whether a value of that
--- type equals zero.
+-- type equals zero. This class requires that the type has a zero in the first
+-- place.
 -- This class is only used for reverse AD of recursion.
 class LT a => DZ a where
-  -- TODO: superclass constraint should be the class that has 'zero', not full 'LT'
   isZero :: a -> Bool
 
 instance DZ () where
@@ -377,7 +393,7 @@ instance DZ Scal where
 instance KnownNat n => DZ (Vect n) where
   isZero = (== zero)
 
-instance (DZ a, DZ b) => DZ (Copower a b) where
+instance DZ b => DZ (Copower a b) where
   isZero (MkCopow xs) = all isZero (map snd xs)
 
 instance (DZ a, DZ b) => DZ (LEither a b) where

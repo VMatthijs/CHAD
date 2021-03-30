@@ -81,7 +81,7 @@ showLOp DSum        = "DSum"
 showLOp DSumT       = "DSumT"
 
 -- | Evaluate the linear operators
-evalLOp :: LT b => LinearOperation a b c -> a -> LFun b c
+evalLOp :: LinearOperation a b c -> a -> LFun b c
 evalLOp DConstant () = zero
 evalLOp DConstantT () = zero
 evalLOp DEAdd (_x, _y) = lAdd

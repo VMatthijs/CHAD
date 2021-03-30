@@ -70,7 +70,7 @@ simplifyTTerm (Error s) = Error s
 -- | Simplify the App TTerm.
 -- We allow substituting Pair expressions where each element of the pair is
 -- individually only used once in the function body.
-simplifyApp :: (LT a, LT b) => TTerm env (a -> b) -> TTerm env a -> TTerm env b
+simplifyApp :: TTerm env (a -> b) -> TTerm env a -> TTerm env b
 simplifyApp (Lambda e) (Var j) = substTt (Var j) e
 simplifyApp (Lambda e) a
         -- Count the usages of the components of 'a' in the body, 'e'
@@ -96,8 +96,7 @@ simplifySnd (Pair _ s) = s
 simplifySnd p          = Snd p
 
 simplifyCase ::
-     (LT a, LT b, LT c)
-  => TTerm env (Either a b)
+     TTerm env (Either a b)
   -> TTerm env (a -> c)
   -> TTerm env (b -> c)
   -> TTerm env c
@@ -107,7 +106,7 @@ simplifyCase x f g       = Case x (simplifyTTerm f) (simplifyTTerm g)
 
 -- | Simplify the LComp TTerm
 simplifyLComp ::
-     (LT a, LT b, LT c)
+     (LT b, LT c)
   => TTerm env (LFun a b)
   -> TTerm env (LFun b c)
   -> TTerm env (LFun a c)
@@ -131,7 +130,7 @@ simplifyLComp f g                          = LComp f g
 
 -- | Simplify the LApp TTerm
 simplifyLApp ::
-     (LT a, LT b) => TTerm env (LFun a b) -> TTerm env a -> TTerm env b
+     LT b => TTerm env (LFun a b) -> TTerm env a -> TTerm env b
 simplifyLApp LId a = a
 simplifyLApp f a   = LApp f a
 
