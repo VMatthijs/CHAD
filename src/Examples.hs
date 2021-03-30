@@ -18,9 +18,8 @@ fromList' :: (KnownNat n, V.Unbox a) => [a] -> V.Vector n a
 fromList' = fromMaybe (error "Incorrect vector size") . V.fromList
 
 -- Constant
-constant :: (LTall a, LTall b, Show b, b ~ Df1 b, b ~ Dr1 b)
-         => b
-         -> SL.STerm a b
+constant ::
+     (LTall a, LTall b, Show b, b ~ Df1 b, b ~ Dr1 b) => b -> SL.STerm a b
 constant c = SL.Comp SL.Unit (SL.Op (Constant c))
 
 -- c * x
@@ -82,11 +81,12 @@ foldProd2 =
     v :: Vect 3
     v = fromList' [1, 2, 3]
 
-realCase :: (LTall a, LTall b)
-         => SL.STerm a (Either () ())
-         -> SL.STerm a b
-         -> SL.STerm a b
-         -> SL.STerm a b
+realCase ::
+     (LTall a, LTall b)
+  => SL.STerm a (Either () ())
+  -> SL.STerm a b
+  -> SL.STerm a b
+  -> SL.STerm a b
 realCase c l r =
   SL.Comp
     (SL.Pair
@@ -147,8 +147,7 @@ fact2 =
                 (SL.Pair
                    (SL.Fst `SL.Comp` SL.Snd)
                    (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt) `SL.Comp`
-                 SL.Ev)
-              `SL.Comp`
+                 SL.Ev) `SL.Comp`
               SL.Op EScalProd))))
     SL.Id `SL.Comp`
   SL.Ev
@@ -168,8 +167,7 @@ fact2Extra =
                 (SL.Pair
                    (SL.Fst `SL.Comp` SL.Snd)
                    (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt) `SL.Comp`
-                 SL.Ev)
-              `SL.Comp`
+                 SL.Ev) `SL.Comp`
               SL.Op EScalProd))))
     SL.Fst `SL.Comp`
   SL.Ev
@@ -190,14 +188,12 @@ tree =
                    (SL.Pair
                       (SL.Fst `SL.Comp` SL.Snd)
                       (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt) `SL.Comp`
-                    SL.Ev)
-                 `SL.Comp`
+                    SL.Ev) `SL.Comp`
                  SL.Op EScalProd)
                 (SL.Pair
                    (SL.Fst `SL.Comp` SL.Snd)
                    (SL.Pair SL.Snd (constant 0.5) `SL.Comp` SL.Op EScalProd) `SL.Comp`
-                 SL.Ev)
-              `SL.Comp`
+                 SL.Ev) `SL.Comp`
               SL.Op EScalProd))))
     SL.Id `SL.Comp`
   SL.Ev
@@ -218,14 +214,12 @@ treeExtra =
                    (SL.Pair
                       (SL.Fst `SL.Comp` SL.Snd)
                       (SL.Pair SL.Snd (constant 1) `SL.Comp` SL.Op EScalSubt) `SL.Comp`
-                    SL.Ev)
-                 `SL.Comp`
+                    SL.Ev) `SL.Comp`
                  SL.Op EScalProd)
                 (SL.Pair
                    (SL.Fst `SL.Comp` SL.Snd)
                    (SL.Pair SL.Snd (constant 0.5) `SL.Comp` SL.Op EScalProd) `SL.Comp`
-                 SL.Ev)
-              `SL.Comp`
+                 SL.Ev) `SL.Comp`
               SL.Op EScalProd))))
     SL.Fst `SL.Comp`
   SL.Ev

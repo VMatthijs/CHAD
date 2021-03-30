@@ -7,11 +7,11 @@ module Simplify
   ( simplifyTTerm
   ) where
 
-import           Data.Foldable (toList)
-import           Data.Monoid (Sum(..))
+import           Data.Foldable      (toList)
+import           Data.Monoid        (Sum (..))
 
-import           TargetLanguage (TTerm (..), substTt, usesOf',
-                                 Layout (..), truncateLayoutWithExpr)
+import           TargetLanguage     (Layout (..), TTerm (..), substTt,
+                                     truncateLayoutWithExpr, usesOf')
 import           TargetLanguage.Env
 import           Types
 
@@ -32,7 +32,8 @@ simplifyTTerm (Inr p) = Inr (simplifyTTerm p)
 simplifyTTerm (Case p f g) = simplifyCase p f g
 simplifyTTerm (Op op a) = Op op (simplifyTTerm a)
 simplifyTTerm (Map f a) = Map (simplifyTTerm f) (simplifyTTerm a)
-simplifyTTerm (Foldr f v xs) = Foldr (simplifyTTerm f) (simplifyTTerm v) (simplifyTTerm xs)
+simplifyTTerm (Foldr f v xs) =
+  Foldr (simplifyTTerm f) (simplifyTTerm v) (simplifyTTerm xs)
 simplifyTTerm (Rec t) = Rec (simplifyTTerm t)
 simplifyTTerm (It t) = It (simplifyTTerm t)
 simplifyTTerm (Sign t) = Sign (simplifyTTerm t)
@@ -56,12 +57,15 @@ simplifyTTerm (LCopowFold t) = LCopowFold (simplifyTTerm t)
 simplifyTTerm (LOp lop) = LOp lop
 simplifyTTerm (DMap f xs) = DMap (simplifyTTerm f) (simplifyTTerm xs)
 simplifyTTerm (DtMap f xs) = DtMap (simplifyTTerm f) (simplifyTTerm xs)
-simplifyTTerm (DFoldr f v xs) = DFoldr (simplifyTTerm f) (simplifyTTerm v) (simplifyTTerm xs)
-simplifyTTerm (DtFoldr f v xs) = DtFoldr (simplifyTTerm f) (simplifyTTerm v) (simplifyTTerm xs)
+simplifyTTerm (DFoldr f v xs) =
+  DFoldr (simplifyTTerm f) (simplifyTTerm v) (simplifyTTerm xs)
+simplifyTTerm (DtFoldr f v xs) =
+  DtFoldr (simplifyTTerm f) (simplifyTTerm v) (simplifyTTerm xs)
 simplifyTTerm (DIt d1t d2t) = DIt (simplifyTTerm d1t) (simplifyTTerm d2t)
 simplifyTTerm (DtIt d1t d2t) = DtIt (simplifyTTerm d1t) (simplifyTTerm d2t)
 simplifyTTerm (LRec t) = LRec (simplifyTTerm t)
 simplifyTTerm (LIt t) = LIt (simplifyTTerm t)
+simplifyTTerm (Error s) = Error s
 
 -- | Simplify the App TTerm.
 -- We allow substituting Pair expressions where each element of the pair is
@@ -69,13 +73,12 @@ simplifyTTerm (LIt t) = LIt (simplifyTTerm t)
 simplifyApp :: (LT a, LT b) => TTerm env (a -> b) -> TTerm env a -> TTerm env b
 simplifyApp (Lambda e) (Var j) = substTt (Var j) e
 simplifyApp (Lambda e) a
-  | let -- Count the usages of the components of 'a' in the body, 'e'
-        layout = usesOf' Z e
+        -- Count the usages of the components of 'a' in the body, 'e'
+  | let layout = usesOf' Z e
         -- Then truncate the resulting layout with the actual Pair structure of 'a'
         count = getSum <$> truncateLayoutWithExpr layout a :: Layout Integer
     -- Require that every component is used at most once
-  , all (<=1) (toList count)
-  = simplifyTTerm $ substTt a e
+  , all (<= 1) (toList count) = simplifyTTerm $ substTt a e
   | otherwise = App (Lambda e) a
 simplifyApp Zero _ = Zero
 simplifyApp f a = App f a
@@ -127,7 +130,8 @@ simplifyLComp _ Zero                       = Zero
 simplifyLComp f g                          = LComp f g
 
 -- | Simplify the LApp TTerm
-simplifyLApp :: (LT a, LT b) => TTerm env (LFun a b) -> TTerm env a -> TTerm env b
+simplifyLApp ::
+     (LT a, LT b) => TTerm env (LFun a b) -> TTerm env a -> TTerm env b
 simplifyLApp LId a = a
 simplifyLApp f a   = LApp f a
 
