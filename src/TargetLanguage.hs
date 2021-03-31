@@ -327,11 +327,9 @@ data PrintEnv =
 -- - linear composition (;;) is 1
 printTt :: Int -> PrintEnv -> TTerm env t -> ShowS
 -- Source language extension
-printTt d (PrintEnv _ stack) (Var i) =
+printTt _ (PrintEnv _ stack) (Var i) =
   case drop (idxToInt i) stack of
-    [] ->
-      showParen (d > 10) $
-      showString ("ctxtVar" ++ show (idxToInt i - length stack + 1))
+    []  -> showString ("ctxtVar" ++ show (idxToInt i - length stack + 1))
     x:_ -> showString x
 printTt d (PrintEnv depth stack) (Lambda e) =
   let name = 'x' : show (depth + 1)
