@@ -316,80 +316,97 @@ sinkTt w (LRec s)         = LRec (sinkTt w s)
 sinkTt w (LIt s)          = LIt (sinkTt w s)
 sinkTt _ (Error s)        = Error s
 
+data PrintEnv =
+  PrintEnv Int [String]
+
 -- | Pretty print the target language
 --
 -- Precedences used are as follows:
 -- - application is 10
 -- - plus is 6
 -- - linear composition (;;) is 1
-printTt :: Int -> TTerm env t -> ShowS
+printTt :: Int -> PrintEnv -> TTerm env t -> ShowS
 -- Source language extension
-printTt d (Var i) = showsPrec d i
-printTt d (Lambda e) = showParen (d > 0) $ showString "λ. " . printTt 0 e
-printTt d (App f a) =
-  showParen (d > 10) $ printTt 10 f . showString " " . printTt 11 a
-printTt _ Unit = showString "()"
-printTt _ (Pair a b) =
-  showString "(" . printTt 0 a . showString ", " . printTt 0 b . showString ")"
-printTt d (Fst p) = showFunction d "Fst" [Some p]
-printTt d (Snd p) = showFunction d "Snd" [Some p]
-printTt d (Inl p) = showFunction d "Inl" [Some p]
-printTt d (Inr p) = showFunction d "Inr" [Some p]
-printTt d (Case p l r) =
+printTt d (PrintEnv _ stack) (Var i) =
+  case drop (idxToInt i) stack of
+    [] ->
+      showParen (d > 10) $
+      showString ("Idx UP" ++ show (idxToInt i - length stack + 1))
+    x:_ -> showString x
+printTt d (PrintEnv depth stack) (Lambda e) =
+  let name = 'x' : show (depth + 1)
+   in showParen (d > 0) $
+      showString ("\\" ++ name ++ " -> ") .
+      printTt 0 (PrintEnv (depth + 1) (name : stack)) e
+printTt d env (App f a) =
+  showParen (d > 10) $ printTt 10 env f . showString " " . printTt 11 env a
+printTt _ _ Unit = showString "()"
+printTt _ env (Pair a b) =
+  showString "(" .
+  printTt 0 env a . showString ", " . printTt 0 env b . showString ")"
+printTt d env (Fst p) = showFunction d env "Fst" [Some p]
+printTt d env (Snd p) = showFunction d env "Snd" [Some p]
+printTt d env (Inl p) = showFunction d env "Inl" [Some p]
+printTt d env (Inr p) = showFunction d env "Inr" [Some p]
+printTt d env (Case p l r) =
   showParen (d > 0) $
   showString "Case " .
-  printTt 0 p .
+  printTt 0 env p .
   showString " in {" .
-  printTt 0 l . showString " } { " . printTt 0 r . showString "}"
-printTt d (Op op a) = showFunction d ("evalOp " ++ showOp op) [Some a]
-printTt d (Map f a) = showFunction d "map" [Some f, Some a]
-printTt d (Foldr f v xs) = showFunction d "foldr" [Some f, Some v, Some xs]
-printTt d (Rec t) = showFunction d "rec" [Some t]
-printTt d (It t) = showFunction d "it" [Some t]
-printTt d (Sign t) = showFunction d "sign" [Some t]
+  printTt 0 env l . showString " } { " . printTt 0 env r . showString "}"
+printTt d env (Op op a) = showFunction d env ("evalOp " ++ showOp op) [Some a]
+printTt d env (Map f a) = showFunction d env "map" [Some f, Some a]
+printTt d env (Foldr f v xs) =
+  showFunction d env "foldr" [Some f, Some v, Some xs]
+printTt d env (Rec t) = showFunction d env "rec" [Some t]
+printTt d env (It t) = showFunction d env "it" [Some t]
+printTt d env (Sign t) = showFunction d env "sign" [Some t]
 -- Target language extension
-printTt d (LOp lop) =
+printTt d _ (LOp lop) =
   showParen (d > 10) $ showString ("evalLOp " ++ showLOp lop)
-printTt _ LId = showString "lid"
-printTt d (LComp f g) =
-  showParen (d > 1) $ printTt 1 f . showString " ;; " . printTt 1 g
-printTt d (LEval e) = showFunction d "leval" [Some e]
-printTt d (LApp f a) =
-  showParen (d > 10) $ printTt 11 f . showString " " . printTt 11 a
-printTt _ LUnit = showString "lunit"
-printTt _ LFst = showString "lfst"
-printTt _ LSnd = showString "lsnd"
-printTt d (LPair a b) = showFunction d "lpair" [Some a, Some b]
-printTt _ LInl = showString "linl"
-printTt _ LInr = showString "linr"
-printTt d (LCoPair a b) = showFunction d "lcopair" [Some a, Some b]
-printTt _ (Singleton t) = showString "[(" . printTt 0 t . showString ", -)]"
-printTt _ Zero = showString "0F"
-printTt d (Plus f g) =
-  showParen (d > 6) $ printTt 6 f . showString " + " . printTt 6 g
-printTt d (LSwap t) = showFunction d "lswap" [Some t]
-printTt d (LCopowFold t) = showFunction d "lcopowfold" [Some t]
-printTt d (DMap f xs) = showFunction d "DMap" [Some f, Some xs]
-printTt d (DtMap f xs) = showFunction d "DtMap" [Some f, Some xs]
-printTt d (DFoldr f v xs) = showFunction d "DFoldr" [Some f, Some v, Some xs]
-printTt d (DtFoldr f v xs) = showFunction d "DtFoldr" [Some f, Some v, Some xs]
-printTt d (DIt d1t d2t) = showFunction d "DIt" [Some d1t, Some d2t]
-printTt d (DtIt d1t d2t) = showFunction d "DtIt" [Some d1t, Some d2t]
-printTt d (LRec t) = showFunction d "lrec" [Some t]
-printTt d (LIt t) = showFunction d "lit" [Some t]
-printTt d (Error s) = showParen (d > 10) $ showString ("error " ++ s)
+printTt _ _ LId = showString "lid"
+printTt d env (LComp f g) =
+  showParen (d > 1) $ printTt 1 env f . showString " ;; " . printTt 1 env g
+printTt d env (LEval e) = showFunction d env "leval" [Some e]
+printTt d env (LApp f a) =
+  showParen (d > 10) $ printTt 11 env f . showString " " . printTt 11 env a
+printTt _ _ LUnit = showString "lunit"
+printTt _ _ LFst = showString "lfst"
+printTt _ _ LSnd = showString "lsnd"
+printTt d env (LPair a b) = showFunction d env "lpair" [Some a, Some b]
+printTt _ _ LInl = showString "linl"
+printTt _ _ LInr = showString "linr"
+printTt d env (LCoPair a b) = showFunction d env "lcopair" [Some a, Some b]
+printTt _ env (Singleton t) =
+  showString "[(" . printTt 0 env t . showString ", -)]"
+printTt _ _ Zero = showString "0F"
+printTt d env (Plus f g) =
+  showParen (d > 6) $ printTt 6 env f . showString " + " . printTt 6 env g
+printTt d env (LSwap t) = showFunction d env "lswap" [Some t]
+printTt d env (LCopowFold t) = showFunction d env "lcopowfold" [Some t]
+printTt d env (DMap f xs) = showFunction d env "DMap" [Some f, Some xs]
+printTt d env (DtMap f xs) = showFunction d env "DtMap" [Some f, Some xs]
+printTt d env (DFoldr f v xs) =
+  showFunction d env "DFoldr" [Some f, Some v, Some xs]
+printTt d env (DtFoldr f v xs) =
+  showFunction d env "DtFoldr" [Some f, Some v, Some xs]
+printTt d env (DIt d1t d2t) = showFunction d env "DIt" [Some d1t, Some d2t]
+printTt d env (DtIt d1t d2t) = showFunction d env "DtIt" [Some d1t, Some d2t]
+printTt d env (LRec t) = showFunction d env "lrec" [Some t]
+printTt d env (LIt t) = showFunction d env "lit" [Some t]
+printTt d _ (Error s) = showParen (d > 10) $ showString ("error " ++ s)
 
 data SomeTTerm =
   forall env t. SomeTTerm (TTerm env t)
 
-showFunction :: Int -> String -> [Some (TTerm env)] -> ShowS
-showFunction d funcname args =
+showFunction :: Int -> PrintEnv -> String -> [Some (TTerm env)] -> ShowS
+showFunction d env funcname args =
   showParen (d > 10) $
   showString funcname .
-  foldr (\(Some t) -> (.) (showString " " . printTt 11 t)) id args
+  foldr (\(Some t) -> (.) (showString " " . printTt 11 env t)) id args
 
 instance Show (TTerm env a) where
-  showsPrec p = printTt p
+  showsPrec p = printTt p (PrintEnv 0 [])
 
 data Layout a
   = LyLeaf a
