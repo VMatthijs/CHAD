@@ -331,7 +331,7 @@ printTt d (PrintEnv _ stack) (Var i) =
   case drop (idxToInt i) stack of
     [] ->
       showParen (d > 10) $
-      showString ("Idx UP" ++ show (idxToInt i - length stack + 1))
+      showString ("ctxtVar" ++ show (idxToInt i - length stack + 1))
     x:_ -> showString x
 printTt d (PrintEnv depth stack) (Lambda e) =
   let name = 'x' : show (depth + 1)
