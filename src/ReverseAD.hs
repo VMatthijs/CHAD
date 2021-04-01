@@ -9,6 +9,7 @@ import qualified TargetLanguage     as TL
 import           TargetLanguage.Env (Idx (..))
 import           Types              (Dr1, Dr2, LFun)
 
+-- | Primal calculation (forward pass)
 d1 :: SL.STerm a b -> TL.TTerm env (Dr1 a -> Dr1 b)
 d1 SL.Id = TL.Lambda $ TL.Var Z
 d1 (SL.Comp f g) = TL.Lambda $ TL.App (d1 g) (TL.App (d1 f) (TL.Var Z))
@@ -47,6 +48,7 @@ d1 (SL.Rec t) = TL.Rec (d1 t)
 d1 (SL.It t) = TL.It (d1 t)
 d1 SL.Sign = TL.Lambda $ TL.Sign (TL.Var Z)
 
+-- | Cotangent (aka adjoint sensitivity) calculation (reverse pass)
 d2 :: SL.STerm a b -> TL.TTerm env (Dr1 a -> LFun (Dr2 b) (Dr2 a))
 d2 SL.Id = TL.Lambda TL.LId
 d2 (SL.Comp f g) =
