@@ -9,6 +9,7 @@ import qualified TargetLanguage     as TL
 import           TargetLanguage.Env (Idx (..))
 import           Types              (Df1, Df2, LFun)
 
+-- | Primal calculation (forward pass)
 d1 :: SL.STerm a b -> TL.TTerm env (Df1 a -> Df1 b)
 d1 SL.Id = TL.Lambda $ TL.Var Z
 d1 (SL.Comp f g) = TL.Lambda $ TL.App (d1 g) (TL.App (d1 f) (TL.Var Z))
@@ -43,6 +44,7 @@ d1 (SL.Rec t) = TL.Rec (d1 t)
 d1 (SL.It t) = TL.It (d1 t)
 d1 SL.Sign = TL.Lambda $ TL.Sign (TL.Var Z)
 
+-- | Tangent (aka sensitivity) calculation (forward pass)
 d2 :: SL.STerm a b -> TL.TTerm env (Df1 a -> LFun (Df2 a) (Df2 b))
 d2 SL.Id = TL.Lambda TL.LId
 d2 (SL.Comp f g) =
