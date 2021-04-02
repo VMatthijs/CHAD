@@ -47,21 +47,27 @@ mapQuadratic c = SL.Comp pair' SL.Map
     mapOp = SL.Curry $ SL.Comp SL.Snd (quadratic c)
     pair' = SL.Pair mapOp SL.Id
 
+-- x
 slid :: SL.STerm Scal Scal
 slid = SL.Id
 
+-- (x, x)
 pair :: SL.STerm Scal (Scal, Scal)
 pair = SL.Pair SL.Id SL.Id
 
+-- x + y
 add :: SL.STerm (Scal, Scal) Scal
 add = SL.Op EScalAdd
 
+-- x * y
 prod :: SL.STerm (Scal, Scal) Scal
 prod = SL.Op EScalProd
 
+-- (x + y, x + y)
 addCopy :: SL.STerm (Scal, Scal) (Scal, Scal)
 addCopy = SL.Comp add pair
 
+-- fold (*) 1 xs
 foldProd :: KnownNat n => SL.STerm (Vect n) Scal
 foldProd =
   SL.Comp
@@ -70,6 +76,7 @@ foldProd =
        SL.Id)
     SL.Foldr
 
+-- fold (*) v [1,2,3]
 foldProd2 :: SL.STerm Scal Scal
 foldProd2 =
   SL.Comp
@@ -81,6 +88,7 @@ foldProd2 =
     v :: Vect 3
     v = fromList' [1, 2, 3]
 
+-- case t of inl () -> s | inr () -> r
 realCase ::
      (LT (Df2 a), LT (Df2 b), LT (Dr2 a), LT (Dr2 b))
   => SL.STerm a (Either () ())
@@ -96,6 +104,7 @@ realCase c l r =
        SL.Id)
     SL.Ev
 
+-- factorial function, implemented using iteration
 fact :: SL.STerm Scal Scal
 fact =
   SL.Comp
@@ -114,7 +123,8 @@ fact =
                    (SL.Op EScalProd)))
              SL.Inr)))
 
-factExtra :: SL.STerm (Scal, Scal) Scal -- to test derivative of parameterized iteration w.r.t. parameter
+-- variant of factorial to test derivatives of parameterized iteration w.r.t. parameter
+factExtra :: SL.STerm (Scal, Scal) Scal
 factExtra =
   SL.Comp
     (SL.Pair SL.Unit SL.Id)
@@ -132,6 +142,7 @@ factExtra =
                    (SL.Op EScalProd)))
              SL.Inr)))
 
+-- factorial function implemented with recursion
 fact2 :: SL.STerm Scal Scal
 fact2 =
   SL.Pair
@@ -152,7 +163,8 @@ fact2 =
     SL.Id `SL.Comp`
   SL.Ev
 
-fact2Extra :: SL.STerm (Scal, Scal) Scal -- to test derivative of parameterized recursion w.r.t. parameter
+-- variant of recursive factorial function to test derivative of parameterized recursion w.r.t. parameter
+fact2Extra :: SL.STerm (Scal, Scal) Scal
 fact2Extra =
   SL.Pair
     (SL.Snd `SL.Comp`
@@ -172,6 +184,7 @@ fact2Extra =
     SL.Fst `SL.Comp`
   SL.Ev
 
+-- some recursive function that makes multiple recursive calls, leading to a tree structured form of recursion
 tree :: SL.STerm Scal Scal
 tree =
   SL.Pair
@@ -198,6 +211,7 @@ tree =
     SL.Id `SL.Comp`
   SL.Ev
 
+-- similar to tree, but to test the derivatives of parameterized recursion w.r.t. the parameter
 treeExtra :: SL.STerm (Scal, Scal) Scal
 treeExtra =
   SL.Pair
