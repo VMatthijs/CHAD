@@ -29,7 +29,7 @@ simplifyTTerm (Fst p) = simplifyFst (simplifyTTerm p)
 simplifyTTerm (Snd p) = simplifySnd (simplifyTTerm p)
 simplifyTTerm (Inl p) = Inl (simplifyTTerm p)
 simplifyTTerm (Inr p) = Inr (simplifyTTerm p)
-simplifyTTerm (Case p f g) = simplifyCase p f g
+simplifyTTerm (Case p f g) = simplifyCase (simplifyTTerm p) (simplifyTTerm f) (simplifyTTerm g)
 simplifyTTerm (Op op a) = Op op (simplifyTTerm a)
 simplifyTTerm (Map f a) = Map (simplifyTTerm f) (simplifyTTerm a)
 simplifyTTerm (Foldr f v xs) =
@@ -102,7 +102,7 @@ simplifyCase ::
   -> TTerm env c
 simplifyCase (Inl p) f _ = simplifyTTerm $ App f p
 simplifyCase (Inr p) _ g = simplifyTTerm $ App g p
-simplifyCase x f g       = Case x (simplifyTTerm f) (simplifyTTerm g)
+simplifyCase x f g       = Case x f g
 
 -- | Simplify the LComp TTerm
 simplifyLComp ::
