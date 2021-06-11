@@ -198,7 +198,7 @@ dFoldr f i v =
     let s = V.prescanr (curry (fst . f)) i v
         vvps = V.zip v (V.zip v' s)
         g (vi, (vpi, si)) acc =
-          lApp (snd (f (vi, si))) (vpi, f' (vi, si) `plus` acc)
+          f' (vi, si) `plus` lApp (snd (f (vi, si))) (vpi, acc)
      in V.foldr g i' vvps
 
 dtFoldr ::

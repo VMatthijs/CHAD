@@ -371,6 +371,22 @@ fastTests =
            arbitrarySizedFractional
            E.foldProd)
     , testProperty "foldProd2" (propAll E.foldProd2)
+    -- foldrSum: For small inputs, finite differencing is still accurate enough
+    , testProperty
+        "foldrSum-small"
+        (propAll'
+           (genVect :: Gen (Vect 4))
+           (resize 1 . genWithPrimal)
+           (const arbitrarySizedFractional)
+           (const id)
+           E.foldrSum)
+    -- foldrSum: For larger inputs, we only compare forward AD versus reverse AD
+    , testProperty
+        "foldrSum-noFD"
+        (propFwdVsRev'
+           (genVect :: Gen (Vect 8))
+           arbitrarySizedFractional
+           E.foldrSum)
     ]
 
 slowTests :: TestTree
