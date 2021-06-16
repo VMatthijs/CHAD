@@ -88,6 +88,37 @@ foldProd2 =
     v :: Vect 3
     v = fromList' [1, 2, 3]
 
+-- Implements: \a -> let b = sum a in foldr (\(x,s) -> x + s * b) 0 a
+foldrSum :: KnownNat n => SL.STerm (Vect n) Scal
+foldrSum = SL.Comp (SL.Pair SL.Id termSum) termFoldr
+  where
+    bin f a b = SL.Comp (SL.Pair a b) f
+    termSum :: KnownNat n => SL.STerm (Vect n) Scal
+    termSum =
+      SL.Comp
+        (SL.Pair
+           (SL.Pair
+              (SL.Curry (SL.Comp SL.Snd (SL.Op EScalAdd)))
+              (SL.Comp SL.Unit (SL.Op (Constant 0.0))))
+           SL.Id)
+        SL.Foldr
+    termFoldr :: KnownNat n => SL.STerm (Vect n, Scal) Scal
+    termFoldr =
+      SL.Comp
+        (SL.Pair
+           (SL.Pair
+              (SL.Curry
+                 (bin
+                    (SL.Op EScalAdd)
+                    (SL.Comp SL.Snd SL.Fst)
+                    (bin
+                       (SL.Op EScalProd)
+                       (SL.Comp SL.Snd SL.Snd)
+                       (SL.Comp SL.Fst SL.Snd))))
+              (SL.Comp SL.Unit (SL.Op (Constant 0.0))))
+           SL.Fst)
+        SL.Foldr
+
 -- case t of inl () -> s | inr () -> r
 realCase ::
      (LT (Df2 a), LT (Df2 b), LT (Dr2 a), LT (Dr2 b))
