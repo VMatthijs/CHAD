@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3deb19a1b9e60f7ccf26e63d0d678947cc36a20002928415066aa2076d04c0be
+-- hash: a290fa272956128373f9441941c22c6ba3f21c025356cc9c1565b86564041f57
 
 name:           CHAD
 version:        0.1.0.0
@@ -12,7 +12,7 @@ description:    Please see the README
 homepage:       https://github.com/VMatthijs/CHAD#readme
 bug-reports:    https://github.com/VMatthijs/CHAD/issues
 author:         CHAD Contributors
-maintainer:     Tom Smeding <t.j.smeding@uu.nl>, Matthijs Vákár <m.i.l.vakar@uu.nl>
+maintainer:     Tom Smeding <tom@tomsmeding.com>, Matthijs Vákár <m.i.l.vakar@uu.nl>
 copyright:      2021 Philip de Bruin, Pieter Knops, Danny de Jong, Tom Smeding, Matthijs Vákár
 license:        BSD3
 license-file:   LICENSE

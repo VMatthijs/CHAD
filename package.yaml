@@ -3,7 +3,7 @@ version:             0.1.0.0
 github:              "VMatthijs/CHAD"
 license:             BSD3
 author:              "CHAD Contributors"
-maintainer:          "Tom Smeding <t.j.smeding@uu.nl>, Matthijs Vákár <m.i.l.vakar@uu.nl>"
+maintainer:          "Tom Smeding <tom@tomsmeding.com>, Matthijs Vákár <m.i.l.vakar@uu.nl>"
 copyright:           "2021 Philip de Bruin, Pieter Knops, Danny de Jong, Tom Smeding, Matthijs Vákár"
 
 extra-source-files:
