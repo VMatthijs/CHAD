@@ -4,10 +4,3 @@ cradle:
       config:
         cradle:
           stack:
-    - path: ./Setup.hs
-      config:
-        cradle:
-          direct:
-            arguments:
-              - "-package Cabal"
-              - "-package base"
