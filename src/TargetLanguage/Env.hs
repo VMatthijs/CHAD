@@ -1,8 +1,17 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE GADTs         #-}
+{-# LANGUAGE LambdaCase    #-}
+{-# LANGUAGE RankNTypes    #-}
 {-# LANGUAGE TypeOperators #-}
+
+-- | De Bruijn environment and index definitions.
+--
+-- The "TargetLanguage" uses a well-typed well-scoped De Bruijn representation;
+-- in order to do this in Haskell, a 'TargetLanguage.TTerm' has a type-level
+-- environment containing the types of the bound variables that are in scope.
+-- This module contains definitions for indices into such an environment (used
+-- for representing /variables/ in the target language) as well as some
+-- utilities for working with such environments.
 module TargetLanguage.Env where
 
 import Data.GADT.Compare

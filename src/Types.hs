@@ -10,7 +10,17 @@
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 
--- | Different type definitions used in the language
+-- | Type definitions used for the languages and AD, and definition of linear
+-- functions.
+--
+-- Besides type definitions used in the various languages in this project, as
+-- well as the core type families for CHAD ('Df1', 'Df2', 'Dr1', 'Dr2'), this
+-- module defines the type of linear functions, 'LFun', and gives
+-- implementations for a variety of such linear functions. Since the
+-- constructor of 'LFun' is not exported, this module is the only place where
+-- the programmer has the burden of proving that the written definitions are
+-- indeed linear; outside of this module, we can trust that any fully-defined
+-- 'LFun' value is really a linear function.
 module Types
   ( Vect
   , Scal
@@ -179,7 +189,7 @@ lCopowFold :: (LT b, LT c) => (a -> LFun b c) -> LFun (Copower a b) c
 lCopowFold f = MkLFun g
   where
     g (MkCopow abs') =
-      foldr (\(a, b) acc -> (f a `lApp` b) `plus` acc) zero abs'
+      foldr plus zero (map (\(a,b) -> f a `lApp` b) abs')
 
 lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
 lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)

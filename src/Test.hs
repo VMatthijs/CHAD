@@ -6,6 +6,15 @@
 {-# LANGUAGE UndecidableSuperClasses   #-}
 {-# OPTIONS -Wno-orphans #-} -- for Arbitrary
 
+-- | Test suite for the AD code.
+--
+-- This module contains supporting definitions for finite differencing. The
+-- specified tests verify (using QuickCheck) that CHAD forward AD, CHAD reverse
+-- AD and finite differencing all agree on the examples programs in the
+-- "Examples" module.
+--
+-- Note that not all examples are tested using finite differencing, because of
+-- numerical instability.
 module Test where
 
 import           Data.List                 (mapAccumL)

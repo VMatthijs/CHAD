@@ -1,8 +1,9 @@
 {-# LANGUAGE GADTs #-}
 
 -- | Simplify terms in the target language to aid legibility.
---   This should only do simplifications that any basic compiler
---   would also perform.
+--
+-- This should only do simplifications that any basic compiler
+-- would also perform.
 module Simplify
   ( simplifyTTerm
   ) where
@@ -15,9 +16,11 @@ import           TargetLanguage     (Layout (..), TTerm (..), substTt,
 import           TargetLanguage.Env
 import           Types
 
--- | Simplify a TTerm
---   We do this by defining this function as some sort of fold,
---   to make pattern matching easier.
+-- | Simplify a TTerm using some basic rewriting optimisations.
+--
+-- Note: inlining of variable definitions is only performed if the variable in
+-- question is only used once, or, if it is a 'Pair' expression, if its
+-- components are each used at most once due to uses of 'Fst' and 'Snd'.
 simplifyTTerm :: TTerm env a -> TTerm env a
 -- Source language extension
 simplifyTTerm (Var i) = Var i
@@ -69,6 +72,7 @@ simplifyTTerm (LIt t) = LIt (simplifyTTerm t)
 simplifyTTerm (Error s) = Error s
 
 -- | Simplify the App TTerm.
+--
 -- We allow substituting Pair expressions where each element of the pair is
 -- individually only used once in the function body.
 simplifyApp :: TTerm env (a -> b) -> TTerm env a -> TTerm env b
