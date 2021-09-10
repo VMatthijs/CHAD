@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs            #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Examples where
 
@@ -268,3 +269,76 @@ treeExtra =
               SL.Op EScalProd))))
     SL.Fst `SL.Comp`
   SL.Ev
+
+nestedCurries1 :: SL.STerm Scal (Scal -> Scal)
+nestedCurries1 = SL.Curry (SL.Op EScalAdd)
+
+nestedCurries2 :: SL.STerm Scal (Scal -> Scal -> Scal)
+nestedCurries2 =
+  SL.Curry (SL.Curry (collapse1 (SL.Op EScalAdd)))
+  where
+    collapse1 :: LT2 a => SL.STerm a Scal -> SL.STerm (a, Scal) Scal
+    collapse1 t = SL.Comp (SL.Pair (SL.Comp SL.Fst t) SL.Snd) (SL.Op EScalAdd)
+
+nestedCurries3 :: SL.STerm Scal (Scal -> Scal -> Scal -> Scal)
+nestedCurries3 =
+  SL.Curry (SL.Curry (SL.Curry (collapse1 (collapse1 (SL.Op EScalAdd)))))
+  where
+    collapse1 :: LT2 a => SL.STerm a Scal -> SL.STerm (a, Scal) Scal
+    collapse1 t = SL.Comp (SL.Pair (SL.Comp SL.Fst t) SL.Snd) (SL.Op EScalAdd)
+
+nestedCurries4 :: SL.STerm Scal (Scal -> Scal -> Scal -> Scal -> Scal)
+nestedCurries4 =
+  SL.Curry (SL.Curry (SL.Curry (SL.Curry (collapse1 (collapse1 (collapse1 (SL.Op EScalAdd)))))))
+  where
+    collapse1 :: LT2 a => SL.STerm a Scal -> SL.STerm (a, Scal) Scal
+    collapse1 t = SL.Comp (SL.Pair (SL.Comp SL.Fst t) SL.Snd) (SL.Op EScalAdd)
+
+nestedCurries5 :: SL.STerm Scal (Scal -> Scal -> Scal -> Scal -> Scal -> Scal)
+nestedCurries5 =
+  SL.Curry (SL.Curry (SL.Curry (SL.Curry (SL.Curry (collapse1 (collapse1 (collapse1 (collapse1 (SL.Op EScalAdd)))))))))
+  where
+    collapse1 :: LT2 a => SL.STerm a Scal -> SL.STerm (a, Scal) Scal
+    collapse1 t = SL.Comp (SL.Pair (SL.Comp SL.Fst t) SL.Snd) (SL.Op EScalAdd)
+
+nestedCurries6 :: SL.STerm Scal (Scal -> Scal -> Scal -> Scal -> Scal -> Scal -> Scal)
+nestedCurries6 =
+  SL.Curry (SL.Curry (SL.Curry (SL.Curry (SL.Curry (SL.Curry (collapse1 (collapse1 (collapse1 (collapse1 (collapse1 (SL.Op EScalAdd)))))))))))
+  where
+    collapse1 :: LT2 a => SL.STerm a Scal -> SL.STerm (a, Scal) Scal
+    collapse1 t = SL.Comp (SL.Pair (SL.Comp SL.Fst t) SL.Snd) (SL.Op EScalAdd)
+
+nestedCurries7 :: SL.STerm Scal (Scal -> Scal -> Scal -> Scal -> Scal -> Scal -> Scal -> Scal)
+nestedCurries7 =
+  SL.Curry (SL.Curry (SL.Curry (SL.Curry (SL.Curry (SL.Curry (SL.Curry (collapse1 (collapse1 (collapse1 (collapse1 (collapse1 (collapse1 (SL.Op EScalAdd)))))))))))))
+  where
+    collapse1 :: LT2 a => SL.STerm a Scal -> SL.STerm (a, Scal) Scal
+    collapse1 t = SL.Comp (SL.Pair (SL.Comp SL.Fst t) SL.Snd) (SL.Op EScalAdd)
+
+nestedCurries8 :: SL.STerm Scal (Scal -> Scal -> Scal -> Scal -> Scal -> Scal -> Scal -> Scal -> Scal)
+nestedCurries8 =
+  SL.Curry (SL.Curry (SL.Curry (SL.Curry (SL.Curry (SL.Curry (SL.Curry (SL.Curry (collapse1 (collapse1 (collapse1 (collapse1 (collapse1 (collapse1 (collapse1 (SL.Op EScalAdd)))))))))))))))
+  where
+    collapse1 :: LT2 a => SL.STerm a Scal -> SL.STerm (a, Scal) Scal
+    collapse1 t = SL.Comp (SL.Pair (SL.Comp SL.Fst t) SL.Snd) (SL.Op EScalAdd)
+
+expgrow :: LT2 a => SL.STerm (a, Scal) () -> SL.STerm a ()
+expgrow t = SL.Comp (SL.Curry t) SL.Unit
+
+exponential0 :: SL.STerm Scal ()
+exponential0 = SL.Unit
+
+exponential1 :: SL.STerm Scal ()
+exponential1 = expgrow SL.Unit
+
+exponential2 :: SL.STerm Scal ()
+exponential2 = expgrow (expgrow SL.Unit)
+
+exponential3 :: SL.STerm Scal ()
+exponential3 = expgrow (expgrow (expgrow SL.Unit))
+
+exponential4 :: SL.STerm Scal ()
+exponential4 = expgrow (expgrow (expgrow (expgrow SL.Unit)))
+
+exponential5 :: SL.STerm Scal ()
+exponential5 = expgrow (expgrow (expgrow (expgrow (expgrow SL.Unit))))
