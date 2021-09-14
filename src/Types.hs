@@ -60,6 +60,7 @@ module Types
   , lCoPair
   , Copower
   , singleton
+  , copowFold
   , Df1
   , Df2
   , Dr1
@@ -190,6 +191,9 @@ lCopowFold f = MkLFun g
   where
     g (MkCopow abs') =
       foldr plus zero (map (\(a,b) -> f a `lApp` b) abs')
+
+copowFold :: (LT b, LT c) => (a -> b -> c) -> Copower a b -> c
+copowFold f (MkCopow abs') = foldr plus zero (map (\(a,b) -> f a b) abs')
 
 lPlus :: (LT a, LT b) => LFun a b -> LFun a b -> LFun a b
 lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)

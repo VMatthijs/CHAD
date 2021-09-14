@@ -3,6 +3,7 @@
 {-# LANGUAGE GADTs                     #-}
 {-# LANGUAGE LambdaCase                #-}
 {-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TypeOperators             #-}
 
 -- | Definition of a lambda calculus. Conflicts heavily with TargetLanguage;
@@ -19,7 +20,7 @@ import GHC.TypeLits
 import Data.Type.Equality ((:~:) (Refl))
 import Operation          (Operation(..), evalOp, showOp)
 import TargetLanguage.Env
-import Types (Scal, Copower, Vect)
+import Types (Scal, Copower, Vect, LT(..), copowFold, singleton, lApp)
 
 data Type t where
   TScal :: Type Scal
@@ -29,6 +30,8 @@ data Type t where
   TFun :: Type a -> Type b -> Type (a -> b)
   TCopow :: Type a -> Type b -> Type (Copower a b)
   TVect :: KnownNat n => Type (Vect n)
+
+deriving instance Show (Type t)
 
 data Lambda env t where
   Var :: Type a -> Idx env a -> Lambda env a
@@ -48,11 +51,12 @@ data Lambda env t where
   It :: Lambda env ((a, b) -> Either c b) -> Lambda env ((a, b) -> c)
   Op :: Operation a b -> Lambda env a -> Lambda env b
 
-  CopowFold :: Lambda env (a -> b -> c)
+  CopowFold :: (LT b, LT c)
+            => Lambda env (a -> b -> c)
             -> Lambda env (Copower a b)
             -> Lambda env c
-  Singleton :: Lambda env a -> Lambda env b -> Lambda env (Copower a b)
-  AdjPlus :: Lambda env a -> Lambda env a -> Lambda env a
+  Singleton :: LT b => Lambda env a -> Lambda env b -> Lambda env (Copower a b)
+  AdjPlus :: LT a => Lambda env a -> Lambda env a -> Lambda env a
 
 typeof :: Lambda env t -> Type t
 typeof (Var t _) = t
@@ -142,6 +146,9 @@ evalLam' env (It t) = fix (evalLam' env t)
       case f (a, b) of
         Left c   -> c
         Right b' -> fix f (a, b')
+evalLam' env (CopowFold f p) = copowFold (evalLam' env f) (evalLam' env p)
+evalLam' env (Singleton p d) = singleton (evalLam' env p) `lApp` evalLam' env d
+evalLam' env (AdjPlus a b) = plus (evalLam' env a) (evalLam' env b)
 
 sinkLam :: env :> env' -> Lambda env t -> Lambda env' t
 sinkLam w (Var t i)       = Var t (w >:> i)
@@ -163,14 +170,12 @@ sinkLam w (AdjPlus a b)   = AdjPlus (sinkLam w a) (sinkLam w b)
 data PrintEnv =
   PrintEnv Int [String]
 
--- | Pretty print the target language
+-- | Pretty print the augmented lambda calculus in 'Lambda'
 --
 -- Precedences used are as follows:
 -- - application is 10
 -- - plus is 6
--- - linear composition (;;) is 1
 printLam :: Int -> PrintEnv -> Lambda env t -> ShowS
--- Source language extension
 printLam _ (PrintEnv _ stack) (Var _ i) =
   case drop (idxToInt i) stack of
     []  -> showString ("ctxtVar" ++ show (idxToInt i - length stack + 1))
@@ -200,10 +205,8 @@ printLam d env (Op op a) = showFunction d env ("evalOp " ++ showOp op) [Some a]
 printLam d env (It t) = showFunction d env "it" [Some t]
 printLam d env (CopowFold a b) = showFunction d env "copowfold" [Some a, Some b]
 printLam d env (Singleton a b) = showFunction d env "singleton" [Some a, Some b]
-printLam d env (AdjPlus a b) = showFunction d env "adjplus" [Some a, Some b]
-
-data SomeTTerm =
-  forall env t. SomeTTerm (Lambda env t)
+printLam d env (AdjPlus a b) =
+  showParen (d > 6) $ printLam 6 env a . showString " + " . printLam 6 env b
 
 showFunction :: Int -> PrintEnv -> String -> [Some (Lambda env)] -> ShowS
 showFunction d env funcname args =

@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -29,10 +30,34 @@ type family Dr2' a where
   Dr2' (a -> b) = Copower (Dr1' a) (Dr2' b)
 
 dr1t :: Type t -> Type (Dr1' t)
-dr1t = undefined
+dr1t TScal = TScal
+dr1t TNil = TNil
+dr1t (TPair a b) = TPair (dr1t a) (dr1t b)
+dr1t (TFun a b) = TFun (dr1t a) (TPair (dr1t b) (TFun (dr2t b) (dr2t a)))
+dr1t t = error ("dr1 unimplemented for type " ++ show t)
 
 dr2t :: Type t -> Type (Dr2' t)
-dr2t = undefined
+dr2t TScal = TScal
+dr2t TNil = TNil
+dr2t (TPair a b) = TPair (dr2t a) (dr2t b)
+dr2t (TFun a b) = TCopow (dr1t a) (dr2t b)
+dr2t t = error ("dr2 unimplemented for type " ++ show t)
+
+data Dict c t where
+    Dict :: c t => Dict c t
+
+dr2hasLT :: Type t -> Dict LT (Dr2' t)
+dr2hasLT TScal = Dict
+dr2hasLT TNil = Dict
+dr2hasLT (TPair a b)
+  | Dict <- dr2hasLT a
+  , Dict <- dr2hasLT b
+  = Dict
+dr2hasLT (TFun a b)
+  | Dict <- dr2hasLT a
+  , Dict <- dr2hasLT b
+  = Dict
+dr2hasLT t = error ("dr2 unimplemented for type " ++ show t)
 
 
 type family EnvType env where
@@ -80,9 +105,11 @@ dr env = \case
       Pair (cvtDr1EnvIdx idx (Var primty Z))
            (Lambda (dr2t ty) $ zeroR (envType env) (Var primty (S Z)))
 
-  Lambda argty body ->
-    let resty = typeof body
-        bodydr2ty = TPair (dr1t resty) (TFun (dr2t resty) (TPair (dr2t argty) (dr2t (envType env))))
+  Lambda argty body
+    | let resty = typeof body
+    , Dict <- dr2hasLT resty
+    , Dict <- dr2hasLT (envType env) ->
+    let bodydr2ty = TPair (dr1t resty) (TFun (dr2t resty) (TPair (dr2t argty) (dr2t (envType env))))
     in
     -- Lambda body :: Term env (a -> b)
     -- body :: Term (a : env) b
@@ -112,9 +139,11 @@ dr env = \case
                                  `App` Var (dr2t resty) Z))
                        (Var (TCopow (dr1t argty) (dr2t resty)) Z))
 
-  App fun arg ->
-    let TFun argty resty = typeof fun
-        argdr2ty = TPair (dr1t argty) (TFun (dr2t argty) (dr2t (envType env)))
+  App fun arg
+    | Dict <- dr2hasLT (envType env)
+    , let TFun argty resty = typeof fun
+    , Dict <- dr2hasLT resty ->
+    let argdr2ty = TPair (dr1t argty) (TFun (dr2t argty) (dr2t (envType env)))
         fundr2ty = TPair (dr1t (typeof fun)) (TFun (dr2t (typeof fun)) (dr2t (envType env)))
     in
     -- fun :: Term env (a -> b)
@@ -148,7 +177,8 @@ dr env = \case
     Lambda primty $
       Pair Unit (Lambda TNil $ zeroR (envType env) (Var primty (S Z)))
 
-  Pair e1 e2 ->
+  Pair e1 e2
+    | Dict <- dr2hasLT (envType env) ->
     let e1dr2ty = TPair (dr1t (typeof e1)) (TFun (dr2t (typeof e1)) (dr2t (envType env)))
         e2dr2ty = TPair (dr1t (typeof e2)) (TFun (dr2t (typeof e2)) (dr2t (envType env)))
         adjty = TPair (dr2t (typeof e1)) (dr2t (typeof e2))
