@@ -55,6 +55,7 @@ data Lambda env t where
             => Lambda env (a -> b -> c)
             -> Lambda env (Copower a b)
             -> Lambda env c
+  EmptyCopow :: LT b => Type a -> Type b -> Lambda env (Copower a b)
   Singleton :: LT b => Lambda env a -> Lambda env b -> Lambda env (Copower a b)
   AdjPlus :: LT a => Lambda env a -> Lambda env a -> Lambda env a
 
@@ -72,6 +73,7 @@ typeof (Case _ a _) = let TFun _ t = typeof a in t
 typeof (It f) = let TFun t1 (TEither t2 _) = typeof f in TFun t1 t2
 typeof (Op op _) = typeofOp2 op
 typeof (CopowFold f _) = let TFun _ (TFun _ t) = typeof f in t
+typeof (EmptyCopow t1 t2) = TCopow t1 t2
 typeof (Singleton a b) = TCopow (typeof a) (typeof b)
 typeof (AdjPlus e _) = typeof e
 
@@ -116,6 +118,7 @@ substLam' i v w (Case t l r) =
 substLam' i v w (It t) = It (substLam' i v w t)
 substLam' i v w (Op op y) = Op op (substLam' i v w y)
 substLam' i v w (CopowFold a b) = CopowFold (substLam' i v w a) (substLam' i v w b)
+substLam' _ _ _ (EmptyCopow t1 t2) = EmptyCopow t1 t2
 substLam' i v w (Singleton a b) = Singleton (substLam' i v w a) (substLam' i v w b)
 substLam' i v w (AdjPlus a b) = AdjPlus (substLam' i v w a) (substLam' i v w b)
 
@@ -147,6 +150,7 @@ evalLam' env (It t) = fix (evalLam' env t)
         Left c   -> c
         Right b' -> fix f (a, b')
 evalLam' env (CopowFold f p) = copowFold (evalLam' env f) (evalLam' env p)
+evalLam' _ (EmptyCopow _ _) = zero
 evalLam' env (Singleton p d) = singleton (evalLam' env p) `lApp` evalLam' env d
 evalLam' env (AdjPlus a b) = plus (evalLam' env a) (evalLam' env b)
 
@@ -164,6 +168,7 @@ sinkLam w (Case p g h)    = Case (sinkLam w p) (sinkLam w g) (sinkLam w h)
 sinkLam w (Op op a)       = Op op (sinkLam w a)
 sinkLam w (It s)          = It (sinkLam w s)
 sinkLam w (CopowFold a b) = CopowFold (sinkLam w a) (sinkLam w b)
+sinkLam _ (EmptyCopow t1 t2) = EmptyCopow t1 t2
 sinkLam w (Singleton a b) = Singleton (sinkLam w a) (sinkLam w b)
 sinkLam w (AdjPlus a b)   = AdjPlus (sinkLam w a) (sinkLam w b)
 
@@ -197,13 +202,14 @@ printLam d env (Inl _ p) = showFunction d env "Inl" [Some p]
 printLam d env (Inr _ p) = showFunction d env "Inr" [Some p]
 printLam d env (Case p l r) =
   showParen (d > 0) $
-  showString "Case " .
-  printLam 0 env p .
-  showString " in {" .
-  printLam 0 env l . showString " } { " . printLam 0 env r . showString "}"
+    showString "Case " .
+    printLam 0 env p .
+    showString " in {" .
+    printLam 0 env l . showString " } { " . printLam 0 env r . showString "}"
 printLam d env (Op op a) = showFunction d env ("evalOp " ++ showOp op) [Some a]
 printLam d env (It t) = showFunction d env "it" [Some t]
 printLam d env (CopowFold a b) = showFunction d env "copowfold" [Some a, Some b]
+printLam _ _ (EmptyCopow _ _) = showString "EmptyCopow"
 printLam d env (Singleton a b) = showFunction d env "singleton" [Some a, Some b]
 printLam d env (AdjPlus a b) =
   showParen (d > 6) $ printLam 6 env a . showString " + " . printLam 6 env b
@@ -267,6 +273,7 @@ usesOf' i (Case p f g) = usesOf' i p <> usesOf' i f <> usesOf' i g
 usesOf' i (Op _ a) = usesOf' i a
 usesOf' i (It s) = usesOf' i s
 usesOf' i (CopowFold a b) = usesOf' i a <> usesOf' i b
+usesOf' _ (EmptyCopow _ _) = mempty
 usesOf' i (Singleton a b) = usesOf' i a <> usesOf' i b
 usesOf' i (AdjPlus a b) = usesOf' i a <> usesOf' i b
 
