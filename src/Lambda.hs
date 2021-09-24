@@ -1,17 +1,19 @@
-{-# LANGUAGE DataKinds                 #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE GADTs                     #-}
-{-# LANGUAGE LambdaCase                #-}
-{-# LANGUAGE RankNTypes                #-}
-{-# LANGUAGE StandaloneDeriving        #-}
-{-# LANGUAGE TypeOperators             #-}
+{-# LANGUAGE ConstraintKinds    #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE GADTs              #-}
+{-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE PolyKinds          #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeOperators      #-}
 
 -- | Definition of a lambda calculus. Conflicts heavily with TargetLanguage;
 -- don't use the two in the same module unqualified.
 module Lambda where
 
+import Control.Monad.State.Strict
 import Data.Foldable      (fold)
 import Data.GADT.Compare  (geq)
+import qualified Data.Kind as Kind
 import Data.Maybe         (fromMaybe)
 import Data.Monoid        (Sum (..))
 import Data.Some
@@ -20,14 +22,14 @@ import GHC.TypeLits
 import Data.Type.Equality ((:~:) (Refl))
 import Operation          (Operation(..), evalOp, showOp)
 import TargetLanguage.Env
-import Types (Scal, Copower, Vect, LT(..), copowFold, singleton, lApp)
+import Types
 
 data Type t where
   TScal :: Type Scal
   TNil :: Type ()
   TPair :: Type a -> Type b -> Type (a, b)
-  TEither :: Type a -> Type b -> Type (Either a b)
   TFun :: Type a -> Type b -> Type (a -> b)
+  TLFun :: Type a -> Type b -> Type (LFun a b)
   TCopow :: Type a -> Type b -> Type (Copower a b)
   TVect :: KnownNat n => Type (Vect n)
 
@@ -36,46 +38,102 @@ deriving instance Show (Type t)
 data Lambda env t where
   Var :: Type a -> Idx env a -> Lambda env a
   Lambda :: Type a -> Lambda (a ': env) b -> Lambda env (a -> b)
+  Let :: Lambda env a -> Lambda (a ': env) b -> Lambda env b
   App :: Lambda env (a -> b) -> Lambda env a -> Lambda env b
   Unit :: Lambda env ()
   Pair :: Lambda env a -> Lambda env b -> Lambda env (a, b)
   Fst :: Lambda env (a, b) -> Lambda env a
   Snd :: Lambda env (a, b) -> Lambda env b
-  Inl :: Type b -> Lambda env a -> Lambda env (Either a b)
-  Inr :: Type a -> Lambda env b -> Lambda env (Either a b)
-  Case
-    :: Lambda env (Either a b)
-    -> Lambda env (a -> c)
-    -> Lambda env (b -> c)
-    -> Lambda env c
-  It :: Lambda env ((a, b) -> Either c b) -> Lambda env ((a, b) -> c)
   Op :: Operation a b -> Lambda env a -> Lambda env b
 
-  CopowFold :: (LT b, LT c)
-            => Lambda env (a -> b -> c)
-            -> Lambda env (Copower a b)
-            -> Lambda env c
-  EmptyCopow :: LT b => Type a -> Type b -> Lambda env (Copower a b)
-  Singleton :: LT b => Lambda env a -> Lambda env b -> Lambda env (Copower a b)
-  AdjPlus :: LT a => Lambda env a -> Lambda env a -> Lambda env a
+  AdjPlus :: Lambda env a -> Lambda env a -> Lambda env a
+  Zero :: Type a -> Lambda env a
+
+  LId :: Type a -> Lambda env (LFun a a)
+  LPair :: Lambda env (LFun a b)
+        -> Lambda env (LFun a c)
+        -> Lambda env (LFun a (b, c))
+  LFst :: Type a -> Type b -> Lambda env (LFun (a, b) a)
+  LSnd :: Type a -> Type b -> Lambda env (LFun (a, b) b)
+  LComp :: Lambda env (LFun a b)
+        -> Lambda env (LFun b c)
+        -> Lambda env (LFun a c)
+  LSingleton :: Type b -> Lambda env a -> Lambda env (LFun b (Copower a b))
+  LCopowFold :: Lambda env (a -> LFun b c) -> Lambda env (LFun (Copower a b) c)
+
+-- | A sort-of pointful language that encodes a linear function, in the sense
+-- of a commutative monoid homomorphism. Compile this to linear combinators
+-- using 'makeLFunTerm'.
+data LinLambda (env :: [Kind.Type]) a t where
+  LinApp :: Lambda env (LFun s t) -> LinLambda env a s -> LinLambda env a t
+  LinLet :: Type s -> LinLambda env a s -> LinLambda env (a, s) t -> LinLambda env a t
+  LinLet' :: Type s -> LinLambda env a s -> LinLambda env s t -> LinLambda env a t
+  LinVar :: LinLambda env a a
+  LinPair :: LinLambda env a s -> LinLambda env a t -> LinLambda env a (s, t)
+  LinFst :: LinLambda env a (s, t) -> LinLambda env a s
+  LinSnd :: LinLambda env a (s, t) -> LinLambda env a t
+  LinZero :: Type t -> LinLambda env a t
+  LinPlus :: LinLambda env a t -> LinLambda env a t -> LinLambda env a t
+  LinSingleton :: Lambda env s -> LinLambda env a t -> LinLambda env a (Copower s t)
+  LinCopowFold :: Lambda env (b -> LFun c d) -> LinLambda env a (Copower b c) -> LinLambda env a d
+
+makeLFunTerm :: Type a -> LinLambda env a b -> Lambda env (LFun a b)
+makeLFunTerm t (LinApp fun arg) = LComp (makeLFunTerm t arg) fun
+makeLFunTerm t (LinLet s rhs body) =
+  LComp (LPair (LId t) (makeLFunTerm t rhs)) (makeLFunTerm (TPair t s) body)
+makeLFunTerm t (LinLet' s rhs body) =
+  LComp (makeLFunTerm t rhs) (makeLFunTerm s body)
+makeLFunTerm t LinVar = LId t
+makeLFunTerm t (LinPair e1 e2) = LPair (makeLFunTerm t e1) (makeLFunTerm t e2)
+makeLFunTerm t (LinFst e) =
+  let (term, TPair t1 t2) = makeLFunTerm' t e
+  in LComp term (LFst t1 t2)
+makeLFunTerm t (LinSnd e) =
+  let (term, TPair t1 t2) = makeLFunTerm' t e
+  in LComp term (LSnd t1 t2)
+makeLFunTerm t (LinZero t') = Zero (TLFun t t')
+makeLFunTerm t (LinPlus e1 e2) = AdjPlus (makeLFunTerm t e1) (makeLFunTerm t e2)
+makeLFunTerm t (LinSingleton e1 e2) =
+  let (term, t') = makeLFunTerm' t e2
+  in LComp term (LSingleton t' e1)
+makeLFunTerm t (LinCopowFold fun cp) = LComp (makeLFunTerm t cp) (LCopowFold fun)
+
+makeLFunTerm' :: Type a -> LinLambda env a b -> (Lambda env (LFun a b), Type b)
+makeLFunTerm' t term = let term' = makeLFunTerm t term
+                           TLFun _ t' = typeof term'
+                       in (term', t')
 
 typeof :: Lambda env t -> Type t
 typeof (Var t _) = t
 typeof (Lambda t e) = TFun t (typeof e)
+typeof (Let _ e) = typeof e
 typeof (App a _) = let TFun _ t = typeof a in t
 typeof Unit = TNil
 typeof (Pair a b) = TPair (typeof a) (typeof b)
 typeof (Fst e) = let TPair t _ = typeof e in t
 typeof (Snd e) = let TPair _ t = typeof e in t
-typeof (Inl t e) = TEither (typeof e) t
-typeof (Inr t e) = TEither t (typeof e)
-typeof (Case _ a _) = let TFun _ t = typeof a in t
-typeof (It f) = let TFun t1 (TEither t2 _) = typeof f in TFun t1 t2
 typeof (Op op _) = typeofOp2 op
-typeof (CopowFold f _) = let TFun _ (TFun _ t) = typeof f in t
-typeof (EmptyCopow t1 t2) = TCopow t1 t2
-typeof (Singleton a b) = TCopow (typeof a) (typeof b)
 typeof (AdjPlus e _) = typeof e
+typeof (Zero t) = t
+typeof (LId t) = TLFun t t
+typeof (LPair a b) = let TLFun t1 t2 = typeof a ; TLFun _ t3 = typeof b in TLFun t1 (TPair t2 t3)
+typeof (LFst a b) = TLFun (TPair a b) a
+typeof (LSnd a b) = TLFun (TPair a b) b
+typeof (LComp a b) = let TLFun t1 _ = typeof a ; TLFun _ t2 = typeof b in TLFun t1 t2
+typeof (LSingleton t e) = TLFun t (TCopow (typeof e) t)
+typeof (LCopowFold e) = let TFun t1 (TLFun t2 t3) = typeof e in TLFun (TCopow t1 t2) t3
+
+data Dict c t where
+  Dict :: c t => Dict c t
+
+typeHasLT :: Type t -> Dict LT t
+typeHasLT TScal = Dict
+typeHasLT TNil = Dict
+typeHasLT (TPair a b) | Dict <- typeHasLT a, Dict <- typeHasLT b = Dict
+typeHasLT (TFun a b) | Dict <- typeHasLT a, Dict <- typeHasLT b = Dict
+typeHasLT (TLFun a b) | Dict <- typeHasLT a, Dict <- typeHasLT b = Dict
+typeHasLT (TCopow a b) | Dict <- typeHasLT a, Dict <- typeHasLT b = Dict
+typeHasLT TVect = Dict
 
 typeofOp2 :: Operation a b -> Type b
 typeofOp2 = \case
@@ -88,39 +146,41 @@ typeofOp2 = \case
   Operation.Sum -> TScal
 
 -- | Substitute variable with De Bruijn index zero in a 'TTerm'
-substLam :: Lambda env u -> Lambda (u ': env) t -> Lambda env t
-substLam v =
+substLam :: env :> env' -> Lambda env' u -> Lambda (u ': env) t -> Lambda env' t
+substLam w v =
   substLam'
     Z
     v
     (Weaken $ \case
        Z -> error "substLam: replaced variable should've been replaced"
-       S i -> i)
+       S i -> w >:> i)
 
 -- | Substitute given variable with the given environment weakening action in a
 -- 'Lambda'
-substLam' ::
-     Idx env u -> Lambda env' u -> env :> env' -> Lambda env t -> Lambda env' t
+substLam' :: Idx env u -> Lambda env' u -> env :> env' -> Lambda env t -> Lambda env' t
 substLam' i v w (Var ty i')
   | Just Refl <- geq i i' = v
   | otherwise = Var ty (w >:> i')
 substLam' i v w (Lambda ty e) =
   Lambda ty (substLam' (S i) (sinkLam (wSucc wId) v) (wSink w) e)
+substLam' i v w (Let rhs e) =
+  Let (substLam' i v w rhs)
+      (substLam' (S i) (sinkLam (wSucc wId) v) (wSink w) e)
 substLam' i v w (App f a) = App (substLam' i v w f) (substLam' i v w a)
 substLam' _ _ _ Unit = Unit
 substLam' i v w (Pair a b) = Pair (substLam' i v w a) (substLam' i v w b)
 substLam' i v w (Fst p) = Fst (substLam' i v w p)
 substLam' i v w (Snd p) = Snd (substLam' i v w p)
-substLam' i v w (Inl ty t) = Inl ty (substLam' i v w t)
-substLam' i v w (Inr ty t) = Inr ty (substLam' i v w t)
-substLam' i v w (Case t l r) =
-  Case (substLam' i v w t) (substLam' i v w l) (substLam' i v w r)
-substLam' i v w (It t) = It (substLam' i v w t)
 substLam' i v w (Op op y) = Op op (substLam' i v w y)
-substLam' i v w (CopowFold a b) = CopowFold (substLam' i v w a) (substLam' i v w b)
-substLam' _ _ _ (EmptyCopow t1 t2) = EmptyCopow t1 t2
-substLam' i v w (Singleton a b) = Singleton (substLam' i v w a) (substLam' i v w b)
 substLam' i v w (AdjPlus a b) = AdjPlus (substLam' i v w a) (substLam' i v w b)
+substLam' _ _ _ (Zero t) = Zero t
+substLam' _ _ _ (LId t) = LId t
+substLam' i v w (LPair a b) = LPair (substLam' i v w a) (substLam' i v w b)
+substLam' _ _ _ (LFst s t) = LFst s t
+substLam' _ _ _ (LSnd s t) = LSnd s t
+substLam' i v w (LComp a b) = LComp (substLam' i v w a) (substLam' i v w b)
+substLam' i v w (LSingleton t e) = LSingleton t (substLam' i v w e)
+substLam' i v w (LCopowFold e) = LCopowFold (substLam' i v w e)
 
 -- | Evaluate the target language
 evalLam :: Lambda '[] t -> t
@@ -128,100 +188,131 @@ evalLam = evalLam' VZ
 
 -- | Evaluate the target language in the given environment
 evalLam' :: Val env -> Lambda env t -> t
--- Source language extension
 evalLam' env (Var _ i) = valProject env i
 evalLam' env (Lambda _ e) = \v -> evalLam' (VS v env) e
+evalLam' env (Let rhs e) = evalLam' (VS (evalLam' env rhs) env) e
 evalLam' env (App f a) = evalLam' env f (evalLam' env a)
 evalLam' _ Unit = ()
 evalLam' env (Pair a b) = (evalLam' env a, evalLam' env b)
 evalLam' env (Fst p) = fst $ evalLam' env p
 evalLam' env (Snd p) = snd $ evalLam' env p
-evalLam' env (Inl _ p) = Left $ evalLam' env p
-evalLam' env (Inr _ p) = Right $ evalLam' env p
-evalLam' env (Case p l r) =
-  case evalLam' env p of
-    Left q  -> evalLam' env l q
-    Right q -> evalLam' env r q
 evalLam' env (Op op a) = evalOp op (evalLam' env a)
-evalLam' env (It t) = fix (evalLam' env t)
-  where
-    fix f (a, b) =
-      case f (a, b) of
-        Left c   -> c
-        Right b' -> fix f (a, b')
-evalLam' env (CopowFold f p) = copowFold (evalLam' env f) (evalLam' env p)
-evalLam' _ (EmptyCopow _ _) = zero
-evalLam' env (Singleton p d) = singleton (evalLam' env p) `lApp` evalLam' env d
-evalLam' env (AdjPlus a b) = plus (evalLam' env a) (evalLam' env b)
+evalLam' env (AdjPlus a b)
+  | Dict <- typeHasLT (typeof a)
+  = plus (evalLam' env a) (evalLam' env b)
+evalLam' _ (Zero t)
+  | Dict <- typeHasLT t
+  = zero
+evalLam' _ (LId t)
+  | Dict <- typeHasLT t
+  = lId
+evalLam' env (LPair a b)
+  | let TLFun t1 t2 = typeof a
+        TLFun _ t3 = typeof b
+  , Dict <- typeHasLT t1
+  , Dict <- typeHasLT t2
+  , Dict <- typeHasLT t3
+  = lPair (evalLam' env a) (evalLam' env b)
+evalLam' _ (LFst s t)
+  | Dict <- typeHasLT s
+  , Dict <- typeHasLT t
+  = lFst
+evalLam' _ (LSnd s t)
+  | Dict <- typeHasLT s
+  , Dict <- typeHasLT t
+  = lSnd
+evalLam' env (LComp a b)
+  | let TLFun t1 t2 = typeof a
+        TLFun _ t3 = typeof b
+  , Dict <- typeHasLT t1
+  , Dict <- typeHasLT t2
+  , Dict <- typeHasLT t3
+  = lComp (evalLam' env a) (evalLam' env b)
+evalLam' env (LSingleton t e)
+  | Dict <- typeHasLT t
+  = singleton (evalLam' env e)
+evalLam' env (LCopowFold e)
+  | let TFun _ (TLFun t1 t2) = typeof e
+  , Dict <- typeHasLT t1
+  , Dict <- typeHasLT t2
+  = lCopowFold (evalLam' env e)
 
 sinkLam :: env :> env' -> Lambda env t -> Lambda env' t
-sinkLam w (Var t i)       = Var t (w >:> i)
-sinkLam w (Lambda ty e)   = Lambda ty (sinkLam (wSink w) e)
-sinkLam w (App e1 e2)     = App (sinkLam w e1) (sinkLam w e2)
-sinkLam _ Unit            = Unit
-sinkLam w (Pair a b)      = Pair (sinkLam w a) (sinkLam w b)
-sinkLam w (Fst p)         = Fst (sinkLam w p)
-sinkLam w (Snd p)         = Snd (sinkLam w p)
-sinkLam w (Inl ty p)      = Inl ty (sinkLam w p)
-sinkLam w (Inr ty p)      = Inr ty (sinkLam w p)
-sinkLam w (Case p g h)    = Case (sinkLam w p) (sinkLam w g) (sinkLam w h)
-sinkLam w (Op op a)       = Op op (sinkLam w a)
-sinkLam w (It s)          = It (sinkLam w s)
-sinkLam w (CopowFold a b) = CopowFold (sinkLam w a) (sinkLam w b)
-sinkLam _ (EmptyCopow t1 t2) = EmptyCopow t1 t2
-sinkLam w (Singleton a b) = Singleton (sinkLam w a) (sinkLam w b)
-sinkLam w (AdjPlus a b)   = AdjPlus (sinkLam w a) (sinkLam w b)
-
-data PrintEnv =
-  PrintEnv Int [String]
+sinkLam w (Var t i)        = Var t (w >:> i)
+sinkLam w (Lambda ty e)    = Lambda ty (sinkLam (wSink w) e)
+sinkLam w (Let rhs e)      = Let (sinkLam w rhs) (sinkLam (wSink w) e)
+sinkLam w (App e1 e2)      = App (sinkLam w e1) (sinkLam w e2)
+sinkLam _ Unit             = Unit
+sinkLam w (Pair a b)       = Pair (sinkLam w a) (sinkLam w b)
+sinkLam w (Fst p)          = Fst (sinkLam w p)
+sinkLam w (Snd p)          = Snd (sinkLam w p)
+sinkLam w (Op op a)        = Op op (sinkLam w a)
+sinkLam w (AdjPlus a b)    = AdjPlus (sinkLam w a) (sinkLam w b)
+sinkLam _ (Zero t)         = Zero t
+sinkLam _ (LId t)          = LId t
+sinkLam w (LPair a b)      = LPair (sinkLam w a) (sinkLam w b)
+sinkLam _ (LFst s t)       = LFst s t
+sinkLam _ (LSnd s t)       = LSnd s t
+sinkLam w (LComp a b)      = LComp (sinkLam w a) (sinkLam w b)
+sinkLam w (LSingleton t e) = LSingleton t (sinkLam w e)
+sinkLam w (LCopowFold e)   = LCopowFold (sinkLam w e)
 
 -- | Pretty print the augmented lambda calculus in 'Lambda'
 --
 -- Precedences used are as follows:
 -- - application is 10
 -- - plus is 6
-printLam :: Int -> PrintEnv -> Lambda env t -> ShowS
-printLam _ (PrintEnv _ stack) (Var _ i) =
-  case drop (idxToInt i) stack of
-    []  -> showString ("ctxtVar" ++ show (idxToInt i - length stack + 1))
-    x:_ -> showString x
-printLam d (PrintEnv depth stack) (Lambda _ e) =
-  let name = 'x' : show (depth + 1)
-   in showParen (d > 0) $
-      showString ("\\" ++ name ++ " -> ") .
-      printLam 0 (PrintEnv (depth + 1) (name : stack)) e
-printLam d env (App f a) =
-  showParen (d > 10) $ printLam 10 env f . showString " " . printLam 11 env a
-printLam _ _ Unit = showString "()"
-printLam _ env (Pair a b) =
-  showString "(" .
-  printLam 0 env a . showString ", " . printLam 0 env b . showString ")"
+printLam :: Int -> [String] -> Lambda env t -> State Int ShowS
+printLam _ env (Var _ i) =
+  pure $
+    case drop (idxToInt i) env of
+      []  -> showString ("ctxtVar" ++ show (idxToInt i - length env + 1))
+      x:_ -> showString x
+printLam d env (Lambda _ e) = do
+  name <- ('x' :) . show <$> get
+  r <- printLam 0 (name : env) e
+  pure $ showParen (d > 0) $ showString ("\\" ++ name ++ " -> ") . r
+printLam d env (Let rhs e) = do
+  name <- ('x' :) . show <$> get
+  r1 <- printLam 0 env rhs
+  r2 <- printLam 0 env e
+  pure $ showParen (d > 0) $
+    showString ("let " ++ name ++ " = ") . r1 . showString " in " . r2
+printLam d env (App f a) = do
+  r1 <- printLam 10 env f
+  r2 <- printLam 11 env a
+  pure $ showParen (d > 10) $ r1 . showString " " . r2
+printLam _ _ Unit = pure (showString "()")
+printLam _ env (Pair a b) = do
+  r1 <- printLam 0 env a
+  r2 <- printLam 0 env b
+  pure $ showString "(" . r1 . showString ", " . r2 . showString ")"
 printLam d env (Fst p) = showFunction d env "Fst" [Some p]
 printLam d env (Snd p) = showFunction d env "Snd" [Some p]
-printLam d env (Inl _ p) = showFunction d env "Inl" [Some p]
-printLam d env (Inr _ p) = showFunction d env "Inr" [Some p]
-printLam d env (Case p l r) =
-  showParen (d > 0) $
-    showString "Case " .
-    printLam 0 env p .
-    showString " in {" .
-    printLam 0 env l . showString " } { " . printLam 0 env r . showString "}"
 printLam d env (Op op a) = showFunction d env ("evalOp " ++ showOp op) [Some a]
-printLam d env (It t) = showFunction d env "it" [Some t]
-printLam d env (CopowFold a b) = showFunction d env "copowfold" [Some a, Some b]
-printLam _ _ (EmptyCopow _ _) = showString "EmptyCopow"
-printLam d env (Singleton a b) = showFunction d env "singleton" [Some a, Some b]
-printLam d env (AdjPlus a b) =
-  showParen (d > 6) $ printLam 6 env a . showString " + " . printLam 6 env b
+printLam d env (AdjPlus a b) = do
+  r1 <- printLam 6 env a
+  r2 <- printLam 6 env b
+  pure $ showParen (d > 6) $ r1 . showString " + " . r2
+printLam _ _ (Zero _) = pure $ showString "zero"
+printLam _ _ (LId _) = pure $ showString "lid"
+printLam d env (LPair a b) = showFunction d env "lpair" [Some a, Some b]
+printLam _ _ (LFst _ _) = pure $ showString "lfst"
+printLam _ _ (LSnd _ _) = pure $ showString "lsnd"
+printLam d env (LComp a b) = showFunction d env "lcomp" [Some a, Some b]
+printLam d env (LSingleton _ e) = showFunction d env "lsingleton" [Some e]
+printLam d env (LCopowFold e) = showFunction d env "lcopowfold" [Some e]
 
-showFunction :: Int -> PrintEnv -> String -> [Some (Lambda env)] -> ShowS
-showFunction d env funcname args =
-  showParen (d > 10) $
-  showString funcname .
-  foldr (\(Some t) -> (.) (showString " " . printLam 11 env t)) id args
+showFunction :: Int -> [String] -> String -> [Some (Lambda env)] -> State Int ShowS
+showFunction d env funcname args = do
+  rs <- mapM (\(Some t) -> (showString " " .) <$> printLam 11 env t) args
+  pure $
+    showParen (d > 10) $
+      showString funcname .
+      foldr (.) id rs
 
 instance Show (Lambda env a) where
-  showsPrec p = printLam p (PrintEnv 0 [])
+  showsPrec p term = evalState (printLam p [] term) 1
 
 data Layout a
   = LyLeaf a
@@ -262,20 +353,22 @@ usesOf' i (Var _ i')
   | Just Refl <- geq i i' = LyLeaf 1
   | otherwise = mempty
 usesOf' i (Lambda _ e) = usesOf' (S i) e
+usesOf' i (Let rhs e) = usesOf' i rhs <> usesOf' (S i) e
 usesOf' i (App f a) = usesOf' i f <> usesOf' i a
 usesOf' _ Unit = mempty
 usesOf' i (Pair a b) = usesOf' i a <> usesOf' i b
 usesOf' i p@(Fst p') = fromMaybe (usesOf' i p') (usesOfPick i p)
 usesOf' i p@(Snd p') = fromMaybe (usesOf' i p') (usesOfPick i p)
-usesOf' i (Inl _ p) = usesOf' i p
-usesOf' i (Inr _ p) = usesOf' i p
-usesOf' i (Case p f g) = usesOf' i p <> usesOf' i f <> usesOf' i g
 usesOf' i (Op _ a) = usesOf' i a
-usesOf' i (It s) = usesOf' i s
-usesOf' i (CopowFold a b) = usesOf' i a <> usesOf' i b
-usesOf' _ (EmptyCopow _ _) = mempty
-usesOf' i (Singleton a b) = usesOf' i a <> usesOf' i b
 usesOf' i (AdjPlus a b) = usesOf' i a <> usesOf' i b
+usesOf' _ (Zero _) = mempty
+usesOf' _ (LId _) = mempty
+usesOf' i (LPair a b) = usesOf' i a <> usesOf' i b
+usesOf' _ (LFst _ _) = mempty
+usesOf' _ (LSnd _ _) = mempty
+usesOf' i (LComp a b) = usesOf' i a <> usesOf' i b
+usesOf' i (LSingleton _ e) = usesOf' i e
+usesOf' i (LCopowFold e) = usesOf' i e
 
 usesOfPick :: (Num s, Monoid s) => Idx env t -> Lambda env a -> Maybe (Layout s)
 usesOfPick i term = do
@@ -288,6 +381,7 @@ usesOfPick i term = do
     getPath j (Var _ j')
       | Just Refl <- geq j j' = Just []
     getPath _ _ = Nothing
+
     increment :: (Num s, Monoid s) => [Pick] -> Layout s
     increment []              = LyLeaf 1
     increment (PickFst:picks) = LyPair (increment picks) mempty
