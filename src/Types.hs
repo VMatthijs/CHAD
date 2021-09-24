@@ -38,6 +38,7 @@ module Types
   , lMapTuple
   , lAdd
   , lSubt
+  , lNeg
   , lProd
   , lSum
   , lExpand
@@ -165,6 +166,10 @@ lAdd = MkLFun $ uncurry plus
 -- | Scalar subtraction is linear
 lSubt :: LFun (Scal, Scal) Scal
 lSubt = MkLFun $ uncurry (-)
+
+-- | Scalar negation is linear
+lNeg :: LFun Scal Scal
+lNeg = MkLFun negate
 
 -- | Multiplication linear in second argument
 lProd :: (LT a, Num a) => a -> LFun a a

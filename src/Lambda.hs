@@ -1,10 +1,11 @@
-{-# LANGUAGE ConstraintKinds    #-}
-{-# LANGUAGE DataKinds          #-}
-{-# LANGUAGE GADTs              #-}
-{-# LANGUAGE LambdaCase         #-}
-{-# LANGUAGE PolyKinds          #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TypeOperators      #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving  #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 
 -- | Definition of a lambda calculus. Conflicts heavily with TargetLanguage;
 -- don't use the two in the same module unqualified.
@@ -12,15 +13,15 @@ module Lambda where
 
 import Control.Monad.State.Strict
 import Data.Foldable      (fold)
-import Data.GADT.Compare  (geq)
-import qualified Data.Kind as Kind
+import Data.GADT.Compare  (GEq(..))
 import Data.Maybe         (fromMaybe)
 import Data.Monoid        (Sum (..))
+import Data.Proxy
 import Data.Some
 import GHC.TypeLits
 
 import Data.Type.Equality ((:~:) (Refl))
-import Operation          (Operation(..), evalOp, showOp)
+import Operation          (Operation(..), LinearOperation'(..), evalOp, showOp, showLOp', evalLOp')
 import TargetLanguage.Env
 import Types
 
@@ -60,11 +61,12 @@ data Lambda env t where
         -> Lambda env (LFun a c)
   LSingleton :: Type b -> Lambda env a -> Lambda env (LFun b (Copower a b))
   LCopowFold :: Lambda env (a -> LFun b c) -> Lambda env (LFun (Copower a b) c)
+  LOp :: LinearOperation' a b c -> Lambda env (a -> LFun b c)
 
 -- | A sort-of pointful language that encodes a linear function, in the sense
 -- of a commutative monoid homomorphism. Compile this to linear combinators
 -- using 'makeLFunTerm'.
-data LinLambda (env :: [Kind.Type]) a t where
+data LinLambda env a t where
   LinApp :: Lambda env (LFun s t) -> LinLambda env a s -> LinLambda env a t
   LinLet :: Type s -> LinLambda env a s -> LinLambda env (a, s) t -> LinLambda env a t
   LinLet' :: Type s -> LinLambda env a s -> LinLambda env s t -> LinLambda env a t
@@ -72,36 +74,39 @@ data LinLambda (env :: [Kind.Type]) a t where
   LinPair :: LinLambda env a s -> LinLambda env a t -> LinLambda env a (s, t)
   LinFst :: LinLambda env a (s, t) -> LinLambda env a s
   LinSnd :: LinLambda env a (s, t) -> LinLambda env a t
+  LinLOp :: LinearOperation' s a t -> Lambda env s -> LinLambda env a t
   LinZero :: Type t -> LinLambda env a t
   LinPlus :: LinLambda env a t -> LinLambda env a t -> LinLambda env a t
   LinSingleton :: Lambda env s -> LinLambda env a t -> LinLambda env a (Copower s t)
   LinCopowFold :: Lambda env (b -> LFun c d) -> LinLambda env a (Copower b c) -> LinLambda env a d
 
 makeLFunTerm :: Type a -> LinLambda env a b -> Lambda env (LFun a b)
-makeLFunTerm t (LinApp fun arg) = LComp (makeLFunTerm t arg) fun
-makeLFunTerm t (LinLet s rhs body) =
-  LComp (LPair (LId t) (makeLFunTerm t rhs)) (makeLFunTerm (TPair t s) body)
-makeLFunTerm t (LinLet' s rhs body) =
-  LComp (makeLFunTerm t rhs) (makeLFunTerm s body)
-makeLFunTerm t LinVar = LId t
-makeLFunTerm t (LinPair e1 e2) = LPair (makeLFunTerm t e1) (makeLFunTerm t e2)
-makeLFunTerm t (LinFst e) =
-  let (term, TPair t1 t2) = makeLFunTerm' t e
-  in LComp term (LFst t1 t2)
-makeLFunTerm t (LinSnd e) =
-  let (term, TPair t1 t2) = makeLFunTerm' t e
-  in LComp term (LSnd t1 t2)
-makeLFunTerm t (LinZero t') = Zero (TLFun t t')
-makeLFunTerm t (LinPlus e1 e2) = AdjPlus (makeLFunTerm t e1) (makeLFunTerm t e2)
-makeLFunTerm t (LinSingleton e1 e2) =
-  let (term, t') = makeLFunTerm' t e2
-  in LComp term (LSingleton t' e1)
-makeLFunTerm t (LinCopowFold fun cp) = LComp (makeLFunTerm t cp) (LCopowFold fun)
-
-makeLFunTerm' :: Type a -> LinLambda env a b -> (Lambda env (LFun a b), Type b)
-makeLFunTerm' t term = let term' = makeLFunTerm t term
-                           TLFun _ t' = typeof term'
-                       in (term', t')
+makeLFunTerm t = \case
+  LinApp fun arg -> LComp (makeLFunTerm t arg) fun
+  LinLet s rhs body ->
+    LComp (LPair (LId t) (makeLFunTerm t rhs)) (makeLFunTerm (TPair t s) body)
+  LinLet' s rhs body ->
+    LComp (makeLFunTerm t rhs) (makeLFunTerm s body)
+  LinVar -> LId t
+  LinPair e1 e2 -> LPair (makeLFunTerm t e1) (makeLFunTerm t e2)
+  LinFst e ->
+    let (term, TPair t1 t2) = withRT t e
+    in LComp term (LFst t1 t2)
+  LinSnd e ->
+    let (term, TPair t1 t2) = withRT t e
+    in LComp term (LSnd t1 t2)
+  LinLOp lop arg -> LOp lop `App` arg
+  LinZero t' -> Zero (TLFun t t')
+  LinPlus e1 e2 -> AdjPlus (makeLFunTerm t e1) (makeLFunTerm t e2)
+  LinSingleton e1 e2 ->
+    let (term, t') = withRT t e2
+    in LComp term (LSingleton t' e1)
+  LinCopowFold fun cp -> LComp (makeLFunTerm t cp) (LCopowFold fun)
+  where
+    withRT :: Type a -> LinLambda env a b -> (Lambda env (LFun a b), Type b)
+    withRT t1 term = let term' = makeLFunTerm t1 term
+                         TLFun _ t' = typeof term'
+                     in (term', t')
 
 typeof :: Lambda env t -> Type t
 typeof (Var t _) = t
@@ -122,6 +127,13 @@ typeof (LSnd a b) = TLFun (TPair a b) b
 typeof (LComp a b) = let TLFun t1 _ = typeof a ; TLFun _ t2 = typeof b in TLFun t1 t2
 typeof (LSingleton t e) = TLFun t (TCopow (typeof e) t)
 typeof (LCopowFold e) = let TFun t1 (TLFun t2 t3) = typeof e in TLFun (TCopow t1 t2) t3
+typeof (LOp lop) = let (t1, t2, t3) = typeofLOp lop in TFun t1 (TLFun t2 t3)
+
+typeofLOp :: LinearOperation' a b c -> (Type a, Type b, Type c)
+typeofLOp LProd = (TVect, TVect, TVect)
+typeofLOp LReplicate = (TNil, TScal, TVect)
+typeofLOp LScalNeg = (TNil, TScal, TScal)
+typeofLOp LScalProd = (TScal, TScal, TScal)
 
 data Dict c t where
   Dict :: c t => Dict c t
@@ -181,6 +193,7 @@ substLam' _ _ _ (LSnd s t) = LSnd s t
 substLam' i v w (LComp a b) = LComp (substLam' i v w a) (substLam' i v w b)
 substLam' i v w (LSingleton t e) = LSingleton t (substLam' i v w e)
 substLam' i v w (LCopowFold e) = LCopowFold (substLam' i v w e)
+substLam' _ _ _ (LOp lop) = LOp lop
 
 -- | Evaluate the target language
 evalLam :: Lambda '[] t -> t
@@ -236,6 +249,7 @@ evalLam' env (LCopowFold e)
   , Dict <- typeHasLT t1
   , Dict <- typeHasLT t2
   = lCopowFold (evalLam' env e)
+evalLam' _ (LOp lop) = evalLOp' lop
 
 sinkLam :: env :> env' -> Lambda env t -> Lambda env' t
 sinkLam w (Var t i)        = Var t (w >:> i)
@@ -256,6 +270,7 @@ sinkLam _ (LSnd s t)       = LSnd s t
 sinkLam w (LComp a b)      = LComp (sinkLam w a) (sinkLam w b)
 sinkLam w (LSingleton t e) = LSingleton t (sinkLam w e)
 sinkLam w (LCopowFold e)   = LCopowFold (sinkLam w e)
+sinkLam _ (LOp lop)        = LOp lop
 
 -- | Pretty print the augmented lambda calculus in 'Lambda'
 --
@@ -302,6 +317,7 @@ printLam _ _ (LSnd _ _) = pure $ showString "lsnd"
 printLam d env (LComp a b) = showFunction d env "lcomp" [Some a, Some b]
 printLam d env (LSingleton _ e) = showFunction d env "lsingleton" [Some e]
 printLam d env (LCopowFold e) = showFunction d env "lcopowfold" [Some e]
+printLam _ _ (LOp lop) = pure $ showString (showLOp' lop)
 
 showFunction :: Int -> [String] -> String -> [Some (Lambda env)] -> State Int ShowS
 showFunction d env funcname args = do
@@ -369,6 +385,7 @@ usesOf' _ (LSnd _ _) = mempty
 usesOf' i (LComp a b) = usesOf' i a <> usesOf' i b
 usesOf' i (LSingleton _ e) = usesOf' i e
 usesOf' i (LCopowFold e) = usesOf' i e
+usesOf' _ (LOp _) = mempty
 
 usesOfPick :: (Num s, Monoid s) => Idx env t -> Lambda env a -> Maybe (Layout s)
 usesOfPick i term = do
@@ -390,3 +407,39 @@ usesOfPick i term = do
 data Pick
   = PickFst
   | PickSnd
+
+
+instance GEq Type where
+  geq TScal TScal = Just Refl
+  geq TScal _ = Nothing
+  geq TNil TNil = Just Refl
+  geq TNil _ = Nothing
+  geq (TPair a b) (TPair a' b')
+    | Just Refl <- geq a a'
+    , Just Refl <- geq b b'
+    = Just Refl
+  geq TPair{} _ = Nothing
+  geq (TFun a b) (TFun a' b')
+    | Just Refl <- geq a a'
+    , Just Refl <- geq b b'
+    = Just Refl
+  geq TFun{} _ = Nothing
+  geq (TLFun a b) (TLFun a' b')
+    | Just Refl <- geq a a'
+    , Just Refl <- geq b b'
+    = Just Refl
+  geq TLFun{} _ = Nothing
+  geq (TCopow a b) (TCopow a' b')
+    | Just Refl <- geq a a'
+    , Just Refl <- geq b b'
+    = Just Refl
+  geq TCopow{} _ = Nothing
+  geq a@TVect b@TVect
+    | Just Refl <- check a b
+    = Just Refl
+    where -- TODO: Why don't pattern signatures work here?
+          check :: forall n m. (KnownNat n, KnownNat m)
+                => Type (Vect n) -> Type (Vect m) -> Maybe (n :~: m)
+          check _ _ | Just Refl <- sameNat (Proxy @n) (Proxy @m) = Just Refl
+                    | otherwise = Nothing
+  geq TVect _ = Nothing

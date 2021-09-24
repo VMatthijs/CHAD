@@ -13,7 +13,7 @@ import           Prelude                   hiding (sum, zipWith)
 import           Types                     (LFun, LT, LT2, Scal, Vect, lAdd,
                                             lComp, lDup, lExpand, lId,
                                             lMapTuple, lNegate, lPair, lProd,
-                                            lSubt, lSum, lZipWith, zero)
+                                            lSubt, lNeg, lSum, lZipWith, zero)
 
 -- | Possible operators in the source language
 data Operation a b where
@@ -43,6 +43,19 @@ evalOp EScalAdd     = uncurry (+)
 evalOp EScalSubt    = uncurry (-)
 evalOp EScalProd    = uncurry (*)
 evalOp Sum          = sum
+
+-- | @a -> LFun b c@
+data LinearOperation' a b c where
+  LProd :: KnownNat n => LinearOperation' (Vect n) (Vect n) (Vect n)
+  LReplicate :: KnownNat n => LinearOperation' () Scal (Vect n)
+  LScalNeg :: LinearOperation' () Scal Scal
+  LScalProd :: LinearOperation' Scal Scal Scal
+
+showLOp' :: LinearOperation' a b c -> String
+showLOp' LProd = "lprod"
+showLOp' LReplicate = "lreplicate"
+showLOp' LScalNeg = "lscalneg"
+showLOp' LScalProd = "lscalprod"
 
 -- | D op and D op^t of the Operators in the source language
 data LinearOperation a b c where
@@ -80,6 +93,13 @@ showLOp DEScalProd  = "DEScalProd"
 showLOp DEScalProdT = "DEScalProdT"
 showLOp DSum        = "DSum"
 showLOp DSumT       = "DSumT"
+
+-- | Evaluate the linear operators
+evalLOp' :: LinearOperation' a b c -> a -> LFun b c
+evalLOp' LProd = lProd
+evalLOp' LReplicate = const lExpand
+evalLOp' LScalNeg = const lNeg
+evalLOp' LScalProd = lProd
 
 -- | Evaluate the linear operators
 evalLOp :: LinearOperation a b c -> a -> LFun b c

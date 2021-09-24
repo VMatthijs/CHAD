@@ -5,8 +5,11 @@
 {-# LANGUAGE TypeOperators #-}
 module RevLam where
 
+import Data.GADT.Compare
+import Data.Type.Equality
+
 import Lambda
-import Operation (Operation(..))
+import Operation (Operation(..), LinearOperation'(..))
 import TargetLanguage.Env -- TODO don't put this module under TargetLanguage?
 import Types
 
@@ -59,6 +62,17 @@ let_ ty rhs body = App (Lambda ty body) rhs
 
 drt :: EnvS env -> Type t -> Type (Dr1 t, LFun (Dr2 t) (Dr2Env env))
 drt env t = TPair (dr1t t) (TLFun (dr2t t) (dr2envt env))
+
+drOp :: a ~ Dr1 a => Type a -> Type b -> Operation a b -> Lambda env (a -> LFun (Dr2 b) (Dr2 a))
+drOp t t' (Constant _) = Lambda t $ Zero (TLFun (dr2t t') TNil)
+drOp t _ EAdd = Lambda t $ LPair (LId TVect) (LId TVect)
+drOp t _ EProd = Lambda t $ LPair (LOp LProd `App` Snd (Var t Z))
+                                  (LOp LProd `App` Fst (Var t Z))
+drOp t _ EScalAdd = Lambda t $ LPair (LId TScal) (LId TScal)
+drOp t _ EScalSubt = Lambda t $ LPair (LId TScal) (LOp LScalNeg `App` Unit)
+drOp t _ EScalProd = Lambda t $ LPair (LOp LScalProd `App` Snd (Var t Z))
+                                      (LOp LScalProd `App` Fst (Var t Z))
+drOp t _ Sum = Lambda t $ LOp LReplicate `App` Unit
 
 dr :: EnvS env
    -> Lambda env t
@@ -145,5 +159,16 @@ dr env = \case
               (makeLFunTerm (dr2t t2) $
                  Snd (Var dty Z)
                    `LinApp` LinPair (LinZero (dr2t t1)) LinVar)
+
+  Op op arg
+    | let dty = drt env (typeof arg)
+          resty = typeofOp2 op
+    , Just Refl <- geq (typeof arg) (dr1t (typeof arg))
+    , Just Refl <- geq resty (dr1t resty)
+    -> let_ dty (dr env arg) $
+         Pair (Op op (Fst (Var dty Z)))
+              (makeLFunTerm (dr2t resty) $
+                 let dop = drOp (typeof arg) resty op `App` Fst (Var dty Z)
+                 in Snd (Var dty Z) `LinApp` (dop `LinApp` LinVar))
 
   _ -> undefined
