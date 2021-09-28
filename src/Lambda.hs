@@ -322,9 +322,9 @@ printLam d env (Op _ op a) = case (op, a) of
   (Constant x, Unit) -> pure $ showString (show x)
   (EAdd, Pair a1 a2) -> showFunction d env "vecadd" [Some a1, Some a2]
   (EProd, Pair a1 a2) -> showFunction d env "vecprod" [Some a1, Some a2]
-  (EScalAdd, Pair a1 a2) -> binary a1 (6, "+") a2
-  (EScalSubt, Pair a1 a2) -> binary a1 (6, "-") a2
-  (EScalProd, Pair a1 a2) -> binary a1 (7, "*") a2
+  (EScalAdd, Pair a1 a2) -> binary a1 (6, " + ") a2
+  (EScalSubt, Pair a1 a2) -> binary a1 (6, " - ") a2
+  (EScalProd, Pair a1 a2) -> binary a1 (7, " * ") a2
   (EScalSin, _) -> showFunction d env "sin" [Some a]
   (EScalCos, _) -> showFunction d env "cos" [Some a]
   (Sum, _) -> showFunction d env "vecsum" [Some a]
