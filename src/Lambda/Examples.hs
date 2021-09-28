@@ -50,9 +50,21 @@ polynomial = Lambda TScal $
 -- TEST: simplify paper_ex1 == simplify (Fst (dr (EPush TScal ENil) paper_ex1))
 paper_ex1 :: Lambda '[Scal] ((Scal, Scal), Scal)
 paper_ex1 =
-  let x = Var TScal Z
-  in Let (constant 2 `scalprod` x) $  -- y
-     Let (x `scalprod` Var TScal Z) $  -- z
-     Let (Op TScal EScalCos (Var TScal Z)) $  -- w
-     Let (Pair (Pair (Var TScal (S (S Z))) (Var TScal (S Z))) (Var TScal Z)) $  -- v
-       Var (TPair (TPair TScal TScal) TScal) Z
+  Let (constant 2 `scalprod` Var TScal Z) $  -- y
+  Let (Var TScal (S Z) `scalprod` Var TScal Z) $  -- z
+  Let (Op TScal EScalCos (Var TScal Z)) $  -- w
+  Let (Pair (Pair (Var TScal (S (S Z))) (Var TScal (S Z))) (Var TScal Z)) $  -- v
+    Var (TPair (TPair TScal TScal) TScal) Z
+
+-- Second example program in the paper
+--
+-- TEST: simplify paper_ex2 ==
+--       simplify (Fst (dr (EPush TScal (EPush TScal (EPush TScal (EPush TScal ENil)))) paper_ex2))
+paper_ex2 :: Lambda '[Scal, Scal, Scal, Scal] Scal
+paper_ex2 =
+  Let (Var TScal (S (S (S Z))) `scalprod` Var TScal Z
+         `scaladd` constant 2 `scalprod` Var TScal (S (S Z))) $  -- y
+  Let (Var TScal Z `scalprod` Var TScal (S (S Z))) $  -- z
+  Let (Var TScal Z `scaladd` Var TScal (S (S Z))) $  -- w
+  Let (Op TScal EScalSin (Var TScal Z)) $  -- v
+    Var TScal Z

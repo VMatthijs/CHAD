@@ -20,9 +20,9 @@ import Data.Maybe         (fromMaybe)
 import Data.Monoid        (getSum)
 import Data.Proxy
 import Data.Some
+import Data.Type.Equality ((:~:) (Refl))
 import GHC.TypeLits
 
-import Data.Type.Equality ((:~:) (Refl))
 import Operation          (Operation(..), LinearOperation'(..), evalOp, showOp, showLOp', evalLOp')
 import TargetLanguage.Env
 import Types
