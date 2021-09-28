@@ -4,6 +4,7 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving  #-}
+{-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeOperators       #-}
 
@@ -13,9 +14,10 @@ module Lambda where
 
 import Control.Monad.State.Strict
 import Data.Foldable      (fold)
-import Data.GADT.Compare  (GEq(..))
+import Data.List          (intersperse)
+import Data.GADT.Compare  (GEq (..))
 import Data.Maybe         (fromMaybe)
-import Data.Monoid        (Sum (..))
+import Data.Monoid        (getSum)
 import Data.Proxy
 import Data.Some
 import GHC.TypeLits
@@ -159,7 +161,7 @@ typeofOp2 = \case
   EScalProd -> TScal
   EScalSin -> TScal
   EScalCos -> TScal
-  Operation.Sum -> TScal
+  Sum -> TScal
 
 -- | Substitute variable with De Bruijn index zero in a 'TTerm'
 substLam :: env :> env' -> Lambda env' u -> Lambda (u ': env) t -> Lambda env' t
@@ -278,9 +280,7 @@ sinkLam _ (LOp lop)        = LOp lop
 
 -- | Pretty print the augmented lambda calculus in 'Lambda'
 --
--- Precedences used are as follows:
--- - application is 10
--- - plus is 6
+-- Precedences used are as in Haskell.
 printLam :: Int -> [String] -> Lambda env t -> State Int ShowS
 printLam _ env (Var _ i) =
   pure $
@@ -292,13 +292,21 @@ printLam d env (Lambda _ e) = do
   modify (+1)
   r <- printLam 0 (name : env) e
   pure $ showParen (d > 0) $ showString ("\\" ++ name ++ " -> ") . r
-printLam d env (Let rhs e) = do
-  name <- ('x' :) . show <$> get
-  modify (+1)
-  r1 <- printLam 0 env rhs
-  r2 <- printLam 0 (name : env) e
+printLam d env topexpr@Let{} = do
+  let collect :: [String] -> Lambda env a -> State Int ([(String, ShowS)], ShowS)
+      collect env' (Let rhs e) = do
+        name <- ('x' :) . show <$> get
+        modify (+1)
+        r1 <- printLam 0 env' rhs
+        (rest, core) <- collect (name : env') e
+        return ((name, r1) : rest, core)
+      collect env' e = ([],) <$> printLam 0 env' e
+  (pairs, core) <- collect env topexpr
   pure $ showParen (d > 0) $
-    showString ("let " ++ name ++ " = ") . r1 . showString " in " . r2
+    showString "let "
+    . foldr (.) id (intersperse (showString " ; ")
+                        [showString (lhs ++ " = ") . rhs | (lhs, rhs) <- pairs])
+    . showString " in " . core
 printLam d env (App f a) = do
   r1 <- printLam 10 env f
   r2 <- printLam 11 env a
@@ -310,11 +318,24 @@ printLam _ env (Pair a b) = do
   pure $ showString "(" . r1 . showString ", " . r2 . showString ")"
 printLam d env (Fst p) = showFunction d env "fst" [Some p]
 printLam d env (Snd p) = showFunction d env "snd" [Some p]
-printLam d env (Op _ op a) = showFunction d env ("evalOp " ++ showOp op) [Some a]
-printLam d env (AdjPlus a b) = do
-  r1 <- printLam 6 env a
-  r2 <- printLam 6 env b
-  pure $ showParen (d > 6) $ r1 . showString " + " . r2
+printLam d env (Op _ op a) = case (op, a) of
+  (Constant x, Unit) -> pure $ showString (show x)
+  (EAdd, Pair a1 a2) -> showFunction d env "vecadd" [Some a1, Some a2]
+  (EProd, Pair a1 a2) -> showFunction d env "vecprod" [Some a1, Some a2]
+  (EScalAdd, Pair a1 a2) -> binary a1 (6, "+") a2
+  (EScalSubt, Pair a1 a2) -> binary a1 (6, "-") a2
+  (EScalProd, Pair a1 a2) -> binary a1 (7, "*") a2
+  (EScalSin, _) -> showFunction d env "sin" [Some a]
+  (EScalCos, _) -> showFunction d env "cos" [Some a]
+  (Sum, _) -> showFunction d env "vecsum" [Some a]
+  (_, _) -> showFunction d env ("evalOp " ++ showOp op) [Some a]
+  where
+    binary :: Lambda env a -> (Int, String) -> Lambda env b -> State Int ShowS
+    binary left (prec, opstr) right = do
+      r1 <- printLam (prec + 1) env left
+      r2 <- printLam (prec + 1) env right
+      pure $ showParen (d > prec) $ r1 . showString opstr . r2
+printLam d env (AdjPlus a b) = showFunction d env "plus" [Some a, Some b]
 printLam _ _ (Zero _) = pure $ showString "zero"
 printLam _ _ (LId _) = pure $ showString "lid"
 printLam d env (LPair a b) = showFunction d env "lpair" [Some a, Some b]
