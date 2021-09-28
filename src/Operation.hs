@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs            #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies     #-}
 
 -- | Definition of the different supported operators
@@ -24,6 +25,8 @@ data Operation a b where
   EScalSubt :: Operation (Scal, Scal) Scal
   EScalProd :: Operation (Scal, Scal) Scal
   Sum :: KnownNat n => Operation (Vect n) Scal
+
+deriving instance Show (Operation a b)
 
 showOp :: Operation a b -> String
 showOp (Constant c) = "const(" ++ show c ++ ")"
@@ -50,6 +53,8 @@ data LinearOperation' a b c where
   LReplicate :: KnownNat n => LinearOperation' () Scal (Vect n)
   LScalNeg :: LinearOperation' () Scal Scal
   LScalProd :: LinearOperation' Scal Scal Scal
+
+deriving instance Show (LinearOperation' a b c)
 
 showLOp' :: LinearOperation' a b c -> String
 showLOp' LProd = "lprod"

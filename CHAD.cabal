@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3519c6f57ff38e5e2c2f09005ddab636239241ae83a6ede85d0d72b56800c5b9
+-- hash: e7144fae21e67ab89eb171e2ea98df859fb9bf8fa02ff03ec4a276b2f86f9eef
 
 name:           CHAD
 version:        0.1.0.0
@@ -29,6 +29,8 @@ library
       Examples
       ForwardAD
       Lambda
+      Lambda.Examples
+      Lambda.Simplify
       Operation
       ReverseAD
       RevLam

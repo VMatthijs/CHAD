@@ -160,13 +160,12 @@ dr env = \case
                  Snd (Var dty Z)
                    `LinApp` LinPair (LinZero (dr2t t1)) LinVar)
 
-  Op op arg
+  Op resty op arg
     | let dty = drt env (typeof arg)
-          resty = typeofOp2 op
     , Just Refl <- geq (typeof arg) (dr1t (typeof arg))
     , Just Refl <- geq resty (dr1t resty)
     -> let_ dty (dr env arg) $
-         Pair (Op op (Fst (Var dty Z)))
+         Pair (Op resty op (Fst (Var dty Z)))
               (makeLFunTerm (dr2t resty) $
                  let dop = drOp (typeof arg) resty op `App` Fst (Var dty Z)
                  in Snd (Var dty Z) `LinApp` (dop `LinApp` LinVar))

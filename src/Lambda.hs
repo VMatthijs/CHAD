@@ -45,7 +45,7 @@ data Lambda env t where
   Pair :: Lambda env a -> Lambda env b -> Lambda env (a, b)
   Fst :: Lambda env (a, b) -> Lambda env a
   Snd :: Lambda env (a, b) -> Lambda env b
-  Op :: Operation a b -> Lambda env a -> Lambda env b
+  Op :: Type b -> Operation a b -> Lambda env a -> Lambda env b
 
   AdjPlus :: Lambda env a -> Lambda env a -> Lambda env a
   Zero :: Type a -> Lambda env a
@@ -62,6 +62,8 @@ data Lambda env t where
   LSingleton :: Type b -> Lambda env a -> Lambda env (LFun b (Copower a b))
   LCopowFold :: Lambda env (a -> LFun b c) -> Lambda env (LFun (Copower a b) c)
   LOp :: LinearOperation' a b c -> Lambda env (a -> LFun b c)
+
+deriving instance Show (Lambda env t)
 
 -- | A sort-of pointful language that encodes a linear function, in the sense
 -- of a commutative monoid homomorphism. Compile this to linear combinators
@@ -117,7 +119,7 @@ typeof Unit = TNil
 typeof (Pair a b) = TPair (typeof a) (typeof b)
 typeof (Fst e) = let TPair t _ = typeof e in t
 typeof (Snd e) = let TPair _ t = typeof e in t
-typeof (Op op _) = typeofOp2 op
+typeof (Op t _ _) = t
 typeof (AdjPlus e _) = typeof e
 typeof (Zero t) = t
 typeof (LId t) = TLFun t t
@@ -183,7 +185,7 @@ substLam' _ _ _ Unit = Unit
 substLam' i v w (Pair a b) = Pair (substLam' i v w a) (substLam' i v w b)
 substLam' i v w (Fst p) = Fst (substLam' i v w p)
 substLam' i v w (Snd p) = Snd (substLam' i v w p)
-substLam' i v w (Op op y) = Op op (substLam' i v w y)
+substLam' i v w (Op t op y) = Op t op (substLam' i v w y)
 substLam' i v w (AdjPlus a b) = AdjPlus (substLam' i v w a) (substLam' i v w b)
 substLam' _ _ _ (Zero t) = Zero t
 substLam' _ _ _ (LId t) = LId t
@@ -209,7 +211,7 @@ evalLam' _ Unit = ()
 evalLam' env (Pair a b) = (evalLam' env a, evalLam' env b)
 evalLam' env (Fst p) = fst $ evalLam' env p
 evalLam' env (Snd p) = snd $ evalLam' env p
-evalLam' env (Op op a) = evalOp op (evalLam' env a)
+evalLam' env (Op _ op a) = evalOp op (evalLam' env a)
 evalLam' env (AdjPlus a b)
   | Dict <- typeHasLT (typeof a)
   = plus (evalLam' env a) (evalLam' env b)
@@ -260,7 +262,7 @@ sinkLam _ Unit             = Unit
 sinkLam w (Pair a b)       = Pair (sinkLam w a) (sinkLam w b)
 sinkLam w (Fst p)          = Fst (sinkLam w p)
 sinkLam w (Snd p)          = Snd (sinkLam w p)
-sinkLam w (Op op a)        = Op op (sinkLam w a)
+sinkLam w (Op t op a)      = Op t op (sinkLam w a)
 sinkLam w (AdjPlus a b)    = AdjPlus (sinkLam w a) (sinkLam w b)
 sinkLam _ (Zero t)         = Zero t
 sinkLam _ (LId t)          = LId t
@@ -306,7 +308,7 @@ printLam _ env (Pair a b) = do
   pure $ showString "(" . r1 . showString ", " . r2 . showString ")"
 printLam d env (Fst p) = showFunction d env "fst" [Some p]
 printLam d env (Snd p) = showFunction d env "snd" [Some p]
-printLam d env (Op op a) = showFunction d env ("evalOp " ++ showOp op) [Some a]
+printLam d env (Op _ op a) = showFunction d env ("evalOp " ++ showOp op) [Some a]
 printLam d env (AdjPlus a b) = do
   r1 <- printLam 6 env a
   r2 <- printLam 6 env b
@@ -329,8 +331,11 @@ showFunction d env funcname args = do
       showString funcname .
       foldr (.) id rs
 
-instance Show (Lambda env a) where
-  showsPrec p term = evalState (printLam p [] term) 1
+prettyLam :: Lambda env a -> String
+prettyLam term = evalState (printLam 0 [] term) 1 ""
+
+-- instance Show (Lambda env a) where
+--   showsPrec p term = evalState (printLam p [] term) 1
 
 data Layout a
   = LyLeaf a
@@ -354,13 +359,6 @@ instance Semigroup a => Semigroup (Layout a) where
 instance Monoid a => Monoid (Layout a) where
   mempty = LyLeaf mempty
 
--- Monoid is strictly speaking not necessary here with a more careful implementation
-truncateLayoutWithExpr :: Monoid s => Layout s -> Lambda env a -> Layout s
-truncateLayoutWithExpr l@(LyLeaf _) _ = l
-truncateLayoutWithExpr (LyPair l1 l2) (Pair e1 e2) =
-  LyPair (truncateLayoutWithExpr l1 e1) (truncateLayoutWithExpr l2 e2)
-truncateLayoutWithExpr l@(LyPair _ _) _ = LyLeaf (fold l)
-
 -- | Count the uses of a variable in an expression
 usesOf :: Idx env t -> Lambda env a -> Integer
 usesOf x t = getSum (fold (usesOf' x t))
@@ -377,7 +375,7 @@ usesOf' _ Unit = mempty
 usesOf' i (Pair a b) = usesOf' i a <> usesOf' i b
 usesOf' i p@(Fst p') = fromMaybe (usesOf' i p') (usesOfPick i p)
 usesOf' i p@(Snd p') = fromMaybe (usesOf' i p') (usesOfPick i p)
-usesOf' i (Op _ a) = usesOf' i a
+usesOf' i (Op _ _ a) = usesOf' i a
 usesOf' i (AdjPlus a b) = usesOf' i a <> usesOf' i b
 usesOf' _ (Zero _) = mempty
 usesOf' _ (LId _) = mempty
