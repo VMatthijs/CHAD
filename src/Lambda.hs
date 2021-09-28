@@ -285,12 +285,14 @@ printLam _ env (Var _ i) =
       x:_ -> showString x
 printLam d env (Lambda _ e) = do
   name <- ('x' :) . show <$> get
+  modify (+1)
   r <- printLam 0 (name : env) e
   pure $ showParen (d > 0) $ showString ("\\" ++ name ++ " -> ") . r
 printLam d env (Let rhs e) = do
   name <- ('x' :) . show <$> get
+  modify (+1)
   r1 <- printLam 0 env rhs
-  r2 <- printLam 0 env e
+  r2 <- printLam 0 (name : env) e
   pure $ showParen (d > 0) $
     showString ("let " ++ name ++ " = ") . r1 . showString " in " . r2
 printLam d env (App f a) = do
@@ -302,8 +304,8 @@ printLam _ env (Pair a b) = do
   r1 <- printLam 0 env a
   r2 <- printLam 0 env b
   pure $ showString "(" . r1 . showString ", " . r2 . showString ")"
-printLam d env (Fst p) = showFunction d env "Fst" [Some p]
-printLam d env (Snd p) = showFunction d env "Snd" [Some p]
+printLam d env (Fst p) = showFunction d env "fst" [Some p]
+printLam d env (Snd p) = showFunction d env "snd" [Some p]
 printLam d env (Op op a) = showFunction d env ("evalOp " ++ showOp op) [Some a]
 printLam d env (AdjPlus a b) = do
   r1 <- printLam 6 env a
