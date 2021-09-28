@@ -24,6 +24,8 @@ data Operation a b where
   EScalAdd :: Operation (Scal, Scal) Scal
   EScalSubt :: Operation (Scal, Scal) Scal
   EScalProd :: Operation (Scal, Scal) Scal
+  EScalSin :: Operation Scal Scal
+  EScalCos :: Operation Scal Scal
   Sum :: KnownNat n => Operation (Vect n) Scal
 
 deriving instance Show (Operation a b)
@@ -35,6 +37,8 @@ showOp EProd        = "EProd"
 showOp EScalAdd     = "EScalAdd"
 showOp EScalSubt    = "EScalSubt"
 showOp EScalProd    = "EScalProd"
+showOp EScalSin     = "EScalSin"
+showOp EScalCos     = "EScalCos"
 showOp Sum          = "Sum"
 
 -- | Evaluate an operator
@@ -45,6 +49,8 @@ evalOp EProd        = uncurry $ zipWith (*)
 evalOp EScalAdd     = uncurry (+)
 evalOp EScalSubt    = uncurry (-)
 evalOp EScalProd    = uncurry (*)
+evalOp EScalSin     = sin
+evalOp EScalCos     = cos
 evalOp Sum          = sum
 
 -- | @a -> LFun b c@

@@ -69,6 +69,9 @@ drOp t _ EScalAdd = Lambda t $ LPair (LId TScal) (LId TScal)
 drOp t _ EScalSubt = Lambda t $ LPair (LId TScal) (LOp LScalNeg `App` Unit)
 drOp t _ EScalProd = Lambda t $ LPair (LOp LScalProd `App` Snd (Var t Z))
                                       (LOp LScalProd `App` Fst (Var t Z))
+drOp t _ EScalSin = Lambda t $ LOp LScalProd `App` Op TScal EScalCos (Var t Z)
+drOp t _ EScalCos = Lambda t $ LOp LScalProd `App` neg (Op TScal EScalSin (Var t Z))
+  where neg x = Op TScal EScalSubt (Pair (Op TScal (Constant 0.0) Unit) x)
 drOp t _ Sum = Lambda t $ LOp LReplicate `App` Unit
 
 dr :: EnvS env

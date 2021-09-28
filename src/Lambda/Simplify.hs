@@ -26,7 +26,6 @@ import           Types
 -- question is only used once, or, if it is a 'Pair' expression, if its
 -- components are each used at most once due to uses of 'Fst' and 'Snd'.
 simplify :: Lambda env a -> Lambda env a
--- Source language extension
 simplify (Var t i) = Var t i
 simplify (Lambda t e) = Lambda t (simplify e)
 simplify (Let rhs e) = simplifyLet (simplify rhs) (simplify e)
@@ -60,22 +59,19 @@ simplifyApp f a = App f a
 -- individually only used once in the body (because of Fst and Snd
 -- projections).
 simplifyLet :: Lambda env a -> Lambda (a ': env) b -> Lambda env b
+simplifyLet (Let rhs e) body =
+  simplifyLet rhs (simplifyLet e (sinkLam (wSink (wSucc wId)) body))
 simplifyLet (Pair a1 a2) e =
-  Let a1 $
-    Let (sinkLam (wSucc wId) a2) $
-      substLam (wSucc (wSucc wId))
-               (Pair (Var (typeof a1) (S Z)) (Var (typeof a2) Z))
-               e
+  simplifyLet a1 $
+    simplifyLet (sinkLam (wSucc wId) a2) $
+      simplify $ substLam (wSucc (wSucc wId))
+                          (Pair (Var (typeof a1) (S Z)) (Var (typeof a2) Z))
+                          e
 simplifyLet a e
   | decideInlinable (usesOf' Z e :: Layout (Sum Natural)) a
   = simplify $ substLam wId a e
   | otherwise
-  = smartLet a e
-
--- | Construct a let-binding while preventing let-let via let rotation.
-smartLet :: Lambda env a -> Lambda (a ': env) b -> Lambda env b
-smartLet (Let rhs e) body = smartLet rhs (smartLet e (sinkLam (wSink (wSucc wId)) body))
-smartLet rhs body = Let rhs body
+  = Let a e
 
 decideInlinable :: (Num s, Ord s) => Layout (Sum s) -> Lambda env a -> Bool
 decideInlinable (LyPair ly1 ly2) (Pair e1 e2) =
@@ -100,15 +96,15 @@ duplicable _ = False
 
 -- | Simplify the Fst form
 simplifyFst :: Lambda env (a, b) -> Lambda env a
--- Fst of a pair can immediately be resolved
-simplifyFst (Pair t _) = t
-simplifyFst p          = Fst p
+simplifyFst (Pair t _)  = t
+simplifyFst (Let rhs e) = simplifyLet rhs (simplifyFst e)
+simplifyFst p           = Fst p
 
 -- | Simplify the Snd form
 simplifySnd :: Lambda env (a, b) -> Lambda env b
--- Snd of a pair can immediately be resolved
-simplifySnd (Pair _ s) = s
-simplifySnd p          = Snd p
+simplifySnd (Pair _ s)  = s
+simplifySnd (Let rhs e) = simplifyLet rhs (simplifySnd e)
+simplifySnd p           = Snd p
 
 data LComps env a b where
   LComps :: Lambda env (LFun a b) -> LComps env b c -> LComps env a c

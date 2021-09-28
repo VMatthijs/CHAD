@@ -157,6 +157,8 @@ typeofOp2 = \case
   EScalAdd -> TScal
   EScalSubt -> TScal
   EScalProd -> TScal
+  EScalSin -> TScal
+  EScalCos -> TScal
   Operation.Sum -> TScal
 
 -- | Substitute variable with De Bruijn index zero in a 'TTerm'
