@@ -35,6 +35,7 @@ simplify (Pair a b) = Pair (simplify a) (simplify b)
 simplify (Fst p) = simplifyFst (simplify p)
 simplify (Snd p) = simplifySnd (simplify p)
 simplify (Op t op a) = Op t op (simplify a)
+simplify (Map a b) = Map (simplify a) (simplify b)
 simplify (AdjPlus a b) = simplifyPlus (simplify a) (simplify b)
 simplify (Zero t) = Zero t
 simplify (LId t) = LId t

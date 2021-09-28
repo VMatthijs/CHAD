@@ -19,6 +19,7 @@ import Data.GADT.Compare  (GEq (..))
 import Data.Maybe         (fromMaybe)
 import Data.Monoid        (getSum)
 import Data.Proxy
+import qualified Data.Vector.Unboxed.Sized as V
 import Data.Some
 import Data.Type.Equality ((:~:) (Refl))
 import GHC.TypeLits
@@ -48,6 +49,8 @@ data Lambda env t where
   Fst :: Lambda env (a, b) -> Lambda env a
   Snd :: Lambda env (a, b) -> Lambda env b
   Op :: Type b -> Operation a b -> Lambda env a -> Lambda env b
+
+  Map :: KnownNat n => Lambda env (Scal -> Scal) -> Lambda env (Vect n) -> Lambda env (Vect n)
 
   AdjPlus :: Lambda env a -> Lambda env a -> Lambda env a
   Zero :: Type a -> Lambda env a
@@ -122,6 +125,7 @@ typeof (Pair a b) = TPair (typeof a) (typeof b)
 typeof (Fst e) = let TPair t _ = typeof e in t
 typeof (Snd e) = let TPair _ t = typeof e in t
 typeof (Op t _ _) = t
+typeof (Map _ _) = TVect
 typeof (AdjPlus e _) = typeof e
 typeof (Zero t) = t
 typeof (LId t) = TLFun t t
@@ -190,6 +194,7 @@ substLam' i v w (Pair a b) = Pair (substLam' i v w a) (substLam' i v w b)
 substLam' i v w (Fst p) = Fst (substLam' i v w p)
 substLam' i v w (Snd p) = Snd (substLam' i v w p)
 substLam' i v w (Op t op y) = Op t op (substLam' i v w y)
+substLam' i v w (Map a b) = Map (substLam' i v w a) (substLam' i v w b)
 substLam' i v w (AdjPlus a b) = AdjPlus (substLam' i v w a) (substLam' i v w b)
 substLam' _ _ _ (Zero t) = Zero t
 substLam' _ _ _ (LId t) = LId t
@@ -216,6 +221,7 @@ evalLam' env (Pair a b) = (evalLam' env a, evalLam' env b)
 evalLam' env (Fst p) = fst $ evalLam' env p
 evalLam' env (Snd p) = snd $ evalLam' env p
 evalLam' env (Op _ op a) = evalOp op (evalLam' env a)
+evalLam' env (Map a b) = V.map (evalLam' env a) (evalLam' env b)
 evalLam' env (AdjPlus a b)
   | Dict <- typeHasLT (typeof a)
   = plus (evalLam' env a) (evalLam' env b)
@@ -267,6 +273,7 @@ sinkLam w (Pair a b)       = Pair (sinkLam w a) (sinkLam w b)
 sinkLam w (Fst p)          = Fst (sinkLam w p)
 sinkLam w (Snd p)          = Snd (sinkLam w p)
 sinkLam w (Op t op a)      = Op t op (sinkLam w a)
+sinkLam w (Map a b)        = Map (sinkLam w a) (sinkLam w b)
 sinkLam w (AdjPlus a b)    = AdjPlus (sinkLam w a) (sinkLam w b)
 sinkLam _ (Zero t)         = Zero t
 sinkLam _ (LId t)          = LId t
@@ -335,6 +342,7 @@ printLam d env (Op _ op a) = case (op, a) of
       r1 <- printLam (prec + 1) env left
       r2 <- printLam (prec + 1) env right
       pure $ showParen (d > prec) $ r1 . showString opstr . r2
+printLam d env (Map a b) = showFunction d env "map" [Some a, Some b]
 printLam d env (AdjPlus a b) = showFunction d env "plus" [Some a, Some b]
 printLam _ _ (Zero _) = pure $ showString "zero"
 printLam _ _ (LId _) = pure $ showString "lid"
@@ -399,6 +407,7 @@ usesOf' i (Pair a b) = usesOf' i a <> usesOf' i b
 usesOf' i p@(Fst p') = fromMaybe (usesOf' i p') (usesOfPick i p)
 usesOf' i p@(Snd p') = fromMaybe (usesOf' i p') (usesOfPick i p)
 usesOf' i (Op _ _ a) = usesOf' i a
+usesOf' i (Map a b) = usesOf' i a <> usesOf' i b
 usesOf' i (AdjPlus a b) = usesOf' i a <> usesOf' i b
 usesOf' _ (Zero _) = mempty
 usesOf' _ (LId _) = mempty
