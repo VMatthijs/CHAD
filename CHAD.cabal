@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2abac36b934b2c3f97644a4c2b401c793bae68ae6a316fc69ab0ea2ce6825d18
+-- hash: 846c7f1eed65efa8cbf31e51b9f05f77a262b87abf659dc771e82621f9d4ee30
 
 name:           CHAD
 version:        0.1.0.0
@@ -34,6 +34,7 @@ library
       ReverseAD
       Simplify
       SourceLanguage
+      STConvert
       TargetLanguage
       Test
       Type
