@@ -5,21 +5,22 @@ module Lambda.Examples where
 
 import GHC.TypeNats
 
-import Lambda
+import Env
 import Operation
-import TargetLanguage.Env
+import TargetLanguage
+import Type
 import Types
 
 
-bin :: Type c -> Operation (a, b) c -> Lambda env a -> Lambda env b -> Lambda env c
+bin :: Type c -> Operation (a, b) c -> TTerm env a -> TTerm env b -> TTerm env c
 bin t op x y = Op t op (Pair x y)
 
 infixl 6 `scaladd`
-scaladd :: Lambda env Scal -> Lambda env Scal -> Lambda env Scal
+scaladd :: TTerm env Scal -> TTerm env Scal -> TTerm env Scal
 scaladd = bin TScal EScalAdd
 
 infixl 7 `scalprod`
-scalprod :: Lambda env Scal -> Lambda env Scal -> Lambda env Scal
+scalprod :: TTerm env Scal -> TTerm env Scal -> TTerm env Scal
 scalprod = bin TScal EScalProd
 
 class MagicType a where magicType :: Type a
@@ -31,15 +32,15 @@ instance (MagicType a, MagicType b) => MagicType (LFun a b) where magicType = TL
 instance (MagicType a, MagicType b) => MagicType (Copower a b) where magicType = TCopow magicType magicType
 instance KnownNat n => MagicType (Vect n) where magicType = TVect
 
-constant :: (LT a, LT2 a, Show a, MagicType a) => a -> Lambda env a
+constant :: (LT a, LT2 a, Show a, MagicType a) => a -> TTerm env a
 constant x = Op magicType (Constant x) Unit
 
 -- \x -> x * x
-square :: Lambda env (Scal -> Scal)
+square :: TTerm env (Scal -> Scal)
 square = Lambda TScal (Op TScal EScalProd (Pair (Var TScal Z) (Var TScal Z)))
 
 -- \x -> 2 * x * x + 7 * x + 3, using 'square' for the squaring
-polynomial :: Lambda env (Scal -> Scal)
+polynomial :: TTerm env (Scal -> Scal)
 polynomial = Lambda TScal $
   constant 2 `scalprod` (square `App` Var TScal Z)
   `scaladd` constant 7 `scalprod` Var TScal Z
@@ -48,7 +49,7 @@ polynomial = Lambda TScal $
 -- First example program in the paper
 --
 -- TEST: simplify paper_ex1 == simplify (Fst (dr (EPush TScal ENil) paper_ex1))
-paper_ex1 :: Lambda '[Scal] ((Scal, Scal), Scal)
+paper_ex1 :: TTerm '[Scal] ((Scal, Scal), Scal)
 paper_ex1 =
   Let (constant 2 `scalprod` Var TScal Z) $  -- y
   Let (Var TScal (S Z) `scalprod` Var TScal Z) $  -- z
@@ -60,7 +61,7 @@ paper_ex1 =
 --
 -- TEST: simplify paper_ex2 ==
 --       simplify (Fst (dr (EPush TScal (EPush TScal (EPush TScal (EPush TScal ENil)))) paper_ex2))
-paper_ex2 :: Lambda '[Scal, Scal, Scal, Scal] Scal
+paper_ex2 :: TTerm '[Scal, Scal, Scal, Scal] Scal
 paper_ex2 =
   Let (Var TScal (S (S (S Z))) `scalprod` Var TScal Z
          `scaladd` constant 2 `scalprod` Var TScal (S (S Z))) $  -- y

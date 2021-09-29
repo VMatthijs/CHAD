@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e7144fae21e67ab89eb171e2ea98df859fb9bf8fa02ff03ec4a276b2f86f9eef
+-- hash: 2abac36b934b2c3f97644a4c2b401c793bae68ae6a316fc69ab0ea2ce6825d18
 
 name:           CHAD
 version:        0.1.0.0
@@ -26,19 +26,17 @@ source-repository head
 
 library
   exposed-modules:
+      Env
       Examples
       ForwardAD
-      Lambda
       Lambda.Examples
-      Lambda.Simplify
       Operation
       ReverseAD
-      RevLam
       Simplify
       SourceLanguage
       TargetLanguage
-      TargetLanguage.Env
       Test
+      Type
       Types
   other-modules:
       Paths_CHAD

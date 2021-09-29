@@ -12,7 +12,7 @@
 -- This module contains definitions for indices into such an environment (used
 -- for representing /variables/ in the target language) as well as some
 -- utilities for working with such environments.
-module TargetLanguage.Env where
+module Env where
 
 import Data.GADT.Compare
 import Data.Type.Equality ((:~:)(Refl))
