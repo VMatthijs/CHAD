@@ -1,11 +1,7 @@
 {-# LANGUAGE ConstraintKinds         #-}
-{-# LANGUAGE DataKinds               #-}
 {-# LANGUAGE FlexibleContexts        #-}
 {-# LANGUAGE FlexibleInstances       #-}
-{-# LANGUAGE GADTs                   #-}
-{-# LANGUAGE ScopedTypeVariables     #-}
 {-# LANGUAGE TypeFamilyDependencies  #-}
-{-# LANGUAGE TypeOperators           #-}
 {-# LANGUAGE UndecidableInstances    #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}

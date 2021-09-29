@@ -1,9 +1,9 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE GADTs            #-}
+{-# LANGUAGE LambdaCase       #-}
+{-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE TypeOperators    #-}
 
 -- | Reverse-AD functions
 module ReverseAD where
@@ -31,7 +31,7 @@ onehotEnv Z = LinPair LinZero LinVar
 onehotEnv (S i) = LinPair (onehotEnv i) LinZero
 
 drOp :: a ~ Dr1 a => Operation a b -> TTerm env (a -> LFun (Dr2 b) (Dr2 a))
-drOp (Constant _) = Lambda $ Zero
+drOp (Constant _) = Lambda Zero
 drOp EAdd = Lambda $ LPair LId LId
 drOp EProd = Lambda $ LPair (LOp LProd `App` Snd (Var Z))
                                    (LOp LProd `App` Fst (Var Z))
