@@ -32,34 +32,34 @@ onehotEnv (S i) = LinPair (onehotEnv i) LinZero
 
 drOp :: a ~ Dr1 a => Operation a b -> TTerm env (a -> LFun (Dr2 b) (Dr2 a))
 drOp (Constant _) = Lambda Zero
-drOp EAdd = Lambda $ LPair LId LId
-drOp EProd = Lambda $ LPair (LOp LProd `App` Snd (Var Z))
-                                   (LOp LProd `App` Fst (Var Z))
-drOp EScalAdd = Lambda $ LPair LId LId
-drOp EScalSubt = Lambda $ LPair LId (LOp LScalNeg `App` Unit)
-drOp EScalProd = Lambda $ LPair (LOp LScalProd `App` Snd (Var Z))
-                                        (LOp LScalProd `App` Fst (Var Z))
-drOp EScalSin = Lambda $ LOp LScalProd `App` Op EScalCos (Var Z)
-drOp EScalCos = Lambda $ LOp LScalProd `App` neg (Op EScalSin (Var Z))
+drOp EAdd = Lambda $ LinFun $ LinPair LinVar LinVar
+drOp EProd = Lambda $ LinFun $ LinPair (LinLOp LProd (Snd (Var Z)) LinVar)
+                                       (LinLOp LProd (Fst (Var Z)) LinVar)
+drOp EScalAdd = Lambda $ LinFun $ LinPair LinVar LinVar
+drOp EScalSubt = Lambda $ LinFun $ LinPair LinVar (LinLOp LScalNeg Unit LinVar)
+drOp EScalProd = Lambda $ LinFun $ LinPair (LinLOp LScalProd (Snd (Var Z)) LinVar)
+                                           (LinLOp LScalProd (Fst (Var Z)) LinVar)
+drOp EScalSin = Lambda $ LinFun $ LinLOp LScalProd (Op EScalCos (Var Z)) LinVar
+drOp EScalCos = Lambda $ LinFun $ LinLOp LScalProd (neg (Op EScalSin (Var Z))) LinVar
   where neg x = Op EScalSubt (Pair (Op (Constant 0.0) Unit) x)
-drOp Sum = Lambda $ LOp LReplicate `App` Unit
+drOp Sum = Lambda $ LinFun $ LinLOp LReplicate Unit LinVar
 
 dr :: LT (Dr2Env env) => STerm env t -> TTerm (Dr1Env env) (Dr1 t, LFun (Dr2 t) (Dr2Env env))
 dr = \case
   SVar idx ->
     Pair (Var (cvtDr1EnvIdx idx))
-         (makeLFunTerm (onehotEnv idx))
+         (LinFun (onehotEnv idx))
 
   SLambda body ->
     Let (Lambda $ dr body) $
       Pair (Lambda $
               Let (Var (S Z) `App` Var Z) $
                 Pair (Fst (Var Z))
-                     (makeLFunTerm $
+                     (LinFun $
                         LinSnd (Snd (Var Z) `LinApp` LinVar)))
-           (makeLFunTerm $
+           (LinFun $
               LinCopowFold
-                  (Lambda $ makeLFunTerm $
+                  (Lambda $ LinFun $
                      LinFst (Snd (Var (S Z) `App` Var Z)
                                `LinApp` LinVar))
                   LinVar)
@@ -68,17 +68,17 @@ dr = \case
     Let (dr rhs) $
     Let (substTt (wSucc wId) (Fst (Var Z)) (dr body)) $
       Pair (Fst (Var Z))
-           (makeLFunTerm $
-              LinLet' (Snd (Var Z) `LinApp` LinVar)
-                      (LinPlus (LinFst LinVar)
-                               (Snd (Var (S Z)) `LinApp` LinSnd LinVar)))
+           (LinFun $
+              LinLet (Snd (Var Z) `LinApp` LinVar)
+                     (LinPlus (LinFst LinVar)
+                              (Snd (Var (S Z)) `LinApp` LinSnd LinVar)))
 
   SApp fun arg ->
     Let (dr arg) $
     Let (sinkTt (wSucc wId) (dr fun)) $
     Let (App (Fst (Var Z)) (Fst (Var (S Z)))) $
       Pair (Fst (Var Z))
-           (makeLFunTerm $
+           (LinFun $
               LinPlus (Snd (Var (S (S Z)))
                          `LinApp` (Snd (Var Z) `LinApp` LinVar))
                       (Snd (Var (S Z))
@@ -90,28 +90,28 @@ dr = \case
     Let (dr e1) $
     Let (sinkTt (wSucc wId) (dr e2)) $
       Pair (Pair (Fst (Var (S Z))) (Fst (Var Z)))
-           (makeLFunTerm $
+           (LinFun $
               LinPlus (Snd (Var (S Z)) `LinApp` LinFst LinVar)
                       (Snd (Var Z    ) `LinApp` LinSnd LinVar))
 
   SFst e ->
     Let (dr e) $
       Pair (Fst (Fst (Var Z)))
-           (makeLFunTerm $
+           (LinFun $
               Snd (Var Z)
                 `LinApp` LinPair LinVar LinZero)
 
   SSnd e ->
     Let (dr e) $
       Pair (Snd (Fst (Var Z)))
-           (makeLFunTerm $
+           (LinFun $
               Snd (Var Z)
                 `LinApp` LinPair LinZero LinVar)
 
   SOp op arg ->
     Let (dr arg) $
       Pair (Op op (Fst (Var Z)))
-           (makeLFunTerm $
+           (LinFun $
               let dop = drOp op `App` Fst (Var Z)
               in Snd (Var Z) `LinApp` (dop `LinApp` LinVar))
 
