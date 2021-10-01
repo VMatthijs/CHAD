@@ -1,8 +1,10 @@
 {-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE GADTs              #-}
 {-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections      #-}
+{-# LANGUAGE TypeFamilies       #-}
 {-# LANGUAGE TypeOperators      #-}
 
 -- | Definition of the target language
@@ -38,7 +40,7 @@ data TTerm env t where
   AdjPlus :: LT a => TTerm env a -> TTerm env a -> TTerm env a
   Zero :: LT a => TTerm env a
 
-  LinFun :: LinTTerm env a b -> TTerm env (LFun a b)
+  LinFun :: (LT a, LT b) => LinTTerm env '[a] b -> TTerm env (LFun a b)
 
   -- DMap
   --   :: KnownNat n
@@ -66,22 +68,28 @@ data TTerm env t where
 deriving instance Show (TTerm env a)
 
 -- | A sort-of pointful language that encodes a linear function, in the sense
--- of a commutative monoid homomorphism. Compile this to linear combinators
--- using 'makeLFunTerm'.
-data LinTTerm env a t where
-  LinApp :: (LT a, LT s, LT t) => TTerm env (LFun s t) -> LinTTerm env a s -> LinTTerm env a t
-  LinLet :: (LT a, LT s, LT t) => LinTTerm env a s -> LinTTerm env s t -> LinTTerm env a t
-  LinVar :: LT a => LinTTerm env a a
-  LinPair :: (LT a, LT s, LT t) => LinTTerm env a s -> LinTTerm env a t -> LinTTerm env a (s, t)
-  LinFst :: (LT a, LT s, LT t) => LinTTerm env a (s, t) -> LinTTerm env a s
-  LinSnd :: (LT a, LT s, LT t) => LinTTerm env a (s, t) -> LinTTerm env a t
-  LinLOp :: (LT a, LT b, LT t) => LinearOperation' s b t -> TTerm env s -> LinTTerm env a b -> LinTTerm env a t
-  LinZero :: (LT a, LT t) => LinTTerm env a t
-  LinPlus :: (LT a, LT t) => LinTTerm env a t -> LinTTerm env a t -> LinTTerm env a t
-  LinSingleton :: (LT a, LT t) => TTerm env s -> LinTTerm env a t -> LinTTerm env a (Copower s t)
-  LinCopowFold :: (LT a, LT c, LT d) => TTerm env (b -> LFun c d) -> LinTTerm env a (Copower b c) -> LinTTerm env a d
+-- of a commutative monoid homomorphism. The domain is the linear environment
+-- @lenv@; the codomain is @t@. The linear function also has access to
+-- unrestricted variables in the environment @env@ inherited from the
+-- surrounding non-linear computation.
+data LinTTerm env lenv t where
+  LinApp :: (LTenv lenv, LT s, LT t) => TTerm env (LFun s t) -> LinTTerm env lenv s -> LinTTerm env lenv t
+  LinLet :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv s -> LinTTerm env (s ': lenv) t -> LinTTerm env lenv t
+  LinVar :: LT t => Idx lenv t -> LinTTerm env lenv t
+  LinPair :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv s -> LinTTerm env lenv t -> LinTTerm env lenv (s, t)
+  LinFst :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv (s, t) -> LinTTerm env lenv s
+  LinSnd :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv (s, t) -> LinTTerm env lenv t
+  LinLOp :: (LTenv lenv, LT b, LT t) => LinearOperation' s b t -> TTerm env s -> LinTTerm env lenv b -> LinTTerm env lenv t
+  LinZero :: (LTenv lenv, LT t) => LinTTerm env lenv t
+  LinPlus :: (LTenv lenv, LT t) => LinTTerm env lenv t -> LinTTerm env lenv t -> LinTTerm env lenv t
+  LinSingleton :: (LTenv lenv, LT t) => TTerm env s -> LinTTerm env lenv t -> LinTTerm env lenv (Copower s t)
+  LinCopowFold :: (LTenv lenv, LT c, LT d) => TTerm env (b -> LFun c d) -> LinTTerm env lenv (Copower b c) -> LinTTerm env lenv d
 
 deriving instance Show (LinTTerm env a b)
+
+type family LTenv lenv where
+  LTenv (t ': lenv) = (LT t, LTenv lenv)
+  LTenv '[] = ()
 
 -- | Substitute variable with De Bruijn index zero in a 'TTerm'
 substTt :: env :> env' -> TTerm env' u -> TTerm (u ': env) t -> TTerm env' t
@@ -117,10 +125,10 @@ substTt' i v w (LinFun f) = LinFun (substLTt' i v w f)
 
 -- | Substitute given variable with the given environment weakening action in a
 -- 'LinTTerm'
-substLTt' :: Idx env u -> TTerm env' u -> env :> env' -> LinTTerm env a b -> LinTTerm env' a b
+substLTt' :: Idx env u -> TTerm env' u -> env :> env' -> LinTTerm env lenv b -> LinTTerm env' lenv b
 substLTt' i v w (LinApp term f) = LinApp (substTt' i v w term) (substLTt' i v w f)
 substLTt' i v w (LinLet f g) = LinLet (substLTt' i v w f) (substLTt' i v w g)
-substLTt' _ _ _ LinVar = LinVar
+substLTt' _ _ _ (LinVar j) = LinVar j
 substLTt' i v w (LinPair f g) = LinPair (substLTt' i v w f) (substLTt' i v w g)
 substLTt' i v w (LinFst f) = LinFst (substLTt' i v w f)
 substLTt' i v w (LinSnd f) = LinSnd (substLTt' i v w f)
@@ -130,18 +138,34 @@ substLTt' i v w (LinPlus f g) = LinPlus (substLTt' i v w f) (substLTt' i v w g)
 substLTt' i v w (LinSingleton term f) = LinSingleton (substTt' i v w term) (substLTt' i v w f)
 substLTt' i v w (LinCopowFold term f) = LinCopowFold (substTt' i v w term) (substLTt' i v w f)
 
-substLinVar :: (LT a, LT s, LT t) => LinTTerm env a s -> LinTTerm env s t -> LinTTerm env a t
-substLinVar r (LinApp term f) = LinApp term (substLinVar r f)
-substLinVar r (LinLet f g) = LinLet (substLinVar r f) g
-substLinVar r LinVar = r
-substLinVar r (LinPair f g) = LinPair (substLinVar r f) (substLinVar r g)
-substLinVar r (LinFst f) = LinFst (substLinVar r f)
-substLinVar r (LinSnd f) = LinSnd (substLinVar r f)
-substLinVar r (LinLOp op term arg) = LinLOp op term (substLinVar r arg)
-substLinVar _ LinZero = LinZero
-substLinVar r (LinPlus f g) = LinPlus (substLinVar r f) (substLinVar r g)
-substLinVar r (LinSingleton term f) = LinSingleton term (substLinVar r f)
-substLinVar r (LinCopowFold term f) = LinCopowFold term (substLinVar r f)
+-- | Substitute variable with De Bruijn index zero in a 'LinTTerm'
+substLinTt :: LTenv lenv' => lenv :> lenv' -> LinTTerm env lenv' u -> LinTTerm env (u ': lenv) t -> LinTTerm env lenv' t
+substLinTt w v =
+  substLinTt'
+    Z
+    v
+    (Weaken $ \case
+       Z -> error "substLinTt: replaced variable should've been replaced"
+       S i -> w >:> i)
+
+-- | Substitute given variable with the given environment weakening action in a
+-- 'LinTTerm'
+substLinTt' :: LTenv lenv' => Idx lenv u -> LinTTerm env lenv' u -> lenv :> lenv' -> LinTTerm env lenv t -> LinTTerm env lenv' t
+substLinTt' i v w (LinApp f a) = LinApp f (substLinTt' i v w a)
+substLinTt' i v w (LinLet rhs e) =
+  LinLet (substLinTt' i v w rhs)
+         (substLinTt' (S i) (sinkLinTt (wSucc wId) v) (wSink w) e)
+substLinTt' i v w (LinVar i')
+  | Just Refl <- geq i i' = v
+  | otherwise = LinVar (w >:> i')
+substLinTt' i v w (LinPair a b) = LinPair (substLinTt' i v w a) (substLinTt' i v w b)
+substLinTt' i v w (LinFst p) = LinFst (substLinTt' i v w p)
+substLinTt' i v w (LinSnd p) = LinSnd (substLinTt' i v w p)
+substLinTt' i v w (LinLOp op term arg) = LinLOp op term (substLinTt' i v w arg)
+substLinTt' _ _ _ LinZero = LinZero
+substLinTt' i v w (LinPlus a b) = LinPlus (substLinTt' i v w a) (substLinTt' i v w b)
+substLinTt' i v w (LinSingleton term f) = LinSingleton term (substLinTt' i v w f)
+substLinTt' i v w (LinCopowFold term f) = LinCopowFold term (substLinTt' i v w f)
 
 -- | Evaluate the target language
 evalTt :: TTerm '[] t -> t
@@ -161,13 +185,20 @@ evalTt' env (Op op a) = evalOp op (evalTt' env a)
 evalTt' env (Map a b) = V.map (evalTt' env a) (evalTt' env b)
 evalTt' env (AdjPlus a b) = plus (evalTt' env a) (evalTt' env b)
 evalTt' _   Zero = zero
-evalTt' env (LinFun f) = evalLTt' env f
+evalTt' env (LinFun f) = lPair lUnit lId `lComp` evalLTt' env f
+
+type family LinEnvType lenv where
+  LinEnvType '[] = ()
+  LinEnvType (t ': lenv) = (LinEnvType lenv, t)
 
 -- | Evaluate the linear sublanguage of the target language in the given environment
-evalLTt' :: Val env -> LinTTerm env a b -> LFun a b
+evalLTt' :: LT (LinEnvType lenv) => Val env -> LinTTerm env lenv b -> LFun (LinEnvType lenv) b
 evalLTt' env (LinApp fun arg) = lComp (evalLTt' env arg) (evalTt' env fun)
-evalLTt' env (LinLet rhs body) = lComp (evalLTt' env rhs) (evalLTt' env body)
-evalLTt' _   LinVar = lId
+evalLTt' env (LinLet rhs body) = lComp (lPair lId (evalLTt' env rhs)) (evalLTt' env body)
+evalLTt' _   (LinVar j) = makeProj j
+  where makeProj :: (LT (LinEnvType lenv), LT t) => Idx lenv t -> LFun (LinEnvType lenv) t
+        makeProj Z = lSnd
+        makeProj (S i) = lFst `lComp` makeProj i
 evalLTt' env (LinPair e1 e2) = lPair (evalLTt' env e1) (evalLTt' env e2)
 evalLTt' env (LinFst e) = lComp (evalLTt' env e) lFst
 evalLTt' env (LinSnd e) = lComp (evalLTt' env e) lSnd
@@ -190,20 +221,33 @@ sinkTt w (Op op a)     = Op op (sinkTt w a)
 sinkTt w (Map a b)     = Map (sinkTt w a) (sinkTt w b)
 sinkTt w (AdjPlus a b) = AdjPlus (sinkTt w a) (sinkTt w b)
 sinkTt _ Zero          = Zero
-sinkTt w (LinFun f)    = LinFun (sinkLTt w f)
+sinkTt w (LinFun f)    = LinFun (sinkTtL w f)
 
-sinkLTt :: env :> env' -> LinTTerm env a b -> LinTTerm env' a b
-sinkLTt w (LinApp term f) = LinApp (sinkTt w term) (sinkLTt w f)
-sinkLTt w (LinLet f g) = LinLet (sinkLTt w f) (sinkLTt w g)
-sinkLTt _ LinVar = LinVar
-sinkLTt w (LinPair f g) = LinPair (sinkLTt w f) (sinkLTt w g)
-sinkLTt w (LinFst f) = LinFst (sinkLTt w f)
-sinkLTt w (LinSnd f) = LinSnd (sinkLTt w f)
-sinkLTt w (LinLOp op term arg) = LinLOp op (sinkTt w term) (sinkLTt w arg)
-sinkLTt _ LinZero = LinZero
-sinkLTt w (LinPlus f g) = LinPlus (sinkLTt w f) (sinkLTt w g)
-sinkLTt w (LinSingleton term f) = LinSingleton (sinkTt w term) (sinkLTt w f)
-sinkLTt w (LinCopowFold term f) = LinCopowFold (sinkTt w term) (sinkLTt w f)
+sinkTtL :: env :> env' -> LinTTerm env lenv b -> LinTTerm env' lenv b
+sinkTtL w (LinApp term f) = LinApp (sinkTt w term) (sinkTtL w f)
+sinkTtL w (LinLet f g) = LinLet (sinkTtL w f) (sinkTtL w g)
+sinkTtL _ (LinVar i) = LinVar i
+sinkTtL w (LinPair f g) = LinPair (sinkTtL w f) (sinkTtL w g)
+sinkTtL w (LinFst f) = LinFst (sinkTtL w f)
+sinkTtL w (LinSnd f) = LinSnd (sinkTtL w f)
+sinkTtL w (LinLOp op term arg) = LinLOp op (sinkTt w term) (sinkTtL w arg)
+sinkTtL _ LinZero = LinZero
+sinkTtL w (LinPlus f g) = LinPlus (sinkTtL w f) (sinkTtL w g)
+sinkTtL w (LinSingleton term f) = LinSingleton (sinkTt w term) (sinkTtL w f)
+sinkTtL w (LinCopowFold term f) = LinCopowFold (sinkTt w term) (sinkTtL w f)
+
+sinkLinTt :: LTenv lenv' =>lenv :> lenv' -> LinTTerm env lenv b -> LinTTerm env lenv' b
+sinkLinTt w (LinApp term f) = LinApp term (sinkLinTt w f)
+sinkLinTt w (LinLet f g) = LinLet (sinkLinTt w f) (sinkLinTt (wSink w) g)
+sinkLinTt w (LinVar i) = LinVar (w >:> i)
+sinkLinTt w (LinPair f g) = LinPair (sinkLinTt w f) (sinkLinTt w g)
+sinkLinTt w (LinFst f) = LinFst (sinkLinTt w f)
+sinkLinTt w (LinSnd f) = LinSnd (sinkLinTt w f)
+sinkLinTt w (LinLOp op term arg) = LinLOp op term (sinkLinTt w arg)
+sinkLinTt _ LinZero = LinZero
+sinkLinTt w (LinPlus f g) = LinPlus (sinkLinTt w f) (sinkLinTt w g)
+sinkLinTt w (LinSingleton term f) = LinSingleton term (sinkLinTt w f)
+sinkLinTt w (LinCopowFold term f) = LinCopowFold term (sinkLinTt w f)
 
 -- | Pretty print the augmented lambda calculus in 'TTerm'
 --
@@ -243,71 +287,77 @@ printTt _ env (Pair a b) = do
   r1 <- printTt 0 env a
   r2 <- printTt 0 env b
   pure $ showString "(" . r1 . showString ", " . r2 . showString ")"
-printTt d env (Fst p) = showFunction d env "fst" [SomeTTerm p]
-printTt d env (Snd p) = showFunction d env "snd" [SomeTTerm p]
+printTt d env (Fst p) = showFunction d env [] "fst" [SomeTTerm p]
+printTt d env (Snd p) = showFunction d env [] "snd" [SomeTTerm p]
 printTt d env (Op op a) = case (op, a) of
   (Constant x, Unit) -> pure $ showString (show x)
-  (EAdd, Pair a1 a2) -> showFunction d env "vecadd" [SomeTTerm a1, SomeTTerm a2]
-  (EProd, Pair a1 a2) -> showFunction d env "vecprod" [SomeTTerm a1, SomeTTerm a2]
+  (EAdd, Pair a1 a2) -> showFunction d env [] "vecadd" [SomeTTerm a1, SomeTTerm a2]
+  (EProd, Pair a1 a2) -> showFunction d env [] "vecprod" [SomeTTerm a1, SomeTTerm a2]
   (EScalAdd, Pair a1 a2) -> binary a1 (6, " + ") a2
   (EScalSubt, Pair a1 a2) -> binary a1 (6, " - ") a2
   (EScalProd, Pair a1 a2) -> binary a1 (7, " * ") a2
-  (EScalSin, _) -> showFunction d env "sin" [SomeTTerm a]
-  (EScalCos, _) -> showFunction d env "cos" [SomeTTerm a]
-  (Sum, _) -> showFunction d env "vecsum" [SomeTTerm a]
-  (_, _) -> showFunction d env ("evalOp " ++ showOp op) [SomeTTerm a]
+  (EScalSin, _) -> showFunction d env [] "sin" [SomeTTerm a]
+  (EScalCos, _) -> showFunction d env [] "cos" [SomeTTerm a]
+  (Sum, _) -> showFunction d env [] "vecsum" [SomeTTerm a]
+  (_, _) -> showFunction d env [] ("evalOp " ++ showOp op) [SomeTTerm a]
   where
     binary :: TTerm env a -> (Int, String) -> TTerm env b -> State Int ShowS
     binary left (prec, opstr) right = do
       r1 <- printTt (prec + 1) env left
       r2 <- printTt (prec + 1) env right
       pure $ showParen (d > prec) $ r1 . showString opstr . r2
-printTt d env (Map a b) = showFunction d env "map" [SomeTTerm a, SomeTTerm b]
-printTt d env (AdjPlus a b) = showFunction d env "plus" [SomeTTerm a, SomeTTerm b]
+printTt d env (Map a b) = showFunction d env [] "map" [SomeTTerm a, SomeTTerm b]
+printTt d env (AdjPlus a b) = showFunction d env [] "plus" [SomeTTerm a, SomeTTerm b]
 printTt _ _ Zero = pure $ showString "zero"
 printTt d env (LinFun f) = do
-    r1 <- printLTt d env f
+    r1 <- printLTt d env ["v"] f
     pure $ showParen (d > 0) $ showString "\\v -> " . r1
 
 -- | Pretty print the linear sublanguage of the 'TTerm' augmented lambda
--- calculus. This assumes that the linear variable in scope is called 'v'.
+-- calculus.
 --
 -- This recursively calles 'printTt' on the 'TTerm' subterms, and hence
 -- inherits precedences from 'printTt'.
-printLTt :: Int -> [String] -> LinTTerm env a b -> State Int ShowS
-printLTt d env (LinApp f a) = do
+printLTt :: Int -> [String] -> [String] -> LinTTerm env lenv b -> State Int ShowS
+printLTt d env lenv (LinApp f a) = do
   r1 <- printTt 10 env f
-  r2 <- printLTt 11 env a
+  r2 <- printLTt 11 env lenv a
   pure $ showParen (d > 10) $ r1 . showString " " . r2
-printLTt d env (LinLet rhs e) = do
-  r1 <- printLTt 0 env rhs
-  r2 <- printLTt 0 env e
+printLTt d env lenv (LinLet rhs e) = do
+  name <- ('v' :) . show <$> get
+  modify (+1)
+  r1 <- printLTt 0 env lenv rhs
+  r2 <- printLTt 0 env (name : lenv) e
   pure $ showParen (d > 0) $
-    showString "let v = " . r1 . showString " in " . r2
-printLTt _ _ LinVar = pure $ showString "v"
-printLTt _ env (LinPair f g) = do
-  r1 <- printLTt 0 env f
-  r2 <- printLTt 0 env g
+    showString ("let " ++ name ++ " = ") . r1 . showString " in " . r2
+printLTt _ _ lenv (LinVar i) =
+  pure $
+    case drop (idxToInt i) lenv of
+      []  -> showString ("linCtxtVar" ++ show (idxToInt i - length lenv + 1))
+      x:_ -> showString x
+printLTt _ env lenv (LinPair f g) = do
+  r1 <- printLTt 0 env lenv f
+  r2 <- printLTt 0 env lenv g
   pure $ showString "(" . r1 . showString ", " . r2 . showString ")"
-printLTt d env (LinFst f) = showFunction d env "fst" [SomeLinTTerm f]
-printLTt d env (LinSnd f) = showFunction d env "snd" [SomeLinTTerm f]
-printLTt d env (LinLOp op term arg) = do
+printLTt d env lenv (LinFst f) = showFunction d env lenv "fst" [SomeLinTTerm f]
+printLTt d env lenv (LinSnd f) = showFunction d env lenv "snd" [SomeLinTTerm f]
+printLTt d env lenv (LinLOp op term arg) = do
   r1 <- printTt 11 env term
-  r2 <- printLTt 11 env arg
+  r2 <- printLTt 11 env lenv arg
   pure $ showParen (d > 10) $
     showString (showLOp' op ++ " ") . r1 . showString " " . r2
-printLTt _ _ LinZero = pure $ showString "zero"
-printLTt d env (LinPlus f g) = showFunction d env "plus" [SomeLinTTerm f, SomeLinTTerm g]
-printLTt d env (LinSingleton term f) = showFunction d env "singleton" [SomeTTerm term, SomeLinTTerm f]
-printLTt d env (LinCopowFold term f) = showFunction d env "copowfold" [SomeTTerm term, SomeLinTTerm f]
+printLTt _ _ _ LinZero = pure $ showString "zero"
+printLTt d env lenv (LinPlus f g) = showFunction d env lenv "plus" [SomeLinTTerm f, SomeLinTTerm g]
+printLTt d env lenv (LinSingleton term f) = showFunction d env lenv "singleton" [SomeTTerm term, SomeLinTTerm f]
+printLTt d env lenv (LinCopowFold term f) = showFunction d env lenv "copowfold" [SomeTTerm term, SomeLinTTerm f]
 
 data SomeLinTTerm env =
   forall a b. SomeLinTTerm (LinTTerm env a b)
   | forall a. SomeTTerm (TTerm env a)
 
-showFunction :: Int -> [String] -> String -> [SomeLinTTerm env] -> State Int ShowS
-showFunction d env funcname args = do
-  rs <- mapM (\case SomeLinTTerm t -> (showString " " .) <$> printLTt 11 env t
+showFunction :: Int -> [String] -> [String] -> String -> [SomeLinTTerm env] -> State Int ShowS
+showFunction d env lenv funcname args = do
+  rs <- mapM (\case SomeLinTTerm t -> (showString " " .) <$> printLTt 11 env lenv t
                     SomeTTerm t -> (showString " " .) <$> printTt 11 env t)
              args
   pure $
@@ -318,8 +368,8 @@ showFunction d env funcname args = do
 prettyTt :: TTerm env a -> String
 prettyTt term = evalState (printTt 0 [] term) 1 ""
 
-prettyLTt :: LinTTerm env a b -> String
-prettyLTt t = evalState (printLTt 0 [] t) 1 ""
+prettyLTt :: LinTTerm env lenv b -> String
+prettyLTt t = evalState (printLTt 0 [] [] t) 1 ""
 
 -- instance Show (TTerm env a) where
 --   showsPrec p term = evalState (printLam p [] term) 1
@@ -369,10 +419,10 @@ usesOf' _ Zero = mempty
 usesOf' i (LinFun f) = usesOfL i f
 
 -- | Count the uses of the components of a variable in an expression in the linear sublanguage of the target language
-usesOfL :: (Num s, Monoid s) => Idx env t -> LinTTerm env a b -> Layout t s
+usesOfL :: (Num s, Monoid s) => Idx env t -> LinTTerm env lenv b -> Layout t s
 usesOfL i (LinApp term f) = usesOf' i term <> usesOfL i f
 usesOfL i (LinLet f g) = usesOfL i f <> usesOfL i g
-usesOfL _ LinVar = mempty
+usesOfL _ (LinVar _) = mempty
 usesOfL i (LinPair f g) = usesOfL i f <> usesOfL i g
 usesOfL i (LinFst f) = usesOfL i f
 usesOfL i (LinSnd f) = usesOfL i f
@@ -393,11 +443,11 @@ getPick i (Fst e) = TPFst <$> getPick i e
 getPick i (Snd e) = TPSnd <$> getPick i e
 getPick _ _ = Nothing
 
-getPickLin :: LinTTerm env a b -> Maybe (TupPick a b)
-getPickLin LinVar = Just TPHere
-getPickLin (LinFst e) = TPFst <$> getPickLin e
-getPickLin (LinSnd e) = TPSnd <$> getPickLin e
-getPickLin _ = Nothing
+getPickLin :: Idx lenv t -> LinTTerm env lenv b -> Maybe (TupPick t b)
+getPickLin i (LinVar j) | Just Refl <- geq i j = Just TPHere
+getPickLin i (LinFst e) = TPFst <$> getPickLin i e
+getPickLin i (LinSnd e) = TPSnd <$> getPickLin i e
+getPickLin _ _ = Nothing
 
 layoutFromPick :: (Num s, Monoid s) => TupPick t t' -> Layout t s
 layoutFromPick = go (LyLeaf 1)
@@ -407,15 +457,17 @@ layoutFromPick = go (LyLeaf 1)
     go l (TPFst p) = go (LyPair l mempty) p
     go l (TPSnd p) = go (LyPair mempty l) p
 
-usesOfLinVar :: (Num s, Monoid s) => LinTTerm env a b -> Layout a s
-usesOfLinVar (LinApp _ f) = usesOfLinVar f
-usesOfLinVar (LinLet f _) = usesOfLinVar f
-usesOfLinVar LinVar = LyLeaf 1
-usesOfLinVar (LinPair f g) = usesOfLinVar f <> usesOfLinVar g
-usesOfLinVar f@(LinFst g) = maybe (usesOfLinVar g) layoutFromPick (getPickLin f)
-usesOfLinVar f@(LinSnd g) = maybe (usesOfLinVar g) layoutFromPick (getPickLin f)
-usesOfLinVar (LinLOp _ _ arg) = usesOfLinVar arg
-usesOfLinVar LinZero = mempty
-usesOfLinVar (LinPlus f g) = usesOfLinVar f <> usesOfLinVar g
-usesOfLinVar (LinSingleton _ f) = usesOfLinVar f
-usesOfLinVar (LinCopowFold _ f) = usesOfLinVar f
+usesOfLinVar :: (Num s, Monoid s) => Idx lenv t -> LinTTerm env lenv b -> Layout t s
+usesOfLinVar i (LinApp _ f) = usesOfLinVar i f
+usesOfLinVar i (LinLet f g) = usesOfLinVar i f <> usesOfLinVar (S i) g
+usesOfLinVar i (LinVar j)
+  | Just Refl <- geq i j = LyLeaf 1
+  | otherwise = mempty
+usesOfLinVar i (LinPair f g) = usesOfLinVar i f <> usesOfLinVar i g
+usesOfLinVar i f@(LinFst g) = maybe (usesOfLinVar i g) layoutFromPick (getPickLin i f)
+usesOfLinVar i f@(LinSnd g) = maybe (usesOfLinVar i g) layoutFromPick (getPickLin i f)
+usesOfLinVar i (LinLOp _ _ arg) = usesOfLinVar i arg
+usesOfLinVar _ LinZero = mempty
+usesOfLinVar i (LinPlus f g) = usesOfLinVar i f <> usesOfLinVar i g
+usesOfLinVar i (LinSingleton _ f) = usesOfLinVar i f
+usesOfLinVar i (LinCopowFold _ f) = usesOfLinVar i f

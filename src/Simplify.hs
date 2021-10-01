@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -41,10 +43,10 @@ simplifyTTerm Zero = Zero
 simplifyTTerm (LinFun f) = LinFun (simplifyLinTTerm f)
 
 -- | Simplify a 'LinTTerm' using some basic rewriting optimisations.
-simplifyLinTTerm :: LinTTerm env a b -> LinTTerm env a b
+simplifyLinTTerm :: LinTTerm env lenv b -> LinTTerm env lenv b
 simplifyLinTTerm (LinApp term a) = simplifyLinApp (simplifyTTerm term) (simplifyLinTTerm a)
 simplifyLinTTerm (LinLet rhs e) = simplifyLinLet (simplifyLinTTerm rhs) (simplifyLinTTerm e)
-simplifyLinTTerm LinVar = LinVar
+simplifyLinTTerm (LinVar i) = LinVar i
 simplifyLinTTerm (LinPair a b) = LinPair (simplifyLinTTerm a) (simplifyLinTTerm b)
 simplifyLinTTerm (LinFst p) = simplifyLinFst (simplifyLinTTerm p)
 simplifyLinTTerm (LinSnd p) = simplifyLinSnd (simplifyLinTTerm p)
@@ -63,8 +65,11 @@ simplifyApp f a = App f a
 
 -- | Simplify the LinApp form. This converts immediate lambda application into
 -- let-binding.
-simplifyLinApp :: (LT a, LT b, LT c) => TTerm env (LFun b c) -> LinTTerm env a b -> LinTTerm env a c
-simplifyLinApp (LinFun e) a = simplifyLinLet a e
+simplifyLinApp :: (LTenv lenv, LT b, LT c) => TTerm env (LFun b c) -> LinTTerm env lenv b -> LinTTerm env lenv c
+simplifyLinApp (LinFun e) a = simplifyLinLet a (sinkLinTt w e)
+  where w :: '[a] :> (a ': lenv)
+        w = Weaken (\case Z -> Z
+                          S i -> case i of {})
 simplifyLinApp Zero _ = LinZero
 simplifyLinApp f a = LinApp f a
 
@@ -84,12 +89,13 @@ simplifyLet a e
   | otherwise
   = Let a e
 
-simplifyLinLet :: (LT a, LT s, LT t) => LinTTerm env a s -> LinTTerm env s t -> LinTTerm env a t
-simplifyLinLet LinVar body = body
+simplifyLinLet :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv s -> LinTTerm env (s ': lenv) t -> LinTTerm env lenv t
+simplifyLinLet (LinLet rhs e) body =
+  simplifyLinLet rhs (simplifyLinLet e (sinkLinTt (wSink (wSucc wId)) body))
 simplifyLinLet rhs body
-  | let count = usesOfLinVar body
+  | let count = usesOfLinVar Z body
   , decideInlinableLin count rhs
-  = simplifyLinTTerm $ substLinVar rhs body
+  = simplifyLinTTerm $ substLinTt wId rhs body
   | otherwise
   = LinLet rhs body
 
@@ -110,7 +116,7 @@ duplicable (LinFun _) = False  -- TODO: something here?
 duplicable _ = False
 
 duplicableLin :: LinTTerm env a b -> Bool
-duplicableLin LinVar = True
+duplicableLin (LinVar _) = True
 duplicableLin (LinPair a b) = duplicableLin a && duplicableLin b
 duplicableLin (LinFst e) = duplicableLin e
 duplicableLin (LinSnd e) = duplicableLin e
@@ -125,13 +131,13 @@ simplifyFst (Let rhs e) = simplifyLet rhs (simplifyFst e)
 simplifyFst p           = Fst p
 
 -- | Simplify the LinFst form
-simplifyLinFst :: (LT s, LT a, LT b) => LinTTerm env s (a, b) -> LinTTerm env s a
+simplifyLinFst :: (LTenv lenv, LT a, LT b) => LinTTerm env lenv (a, b) -> LinTTerm env lenv a
 simplifyLinFst (LinPair t _) = t
 -- simplifyLinFst (Let rhs e) = simplifyLet rhs (simplifyLinFst e)
 simplifyLinFst p             = LinFst p
 
 -- | Simplify the LinSnd form
-simplifyLinSnd :: (LT s, LT a, LT b) => LinTTerm env s (a, b) -> LinTTerm env s b
+simplifyLinSnd :: (LTenv lenv, LT a, LT b) => LinTTerm env lenv (a, b) -> LinTTerm env lenv b
 simplifyLinSnd (LinPair _ t) = t
 -- simplifyLinSnd (Let rhs e) = simplifyLet rhs (simplifyLinSnd e)
 simplifyLinSnd p             = LinSnd p
@@ -148,9 +154,11 @@ simplifyPlus a Zero = a
 simplifyPlus Zero b = b
 simplifyPlus a b    = AdjPlus a b
 
-simplifyLinPlus :: (LT a, LT b) => LinTTerm env a b -> LinTTerm env a b -> LinTTerm env a b
+simplifyLinPlus :: (LTenv lenv, LT b) => LinTTerm env lenv b -> LinTTerm env lenv b -> LinTTerm env lenv b
 simplifyLinPlus a LinZero = a
 simplifyLinPlus LinZero b = b
 simplifyLinPlus (LinPair a b) (LinPair a' b') =
   simplifyLinTTerm (LinPair (LinPlus a a') (LinPlus b b'))
+simplifyLinPlus (LinLet rhs a) b = simplifyLinLet rhs (simplifyLinPlus a (sinkLinTt (wSucc wId) b))
+simplifyLinPlus a (LinLet rhs b) = simplifyLinLet rhs (simplifyLinPlus (sinkLinTt (wSucc wId) a) b)
 simplifyLinPlus a b = LinPlus a b
