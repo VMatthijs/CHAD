@@ -15,7 +15,7 @@ module Simplify (
 ) where
 
 import           Data.Foldable      (fold)
-import           Data.Monoid        (Sum (..))
+import qualified Data.Monoid        as Mon
 import           Numeric.Natural
 
 import           TargetLanguage
@@ -38,6 +38,8 @@ simplifyTTerm (Fst p) = simplifyFst (simplifyTTerm p)
 simplifyTTerm (Snd p) = simplifySnd (simplifyTTerm p)
 simplifyTTerm (Op op a) = Op op (simplifyTTerm a)
 simplifyTTerm (Map a b) = Map (simplifyTTerm a) (simplifyTTerm b)
+simplifyTTerm (Replicate x) = Replicate (simplifyTTerm x)
+simplifyTTerm (Sum a) = Sum (simplifyTTerm a)
 simplifyTTerm (AdjPlus a b) = simplifyPlus (simplifyTTerm a) (simplifyTTerm b)
 simplifyTTerm Zero = Zero
 simplifyTTerm (LinFun f) = LinFun (simplifyLinTTerm f)
@@ -55,6 +57,9 @@ simplifyLinTTerm LinZero = LinZero
 simplifyLinTTerm (LinPlus a b) = simplifyLinPlus (simplifyLinTTerm a) (simplifyLinTTerm b)
 simplifyLinTTerm (LinSingleton term b) = LinSingleton (simplifyTTerm term) (simplifyLinTTerm b)
 simplifyLinTTerm (LinCopowFold term b) = LinCopowFold (simplifyTTerm term) (simplifyLinTTerm b)
+simplifyLinTTerm (LinZip term b) = LinZip (simplifyTTerm term) (simplifyLinTTerm b)
+simplifyLinTTerm (LinReplicate b) = LinReplicate (simplifyLinTTerm b)
+simplifyLinTTerm (LinSum b) = LinSum (simplifyLinTTerm b)
 
 -- | Simplify the App form. This converts immediate lambda application into
 -- let-binding.
@@ -84,7 +89,7 @@ simplifyLet (Pair a1 a2) e =
     simplifyLet (sinkTt (wSucc wId) a2) $
       simplifyTTerm $ substTt (wSucc (wSucc wId)) (Pair (Var (S Z)) (Var Z)) e
 simplifyLet a e
-  | duplicable a || (fold (usesOf' Z e) :: Sum Natural) <= 1
+  | duplicable a || (fold (usesOf' Z e) :: Mon.Sum Natural) <= 1
   = simplifyTTerm $ substTt wId a e
   | otherwise
   = Let a e
@@ -99,7 +104,7 @@ simplifyLinLet rhs body
   | otherwise
   = LinLet rhs body
 
-decideInlinableLin :: Layout b (Sum Natural) -> LinTTerm env a b -> Bool
+decideInlinableLin :: Layout b (Mon.Sum Natural) -> LinTTerm env a b -> Bool
 decideInlinableLin (LyPair ly1 ly2) (LinPair e1 e2) =
   decideInlinableLin ly1 e1 && decideInlinableLin ly2 e2
 decideInlinableLin (fold -> count) e = count <= 1 || duplicableLin e

@@ -6,7 +6,7 @@
 -- | Definition of the source language
 module SourceLanguage where
 
-import Data.Vector.Unboxed.Sized as V (map)
+import Data.Vector.Unboxed.Sized as V (map, replicate, sum)
 import GHC.TypeNats              (KnownNat)
 
 import Env
@@ -26,6 +26,8 @@ data STerm env a where
   SOp :: (a ~ Dr1 a, b ~ Dr1 b, LT2 a, LT2 b) => Operation a b -> STerm env a -> STerm env b
 
   SMap :: KnownNat n => STerm env (Scal -> Scal) -> STerm env (Vect n) -> STerm env (Vect n)
+  SReplicate :: KnownNat n => STerm env Scal -> STerm env (Vect n)
+  SSum :: KnownNat n => STerm env (Vect n) -> STerm env Scal
 
 -- | Evaluate the source language
 evalSt :: Val env -> STerm env t -> t
@@ -39,3 +41,5 @@ evalSt env (SFst p) = fst $ evalSt env p
 evalSt env (SSnd p) = snd $ evalSt env p
 evalSt env (SOp op a) = evalOp op (evalSt env a)
 evalSt env (SMap a b) = V.map (evalSt env a) (evalSt env b)
+evalSt env (SReplicate x) = V.replicate (evalSt env x)
+evalSt env (SSum v) = V.sum (evalSt env v)

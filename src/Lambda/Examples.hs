@@ -4,6 +4,8 @@
 
 module Lambda.Examples where
 
+import GHC.TypeNats
+
 import Env
 import Operation
 import SourceLanguage
@@ -37,6 +39,13 @@ polynomial = SLambda $
 
 -- First example program in the paper
 --
+-- x : Scal |- paper_ex1 : ((Scal, Scal), Scal)
+-- let y = 2 * x
+--     z = x * y
+--     w = cos z
+--     v = ((y, z), w)
+-- in v
+--
 -- TEST: simplifyTTerm (stConvert paper_ex1) == simplifyTTerm (Fst (dr paper_ex1))
 paper_ex1 :: STerm '[Scal] ((Scal, Scal), Scal)
 paper_ex1 =
@@ -48,6 +57,13 @@ paper_ex1 =
 
 -- Second example program in the paper
 --
+-- x1 : Scal, x2 : Scal, x3 : Scal, x4 : Scal |- paper_ex2 : Scal
+-- let y = x1 * x4 + 2 * x2
+--     z = y * x3
+--     w = z + x4
+--     v = sin w
+-- in v
+--
 -- TEST: simplifyTTerm (stConvert paper_ex2) == simplifyTTerm (Fst (dr paper_ex2))
 paper_ex2 :: STerm '[Scal, Scal, Scal, Scal] Scal
 paper_ex2 =
@@ -56,4 +72,36 @@ paper_ex2 =
   SLet (SVar Z `scalprod` SVar (S (S Z))) $  -- z
   SLet (SVar Z `scaladd` SVar (S (S Z))) $  -- w
   SLet (SOp EScalSin (SVar Z)) $  -- v
+    SVar Z
+
+-- Third example program in the paper
+--
+-- x : Scal |- paper_ex3 : Scal^n
+-- let f = \z -> x * z + 1
+--     zs = replicate x
+--     ys = map f zs
+-- in ys
+--
+-- TEST: simplifyTTerm (stConvert (paper_ex3 @5)) == simplifyTTerm (Fst (dr (paper_ex3 @5)))
+paper_ex3 :: KnownNat n => STerm '[Scal] (Vect n)
+paper_ex3 =
+  SLet (SLambda $ SVar (S Z) `scalprod` SVar Z `scaladd` constant 1) $  -- f
+  SLet (SReplicate (SVar (S Z))) $  -- zs
+  SLet (SMap (SVar (S Z)) (SVar Z)) $  -- ys
+    SVar Z
+
+-- Fourth example program in the paper
+--
+-- x1 : Scal, x2 : Scal^n |- paper_ex4 : Scal
+-- let f = \x2i -> x1 * x2i
+--     ys = map f x2
+--     w = sum ys
+-- in w
+--
+-- TEST: simplifyTTerm (stConvert (paper_ex4 @5)) == simplifyTTerm (Fst (dr (paper_ex4 @5)))
+paper_ex4 :: KnownNat n => STerm '[Vect n, Scal] Scal
+paper_ex4 =
+  SLet (SLambda $ SVar (S (S Z)) `scalprod` SVar Z) $  -- f
+  SLet (SMap (SVar Z) (SVar (S Z))) $  -- ys
+  SLet (SSum (SVar Z)) $  -- w
     SVar Z

@@ -6,14 +6,12 @@
 -- | Definition of the different supported operators
 module Operation where
 
-import           Data.Vector.Unboxed.Sized (sum, zipWith)
+import           Data.Vector.Unboxed.Sized (zipWith)
 import           GHC.TypeNats              (KnownNat)
 import           Prelude                   hiding (sum, zipWith)
 
-import           Types                     (LFun, LT, LT2, Scal, Vect, lAdd,
-                                            lComp, lDup, lExpand, lId,
-                                            lMapTuple, lNegate, lPair, lProd,
-                                            lSubt, lNeg, lSum, lZipWith, zero)
+import           Types                     (LFun, LT, LT2, Scal, Vect,
+                                            lExpand, lProd, lNeg)
 
 -- | Possible operators in the source language
 data Operation a b where
@@ -25,7 +23,6 @@ data Operation a b where
   EScalProd :: Operation (Scal, Scal) Scal
   EScalSin :: Operation Scal Scal
   EScalCos :: Operation Scal Scal
-  Sum :: KnownNat n => Operation (Vect n) Scal
 
 deriving instance Show (Operation a b)
 
@@ -38,7 +35,6 @@ showOp EScalSubt    = "EScalSubt"
 showOp EScalProd    = "EScalProd"
 showOp EScalSin     = "EScalSin"
 showOp EScalCos     = "EScalCos"
-showOp Sum          = "Sum"
 
 -- | Evaluate an operator
 evalOp :: Operation a b -> a -> b
@@ -50,93 +46,25 @@ evalOp EScalSubt    = uncurry (-)
 evalOp EScalProd    = uncurry (*)
 evalOp EScalSin     = sin
 evalOp EScalCos     = cos
-evalOp Sum          = sum
 
 -- | @a -> LFun b c@
-data LinearOperation' a b c where
-  LProd :: KnownNat n => LinearOperation' (Vect n) (Vect n) (Vect n)
-  LReplicate :: KnownNat n => LinearOperation' () Scal (Vect n)
-  LScalNeg :: LinearOperation' () Scal Scal
-  LScalProd :: LinearOperation' Scal Scal Scal
-
-deriving instance Show (LinearOperation' a b c)
-
-showLOp' :: LinearOperation' a b c -> String
-showLOp' LProd = "lprod"
-showLOp' LReplicate = "lreplicate"
-showLOp' LScalNeg = "lscalneg"
-showLOp' LScalProd = "lscalprod"
-
--- | D op and D op^t of the Operators in the source language
 data LinearOperation a b c where
-  DConstant :: LT b => LinearOperation () () b
-  DConstantT :: LT b => LinearOperation () b ()
-  DEAdd
-    :: KnownNat n => LinearOperation (Vect n, Vect n) (Vect n, Vect n) (Vect n)
-  DEAddT
-    :: KnownNat n => LinearOperation (Vect n, Vect n) (Vect n) (Vect n, Vect n)
-  DEProd
-    :: KnownNat n => LinearOperation (Vect n, Vect n) (Vect n, Vect n) (Vect n)
-  DEProdT
-    :: KnownNat n => LinearOperation (Vect n, Vect n) (Vect n) (Vect n, Vect n)
-  DEScalAdd :: LinearOperation (Scal, Scal) (Scal, Scal) Scal
-  DEScalAddT :: LinearOperation (Scal, Scal) Scal (Scal, Scal)
-  DEScalSubt :: LinearOperation (Scal, Scal) (Scal, Scal) Scal
-  DEScalSubtT :: LinearOperation (Scal, Scal) Scal (Scal, Scal)
-  DEScalProd :: LinearOperation (Scal, Scal) (Scal, Scal) Scal
-  DEScalProdT :: LinearOperation (Scal, Scal) Scal (Scal, Scal)
-  DSum :: KnownNat n => LinearOperation (Vect n) (Vect n) Scal
-  DSumT :: KnownNat n => LinearOperation (Vect n) Scal (Vect n)
+  LProd :: KnownNat n => LinearOperation (Vect n) (Vect n) (Vect n)
+  LReplicate :: KnownNat n => LinearOperation () Scal (Vect n)
+  LScalNeg :: LinearOperation () Scal Scal
+  LScalProd :: LinearOperation Scal Scal Scal
+
+deriving instance Show (LinearOperation a b c)
 
 showLOp :: LinearOperation a b c -> String
-showLOp DConstant   = "DConstant"
-showLOp DConstantT  = "DConstantT"
-showLOp DEAdd       = "DEAdd"
-showLOp DEAddT      = "DEAddT"
-showLOp DEProd      = "DEProd"
-showLOp DEProdT     = "DEProdT"
-showLOp DEScalAdd   = "DEScalAdd"
-showLOp DEScalAddT  = "DEScalAddT"
-showLOp DEScalSubt  = "DEScalSubt"
-showLOp DEScalSubtT = "DEScalSubtT"
-showLOp DEScalProd  = "DEScalProd"
-showLOp DEScalProdT = "DEScalProdT"
-showLOp DSum        = "DSum"
-showLOp DSumT       = "DSumT"
-
--- | Evaluate the linear operators
-evalLOp' :: LinearOperation' a b c -> a -> LFun b c
-evalLOp' LProd = lProd
-evalLOp' LReplicate = const lExpand
-evalLOp' LScalNeg = const lNeg
-evalLOp' LScalProd = lProd
+showLOp LProd = "lprod"
+showLOp LReplicate = "lreplicate"
+showLOp LScalNeg = "lscalneg"
+showLOp LScalProd = "lscalprod"
 
 -- | Evaluate the linear operators
 evalLOp :: LinearOperation a b c -> a -> LFun b c
-evalLOp DConstant () = zero
-evalLOp DConstantT () = zero
-evalLOp DEAdd (_x, _y) = lAdd
-evalLOp DEAddT (_x, _y) = lDup
-evalLOp DEProd (x, y) = lComp (lMapTuple xDeriv yDeriv) lAdd
-  where
-    xDeriv = lZipWith lProd y
-    yDeriv = lZipWith lProd x
-evalLOp DEProdT (x, y) = lPair xDeriv yDeriv
-  where
-    xDeriv = lZipWith lProd y
-    yDeriv = lZipWith lProd x
-evalLOp DEScalAdd (_, _) = lAdd
-evalLOp DEScalAddT (_, _) = lDup
-evalLOp DEScalSubt (_, _) = lSubt
-evalLOp DEScalSubtT (_, _) = lPair lId lNegate
-evalLOp DEScalProd (x, y) = lComp (lMapTuple xDeriv yDeriv) lAdd
-  where
-    xDeriv = lProd y
-    yDeriv = lProd x
-evalLOp DEScalProdT (x, y) = lPair xDeriv yDeriv
-  where
-    xDeriv = lProd y
-    yDeriv = lProd x
--- Jacobian: 1xn [1, 1, 1, ...]
-evalLOp DSum _x = lSum
-evalLOp DSumT _x = lExpand
+evalLOp LProd = lProd
+evalLOp LReplicate = const lExpand
+evalLOp LScalNeg = const lNeg
+evalLOp LScalProd = lProd

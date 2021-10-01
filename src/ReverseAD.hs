@@ -8,7 +8,7 @@
 -- | Reverse-AD functions
 module ReverseAD where
 
-import           Operation          (LinearOperation' (..), Operation (..))
+import           Operation          (LinearOperation (..), Operation (..))
 import           SourceLanguage     as SL
 import           TargetLanguage     as TL
 import           Env
@@ -42,7 +42,6 @@ drOp EScalProd = Lambda $ LinFun $ LinPair (LinLOp LScalProd (Snd (Var Z)) (LinV
 drOp EScalSin = Lambda $ LinFun $ LinLOp LScalProd (Op EScalCos (Var Z)) (LinVar Z)
 drOp EScalCos = Lambda $ LinFun $ LinLOp LScalProd (neg (Op EScalSin (Var Z))) (LinVar Z)
   where neg x = Op EScalSubt (Pair (Op (Constant 0.0) Unit) x)
-drOp Sum = Lambda $ LinFun $ LinLOp LReplicate Unit (LinVar Z)
 
 dr :: LT (Dr2Env env) => STerm env t -> TTerm (Dr1Env env) (Dr1 t, LFun (Dr2 t) (Dr2Env env))
 dr = \case
@@ -75,7 +74,7 @@ dr = \case
 
   SApp fun arg ->
     Let (dr arg) $
-    Let (sinkTt (wSucc wId) (dr fun)) $
+    Let (sinkTt1 (dr fun)) $
     Let (App (Fst (Var Z)) (Fst (Var (S Z)))) $
       Pair (Fst (Var Z))
            (LinFun $
@@ -88,7 +87,7 @@ dr = \case
 
   SPair e1 e2 ->
     Let (dr e1) $
-    Let (sinkTt (wSucc wId) (dr e2)) $
+    Let (sinkTt1 (dr e2)) $
       Pair (Pair (Fst (Var (S Z))) (Fst (Var Z)))
            (LinFun $
               LinPlus (Snd (Var (S Z)) `LinApp` LinFst (LinVar Z))
@@ -115,4 +114,18 @@ dr = \case
               let dop = drOp op `App` Fst (Var Z)
               in Snd (Var Z) `LinApp` (dop `LinApp` LinVar Z))
 
-  _ -> undefined
+  SMap f e ->
+    Let (dr f) $
+    Let (sinkTt1 (dr e)) $
+      Pair (Map (Lambda $ Fst (Fst (Var (S (S Z))) `App` Var Z)) (Fst (Var Z)))
+           (LinFun $ Snd (Var (S Z)) `LinApp` LinZip (Fst (Var Z)) (LinVar Z))
+
+  SReplicate e ->
+    Let (dr e) $
+      Pair (Replicate (Fst (Var Z)))
+           (LinFun $ Snd (Var Z) `LinApp` LinSum (LinVar Z))
+
+  SSum e ->
+    Let (dr e) $
+      Pair (Sum (Fst (Var Z)))
+           (LinFun $ Snd (Var Z) `LinApp` LinReplicate (LinVar Z))
