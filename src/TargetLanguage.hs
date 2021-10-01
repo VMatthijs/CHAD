@@ -351,8 +351,8 @@ printLTt d env lenv (LinPlus f g) = showFunction d env lenv "plus" [SomeLinTTerm
 printLTt d env lenv (LinSingleton term f) = showFunction d env lenv "singleton" [SomeTTerm term, SomeLinTTerm f]
 printLTt d env lenv (LinCopowFold term f) = showFunction d env lenv "copowfold" [SomeTTerm term, SomeLinTTerm f]
 
-data SomeLinTTerm env =
-  forall a b. SomeLinTTerm (LinTTerm env a b)
+data SomeLinTTerm env
+  = forall a b. SomeLinTTerm (LinTTerm env a b)
   | forall a. SomeTTerm (TTerm env a)
 
 showFunction :: Int -> [String] -> [String] -> String -> [SomeLinTTerm env] -> State Int ShowS
