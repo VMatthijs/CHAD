@@ -40,7 +40,7 @@ simplifyTTerm (Op op a) = Op op (simplifyTTerm a)
 simplifyTTerm (Map a b) = Map (simplifyTTerm a) (simplifyTTerm b)
 simplifyTTerm (Replicate x) = Replicate (simplifyTTerm x)
 simplifyTTerm (Sum a) = Sum (simplifyTTerm a)
-simplifyTTerm (AdjPlus a b) = simplifyPlus (simplifyTTerm a) (simplifyTTerm b)
+-- simplifyTTerm (AdjPlus a b) = simplifyPlus (simplifyTTerm a) (simplifyTTerm b)
 simplifyTTerm Zero = Zero
 simplifyTTerm (LinFun f) = LinFun (simplifyLinTTerm f)
 
@@ -116,7 +116,7 @@ duplicable Unit{} = True
 duplicable (Pair a b) = duplicable a && duplicable b
 duplicable (Fst e) = duplicable e
 duplicable (Snd e) = duplicable e
-duplicable (AdjPlus a b) = duplicable a && duplicable b
+-- duplicable (AdjPlus a b) = duplicable a && duplicable b
 duplicable Zero = True
 duplicable (LinFun _) = False  -- TODO: something here?
 duplicable _ = False
@@ -154,11 +154,11 @@ simplifySnd (Pair _ s)  = s
 simplifySnd (Let rhs e) = simplifyLet rhs (simplifySnd e)
 simplifySnd p           = Snd p
 
--- | Simplify the Plus form
-simplifyPlus :: LT a => TTerm env a -> TTerm env a -> TTerm env a
-simplifyPlus a Zero = a
-simplifyPlus Zero b = b
-simplifyPlus a b    = AdjPlus a b
+-- -- | Simplify the Plus form
+-- simplifyPlus :: LT a => TTerm env a -> TTerm env a -> TTerm env a
+-- simplifyPlus a Zero = a
+-- simplifyPlus Zero b = b
+-- simplifyPlus a b    = AdjPlus a b
 
 simplifyLinPlus :: (LTenv lenv, LT b) => LinTTerm env lenv b -> LinTTerm env lenv b -> LinTTerm env lenv b
 simplifyLinPlus a LinZero = a
