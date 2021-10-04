@@ -1,8 +1,9 @@
-{-# LANGUAGE DataKinds     #-}
-{-# LANGUAGE GADTs         #-}
-{-# LANGUAGE LambdaCase    #-}
-{-# LANGUAGE RankNTypes    #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE GADTs              #-}
+{-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE RankNTypes         #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeOperators      #-}
 
 -- | De Bruijn environment and index definitions.
 --
@@ -23,13 +24,15 @@ data Idx env t where
   Z :: Idx (t ': env) t
   S :: Idx env t -> Idx (s ': env) t
 
+deriving instance Show (Idx env t)
+
 -- | Forget type information from a De Bruijn index and realise it as an integer
 idxToInt :: Idx env t -> Int
 idxToInt Z = 0
 idxToInt (S i) = succ (idxToInt i)
 
-instance Show (Idx env t) where
-  showsPrec d idx = showParen (d > 10) $ showString ("Idx " ++ show (idxToInt idx))
+-- instance Show (Idx env t) where
+--   showsPrec d idx = showParen (d > 10) $ showString ("Idx " ++ show (idxToInt idx))
 
 instance GEq (Idx env) where
   geq Z Z = Just Refl

@@ -1,7 +1,8 @@
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs            #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE GADTs              #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeOperators      #-}
 
 -- | Definition of the source language
 module SourceLanguage where
@@ -28,6 +29,8 @@ data STerm env a where
   SMap :: KnownNat n => STerm env (Scal -> Scal) -> STerm env (Vect n) -> STerm env (Vect n)
   SReplicate :: KnownNat n => STerm env Scal -> STerm env (Vect n)
   SSum :: KnownNat n => STerm env (Vect n) -> STerm env Scal
+
+deriving instance Show (STerm env a)
 
 -- | Evaluate the source language
 evalSt :: Val env -> STerm env t -> t
