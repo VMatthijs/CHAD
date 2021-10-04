@@ -44,29 +44,6 @@ data TTerm env t where
 
   LinFun :: (LT a, LT b) => LinTTerm env '[a] b -> TTerm env (LFun a b)
 
-  -- DMap
-  --   :: KnownNat n
-  --   => TTerm env (Scal -> (Scal, LFun Scal Scal))
-  --   -> TTerm env (Vect n)
-  --   -> TTerm env (LFun (Scal -> Scal, Vect n) (Vect n))
-  -- DtMap
-  --   :: KnownNat n
-  --   => TTerm env (Scal -> (Scal, LFun Scal Scal))
-  --   -> TTerm env (Vect n)
-  --   -> TTerm env (LFun (Vect n) (Copower Scal Scal, Vect n))
-  -- DFoldr
-  --   :: (KnownNat n, V.Unbox a, V.Unbox b, LT b)
-  --   => TTerm env ((Scal, a) -> (a, LFun (Scal, b) b))
-  --   -> TTerm env a
-  --   -> TTerm env (Vect n)
-  --   -> TTerm env (LFun (((Scal, a) -> b, b), Vect n) b)
-  -- DtFoldr
-  --   :: (KnownNat n, V.Unbox a, V.Unbox b, LT b)
-  --   => TTerm env ((Scal, a) -> (a, LFun b (Scal, b)))
-  --   -> TTerm env a
-  --   -> TTerm env (Vect n)
-  --   -> TTerm env (LFun b ((Copower (Scal, a) b, b), Vect n))
-
 deriving instance Show (TTerm env a)
 
 -- | A sort-of pointful language that encodes a linear function, in the sense
