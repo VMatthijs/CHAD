@@ -118,7 +118,9 @@ dr = \case
     Let (dr f) $
     Let (sinkTt1 (dr e)) $
       Pair (Map (Lambda $ Fst (Fst (Var (S (S Z))) `App` Var Z)) (Fst (Var Z)))
-           (LinFun $ Snd (Var (S Z)) `LinApp` LinZip (Fst (Var Z)) (LinVar Z))
+           (LinFun $ LinPlus (Snd (Var (S Z)) `LinApp` LinZip (Fst (Var Z)) (LinVar Z))
+                             (Snd (Var Z) `LinApp` LinZipWith (Lambda $ LinFun $ Snd (Fst (Var (S (S Z))) `App` Var Z) `LinApp` LinVar Z)
+                                                              (Fst (Var Z)) (LinVar Z)))
 
   SReplicate e ->
     Let (dr e) $

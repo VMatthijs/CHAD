@@ -91,6 +91,11 @@ data LinTTerm env lenv t where
          => TTerm env (Vect n)
          -> LinTTerm env lenv (Vect n)
          -> LinTTerm env lenv (Copower Scal Scal)
+  LinZipWith :: KnownNat n
+             => TTerm env (Scal -> LFun Scal Scal)
+             -> TTerm env (Vect n)
+             -> LinTTerm env lenv (Vect n)
+             -> LinTTerm env lenv (Vect n)
   LinReplicate :: KnownNat n => LinTTerm env lenv Scal -> LinTTerm env lenv (Vect n)
   LinSum :: KnownNat n => LinTTerm env lenv (Vect n) -> LinTTerm env lenv Scal
 
@@ -149,6 +154,7 @@ substLTt' i v w (LinPlus f g) = LinPlus (substLTt' i v w f) (substLTt' i v w g)
 substLTt' i v w (LinSingleton term f) = LinSingleton (substTt' i v w term) (substLTt' i v w f)
 substLTt' i v w (LinCopowFold term f) = LinCopowFold (substTt' i v w term) (substLTt' i v w f)
 substLTt' i v w (LinZip term f) = LinZip (substTt' i v w term) (substLTt' i v w f)
+substLTt' i v w (LinZipWith fun term f) = LinZipWith (substTt' i v w fun) (substTt' i v w term) (substLTt' i v w f)
 substLTt' i v w (LinReplicate f) = LinReplicate (substLTt' i v w f)
 substLTt' i v w (LinSum f) = LinSum (substLTt' i v w f)
 
@@ -181,6 +187,7 @@ substLinTt' i v w (LinPlus a b) = LinPlus (substLinTt' i v w a) (substLinTt' i v
 substLinTt' i v w (LinSingleton term f) = LinSingleton term (substLinTt' i v w f)
 substLinTt' i v w (LinCopowFold term f) = LinCopowFold term (substLinTt' i v w f)
 substLinTt' i v w (LinZip term f) = LinZip term (substLinTt' i v w f)
+substLinTt' i v w (LinZipWith fun term f) = LinZipWith fun term (substLinTt' i v w f)
 substLinTt' i v w (LinReplicate f) = LinReplicate (substLinTt' i v w f)
 substLinTt' i v w (LinSum f) = LinSum (substLinTt' i v w f)
 
@@ -227,6 +234,7 @@ evalLTt' env (LinPlus e1 e2) = plus (evalLTt' env e1) (evalLTt' env e2)
 evalLTt' env (LinSingleton e1 e2) = lComp (evalLTt' env e2) (singleton (evalTt' env e1))
 evalLTt' env (LinCopowFold fun cp) = lComp (evalLTt' env cp) (lCopowFold (evalTt' env fun))
 evalLTt' env (LinZip p d) = evalLTt' env d `lComp` lZip (evalTt' env p)
+evalLTt' env (LinZipWith f p d) = evalLTt' env d `lComp` lZipWith (evalTt' env f) (evalTt' env p)
 evalLTt' env (LinReplicate e) = evalLTt' env e `lComp` lExpand
 evalLTt' env (LinSum e) = evalLTt' env e `lComp` lSum
 
@@ -263,6 +271,7 @@ sinkTtL w (LinPlus f g) = LinPlus (sinkTtL w f) (sinkTtL w g)
 sinkTtL w (LinSingleton term f) = LinSingleton (sinkTt w term) (sinkTtL w f)
 sinkTtL w (LinCopowFold term f) = LinCopowFold (sinkTt w term) (sinkTtL w f)
 sinkTtL w (LinZip term f) = LinZip (sinkTt w term) (sinkTtL w f)
+sinkTtL w (LinZipWith fun term f) = LinZipWith (sinkTt w fun) (sinkTt w term) (sinkTtL w f)
 sinkTtL w (LinReplicate f) = LinReplicate (sinkTtL w f)
 sinkTtL w (LinSum f) = LinSum (sinkTtL w f)
 
@@ -279,6 +288,7 @@ sinkLinTt w (LinPlus f g) = LinPlus (sinkLinTt w f) (sinkLinTt w g)
 sinkLinTt w (LinSingleton term f) = LinSingleton term (sinkLinTt w f)
 sinkLinTt w (LinCopowFold term f) = LinCopowFold term (sinkLinTt w f)
 sinkLinTt w (LinZip term f) = LinZip term (sinkLinTt w f)
+sinkLinTt w (LinZipWith fun term f) = LinZipWith fun term (sinkLinTt w f)
 sinkLinTt w (LinReplicate f) = LinReplicate (sinkLinTt w f)
 sinkLinTt w (LinSum f) = LinSum (sinkLinTt w f)
 
@@ -385,6 +395,7 @@ printLTt d env lenv (LinPlus f g) = showFunction d env lenv "plus" [SomeLinTTerm
 printLTt d env lenv (LinSingleton term f) = showFunction d env lenv "singleton" [SomeTTerm term, SomeLinTTerm f]
 printLTt d env lenv (LinCopowFold term f) = showFunction d env lenv "copowfold" [SomeTTerm term, SomeLinTTerm f]
 printLTt d env lenv (LinZip term f) = showFunction d env lenv "lzip" [SomeTTerm term, SomeLinTTerm f]
+printLTt d env lenv (LinZipWith fun term f) = showFunction d env lenv "lzipWith" [SomeTTerm fun, SomeTTerm term, SomeLinTTerm f]
 printLTt d env lenv (LinReplicate f) = showFunction d env lenv "lreplicate" [SomeLinTTerm f]
 printLTt d env lenv (LinSum f) = showFunction d env lenv "lsum" [SomeLinTTerm f]
 
@@ -471,6 +482,7 @@ usesOfL i (LinPlus f g) = usesOfL i f <> usesOfL i g
 usesOfL i (LinSingleton term f) = usesOf' i term <> usesOfL i f
 usesOfL i (LinCopowFold term f) = usesOf' i term <> usesOfL i f
 usesOfL i (LinZip term f) = usesOf' i term <> usesOfL i f
+usesOfL i (LinZipWith term term' f) = usesOf' i term <> usesOf' i term' <> usesOfL i f
 usesOfL i (LinReplicate f) = usesOfL i f
 usesOfL i (LinSum f) = usesOfL i f
 
@@ -514,5 +526,6 @@ usesOfLinVar i (LinPlus f g) = usesOfLinVar i f <> usesOfLinVar i g
 usesOfLinVar i (LinSingleton _ f) = usesOfLinVar i f
 usesOfLinVar i (LinCopowFold _ f) = usesOfLinVar i f
 usesOfLinVar i (LinZip _ f) = usesOfLinVar i f
+usesOfLinVar i (LinZipWith _ _ f) = usesOfLinVar i f
 usesOfLinVar i (LinReplicate f) = usesOfLinVar i f
 usesOfLinVar i (LinSum f) = usesOfLinVar i f
