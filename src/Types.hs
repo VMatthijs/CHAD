@@ -52,7 +52,6 @@ module Types
   , Dr1
   , Dr2
   , LT(..)
-  , DZ(..)
   , LT2
   , LTU
   , LT2U
@@ -272,30 +271,6 @@ type instance LTctx [a] = ()
 instance LT [a] where
     zero = []
     plus = (++)
-
--- | Decidable Zero: types for which it is decidable whether a value of that
--- type equals zero. This class requires that the type has a zero in the first
--- place.
--- This class is only used for reverse AD of recursion.
-class LT a =>
-      DZ a
-  where
-  isZero :: a -> Bool
-
-instance DZ () where
-  isZero _ = True
-
-instance (DZ a, DZ b) => DZ (a, b) where
-  isZero (a, b) = isZero a && isZero b
-
-instance DZ Scal where
-  isZero = (== zero)
-
-instance KnownNat n => DZ (Vect n) where
-  isZero = (== zero)
-
-instance DZ b => DZ (Copower a b) where
-  isZero (MkCopow xs) = all isZero (map snd xs)
 
 -- | Convenience constraint set that requires 'LT' on the types of (co)tangents
 type LT2 a = (LT (Df2 a), LT (Dr2 a))
