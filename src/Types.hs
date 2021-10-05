@@ -64,6 +64,9 @@ module Types
   , LT(..)
   , DZ(..)
   , LT2
+  , LTU
+  , LT2U
+  , UnLin
   ) where
 
 import           Data.Kind                 (Constraint)
@@ -397,6 +400,12 @@ instance (LT a, LT b) => LT (LEither a b) where
     MkLEither (Just (Right (b `plus` b')))
   plus _ _ = error "This should never be used." -- This doesn't make sense.
 
+type instance LTctx [a] = ()
+
+instance LT [a] where
+    zero = []
+    plus = (++)
+
 -- | Decidable Zero: types for which it is decidable whether a value of that
 -- type equals zero. This class requires that the type has a zero in the first
 -- place.
@@ -428,3 +437,22 @@ instance (DZ a, DZ b) => DZ (LEither a b) where
 
 -- | Convenience constraint set that requires 'LT' on the types of (co)tangents
 type LT2 a = (LT (Df2 a), LT (Dr2 a))
+
+-- | Convenience constraint set that requires 'LT' on the un-linearised type as
+-- well as the type itself
+type LTU a = (LT a, LT (UnLin a))
+
+-- | Convenience constraint set that requires 'LT' on the (co)tangents of the
+-- type, as well as their un-linearised types.
+type LT2U a = (LT2 a, LT (UnLin (Df2 a)), LT (UnLin (Dr2 a)))
+
+-- | Conversion of linear function to ordinary functions. This is the
+-- type-level change from @TargetLanguage@ to @Concrete@.
+type family UnLin a where
+  UnLin Scal = Scal
+  UnLin (a, b) = (UnLin a, UnLin b)
+  UnLin () = ()
+  UnLin (a -> b) = UnLin a -> UnLin b
+  UnLin (LFun a b) = UnLin a -> UnLin b
+  UnLin (Copower a b) = [(UnLin a, UnLin b)]
+  UnLin (Vect n) = Vect n

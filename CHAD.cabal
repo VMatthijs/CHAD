@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 47c541f1413775f92b5932bcc7b309684f1dc71a8112444141de6953be0c85f8
+-- hash: 783a148da283d122e75858b65d5af2239ceebbb4245ce912cb902666c04a4006
 
 name:           CHAD
 version:        0.1.0.0
@@ -26,6 +26,8 @@ source-repository head
 
 library
   exposed-modules:
+      Concrete
+      Concrete.Simplify
       Env
       Examples
       ForwardAD
@@ -37,6 +39,7 @@ library
       STConvert
       TargetLanguage
       Test
+      ToConcrete
       Types
   other-modules:
       Paths_CHAD

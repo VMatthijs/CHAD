@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
@@ -160,7 +161,7 @@ simplifySnd p           = Snd p
 -- simplifyPlus Zero b = b
 -- simplifyPlus a b    = AdjPlus a b
 
-simplifyLinPlus :: (LTenv lenv, LT b) => LinTTerm env lenv b -> LinTTerm env lenv b -> LinTTerm env lenv b
+simplifyLinPlus :: (LTenv lenv, LTU b) => LinTTerm env lenv b -> LinTTerm env lenv b -> LinTTerm env lenv b
 simplifyLinPlus a LinZero = a
 simplifyLinPlus LinZero b = b
 simplifyLinPlus (LinPair a b) (LinPair a' b') =

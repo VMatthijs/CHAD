@@ -12,7 +12,7 @@ import           Operation          (LinearOperation (..), Operation (..))
 import           SourceLanguage     as SL
 import           TargetLanguage     as TL
 import           Env
-import           Types              (LT, Dr1, Dr2, LFun)
+import           Types              (LT, LTU, Dr1, Dr2, LFun)
 
 type family Dr1Env env where
   Dr1Env '[] = '[]
@@ -26,7 +26,7 @@ cvtDr1EnvIdx :: Idx env t -> Idx (Dr1Env env) (Dr1 t)
 cvtDr1EnvIdx Z = Z
 cvtDr1EnvIdx (S i) = S (cvtDr1EnvIdx i)
 
-onehotEnv :: (LTenv lenv, LT (Dr2Env env), LT (Dr2 t)) => Idx env t -> LinTTerm env' (Dr2 t ': lenv) (Dr2Env env)
+onehotEnv :: (LTenv lenv, LTU (Dr2Env env), LT (Dr2 t)) => Idx env t -> LinTTerm env' (Dr2 t ': lenv) (Dr2Env env)
 onehotEnv Z = LinPair LinZero (LinVar Z)
 onehotEnv (S i) = LinPair (onehotEnv i) LinZero
 
@@ -43,7 +43,7 @@ drOp EScalSin = Lambda $ LinFun $ LinLOp LScalProd (Op EScalCos (Var Z)) (LinVar
 drOp EScalCos = Lambda $ LinFun $ LinLOp LScalProd (neg (Op EScalSin (Var Z))) (LinVar Z)
   where neg x = Op EScalSubt (Pair (Op (Constant 0.0) Unit) x)
 
-dr :: LT (Dr2Env env) => STerm env t -> TTerm (Dr1Env env) (Dr1 t, LFun (Dr2 t) (Dr2Env env))
+dr :: LTU (Dr2Env env) => STerm env t -> TTerm (Dr1Env env) (Dr1 t, LFun (Dr2 t) (Dr2Env env))
 dr = \case
   SVar idx ->
     Pair (Var (cvtDr1EnvIdx idx))

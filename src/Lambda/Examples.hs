@@ -12,7 +12,10 @@ import SourceLanguage
 import Types
 
 
-bin :: (a ~ Dr1 a, b ~ Dr1 b, c ~ Dr1 c, LT2 a, LT2 b, LT2 c) => Operation (a, b) c -> STerm env a -> STerm env b -> STerm env c
+bin :: (a ~ Dr1 a, b ~ Dr1 b, c ~ Dr1 c
+       ,a ~ UnLin a, b ~ UnLin b, c ~ UnLin c
+       ,LT2 a, LT2 b, LT2 c)
+    => Operation (a, b) c -> STerm env a -> STerm env b -> STerm env c
 bin op x y = SOp op (SPair x y)
 
 infixl 6 `scaladd`
@@ -23,7 +26,7 @@ infixl 7 `scalprod`
 scalprod :: STerm env Scal -> STerm env Scal -> STerm env Scal
 scalprod = bin EScalProd
 
-constant :: (a ~ Dr1 a, LT a, LT2 a, Show a) => a -> STerm env a
+constant :: (a ~ Dr1 a, a ~ UnLin a, LT a, LT2 a, Show a) => a -> STerm env a
 constant x = SOp (Constant x) SUnit
 
 -- \x -> x * x

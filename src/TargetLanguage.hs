@@ -33,14 +33,14 @@ data TTerm env t where
   Pair :: TTerm env a -> TTerm env b -> TTerm env (a, b)
   Fst :: TTerm env (a, b) -> TTerm env a
   Snd :: TTerm env (a, b) -> TTerm env b
-  Op :: Operation a b -> TTerm env a -> TTerm env b
+  Op :: (a ~ UnLin a, b ~ UnLin b) => Operation a b -> TTerm env a -> TTerm env b
 
   Map :: KnownNat n => TTerm env (Scal -> Scal) -> TTerm env (Vect n) -> TTerm env (Vect n)
   Replicate :: KnownNat n => TTerm env Scal -> TTerm env (Vect n)
   Sum :: KnownNat n => TTerm env (Vect n) -> TTerm env Scal
 
   -- AdjPlus :: LT a => TTerm env a -> TTerm env a -> TTerm env a
-  Zero :: LT a => TTerm env a
+  Zero :: LTU a => TTerm env a
 
   LinFun :: (LT a, LT b) => LinTTerm env '[a] b -> TTerm env (LFun a b)
 
@@ -58,11 +58,11 @@ data LinTTerm env lenv t where
   LinPair :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv s -> LinTTerm env lenv t -> LinTTerm env lenv (s, t)
   LinFst :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv (s, t) -> LinTTerm env lenv s
   LinSnd :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv (s, t) -> LinTTerm env lenv t
-  LinLOp :: (LTenv lenv, LT b, LT t) => LinearOperation s b t -> TTerm env s -> LinTTerm env lenv b -> LinTTerm env lenv t
-  LinZero :: (LTenv lenv, LT t) => LinTTerm env lenv t
-  LinPlus :: (LTenv lenv, LT t) => LinTTerm env lenv t -> LinTTerm env lenv t -> LinTTerm env lenv t
+  LinLOp :: (LTenv lenv, LT b, LT t, s ~ UnLin s, b ~ UnLin b, t ~ UnLin t) => LinearOperation s b t -> TTerm env s -> LinTTerm env lenv b -> LinTTerm env lenv t
+  LinZero :: (LTenv lenv, LTU t) => LinTTerm env lenv t
+  LinPlus :: (LTenv lenv, LTU t) => LinTTerm env lenv t -> LinTTerm env lenv t -> LinTTerm env lenv t
   LinSingleton :: (LTenv lenv, LT t) => TTerm env s -> LinTTerm env lenv t -> LinTTerm env lenv (Copower s t)
-  LinCopowFold :: (LTenv lenv, LT b, LT c) => TTerm env (a -> LFun b c) -> LinTTerm env lenv (Copower a b) -> LinTTerm env lenv c
+  LinCopowFold :: (LTenv lenv, LT b, LTU c) => TTerm env (a -> LFun b c) -> LinTTerm env lenv (Copower a b) -> LinTTerm env lenv c
 
   LinZip :: KnownNat n
          => TTerm env (Vect n)
