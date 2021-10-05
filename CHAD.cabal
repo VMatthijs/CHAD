@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 783a148da283d122e75858b65d5af2239ceebbb4245ce912cb902666c04a4006
+-- hash: aa963d66f3abd76a05c4f4288fdf55429bf46523deeb24f10952543435be9a5d
 
 name:           CHAD
 version:        0.1.0.0
@@ -28,6 +28,7 @@ library
   exposed-modules:
       Concrete
       Concrete.Simplify
+      Count
       Env
       Examples
       ForwardAD

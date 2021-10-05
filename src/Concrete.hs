@@ -24,6 +24,7 @@ import           Data.Type.Equality        ((:~:) (Refl))
 import qualified Data.Vector.Unboxed.Sized as V (map, zipWith, replicate, sum, toList)
 import           GHC.TypeNats              (KnownNat)
 
+import           Count
 import           Env
 import           Operation
 import           Types
@@ -242,74 +243,39 @@ prettyCt term = evalState (printCt 0 [] term) 1 ""
 -- instance Show (CTerm env a) where
 --   showsPrec p term = evalState (printLam p [] term) 1
 
-data Layout t a where
-  LyLeaf :: a -> Layout t a
-  LyPair :: Layout t1 a -> Layout t2 a -> Layout (t1, t2) a
-deriving instance Show a => Show (Layout t a)
-
-instance Functor (Layout t) where
-  fmap f (LyLeaf x)     = LyLeaf (f x)
-  fmap f (LyPair l1 l2) = LyPair (fmap f l1) (fmap f l2)
-
-instance Foldable (Layout t) where
-  foldMap f (LyLeaf x)     = f x
-  foldMap f (LyPair l1 l2) = foldMap f l1 <> foldMap f l2
-
-instance Semigroup a => Semigroup (Layout t a) where
-  LyLeaf a <> LyLeaf b = LyLeaf (a <> b)
-  LyLeaf n <> LyPair l1 l2 = LyPair (fmap (n <>) l1) (fmap (n <>) l2)
-  LyPair l1 l2 <> LyLeaf n = LyPair (fmap (<> n) l1) (fmap (<> n) l2)
-  LyPair l1 l2 <> LyPair l3 l4 = LyPair (l1 <> l3) (l2 <> l4)
-
-instance Monoid a => Monoid (Layout t a) where
-  mempty = LyLeaf mempty
-
 -- | Count the uses of a variable in an expression
-usesOf :: Idx env t -> CTerm env a -> Integer
-usesOf x t = getSum (fold (usesOf' x t))
+usesOfCt :: Idx env t -> CTerm env a -> Integer
+usesOfCt x t = getSum (fold (usesOfCt' x t))
 
 -- | Count the uses of the components of a variable in an expression
-usesOf' :: (Num s, Monoid s) => Idx env t -> CTerm env a -> Layout t s
-usesOf' i (CVar i')
+usesOfCt' :: (Num s, Monoid s) => Idx env t -> CTerm env a -> Layout t s
+usesOfCt' i (CVar i')
   | Just Refl <- geq i i' = LyLeaf 1
   | otherwise = mempty
-usesOf' i (CLambda e) = usesOf' (S i) e
-usesOf' i (CLet rhs e) = usesOf' i rhs <> usesOf' (S i) e
-usesOf' i (CApp f a) = usesOf' i f <> usesOf' i a
-usesOf' _ CUnit = mempty
-usesOf' i (CPair a b) = usesOf' i a <> usesOf' i b
-usesOf' i p@(CFst p') = maybe (usesOf' i p') layoutFromPick (getPick i p)
-usesOf' i p@(CSnd p') = maybe (usesOf' i p') layoutFromPick (getPick i p)
-usesOf' i (COp _ a) = usesOf' i a
-usesOf' i (CMap a b) = usesOf' i a <> usesOf' i b
-usesOf' i (CZipWith a b c) = usesOf' i a <> usesOf' i b <> usesOf' i c
-usesOf' i (CReplicate x) = usesOf' i x
-usesOf' i (CSum x) = usesOf' i x
-usesOf' i (CToList x) = usesOf' i x
-usesOf' _ CLNil = mempty
-usesOf' i (CLCons a b) = usesOf' i a <> usesOf' i b
-usesOf' i (CLMap a b) = usesOf' i a <> usesOf' i b
-usesOf' i (CLFoldr a b c) = usesOf' i a <> usesOf' i b <> usesOf' i c
-usesOf' i (CLSum x) = usesOf' i x
-usesOf' i (CLZip a b) = usesOf' i a <> usesOf' i b
-usesOf' _ CZero = mempty
-usesOf' i (CPlus a b) = usesOf' i a <> usesOf' i b
-
-data TupPick large small where
-  TPHere :: TupPick t t
-  TPFst :: TupPick t (a, b) -> TupPick t a
-  TPSnd :: TupPick t (a, b) -> TupPick t b
+usesOfCt' i (CLambda e) = usesOfCt' (S i) e
+usesOfCt' i (CLet rhs e) = usesOfCt' i rhs <> usesOfCt' (S i) e
+usesOfCt' i (CApp f a) = usesOfCt' i f <> usesOfCt' i a
+usesOfCt' _ CUnit = mempty
+usesOfCt' i (CPair a b) = usesOfCt' i a <> usesOfCt' i b
+usesOfCt' i p@(CFst p') = maybe (usesOfCt' i p') layoutFromPick (getPick i p)
+usesOfCt' i p@(CSnd p') = maybe (usesOfCt' i p') layoutFromPick (getPick i p)
+usesOfCt' i (COp _ a) = usesOfCt' i a
+usesOfCt' i (CMap a b) = usesOfCt' i a <> usesOfCt' i b
+usesOfCt' i (CZipWith a b c) = usesOfCt' i a <> usesOfCt' i b <> usesOfCt' i c
+usesOfCt' i (CReplicate x) = usesOfCt' i x
+usesOfCt' i (CSum x) = usesOfCt' i x
+usesOfCt' i (CToList x) = usesOfCt' i x
+usesOfCt' _ CLNil = mempty
+usesOfCt' i (CLCons a b) = usesOfCt' i a <> usesOfCt' i b
+usesOfCt' i (CLMap a b) = usesOfCt' i a <> usesOfCt' i b
+usesOfCt' i (CLFoldr a b c) = usesOfCt' i a <> usesOfCt' i b <> usesOfCt' i c
+usesOfCt' i (CLSum x) = usesOfCt' i x
+usesOfCt' i (CLZip a b) = usesOfCt' i a <> usesOfCt' i b
+usesOfCt' _ CZero = mempty
+usesOfCt' i (CPlus a b) = usesOfCt' i a <> usesOfCt' i b
 
 getPick :: Idx env t -> CTerm env a -> Maybe (TupPick t a)
 getPick i (CVar j) | Just Refl <- geq i j = Just TPHere
 getPick i (CFst e) = TPFst <$> getPick i e
 getPick i (CSnd e) = TPSnd <$> getPick i e
 getPick _ _ = Nothing
-
-layoutFromPick :: (Num s, Monoid s) => TupPick t t' -> Layout t s
-layoutFromPick = go (LyLeaf 1)
-  where
-    go :: (Num s, Monoid s) => Layout t' s -> TupPick t t' -> Layout t s
-    go l TPHere = l
-    go l (TPFst p) = go (LyPair l mempty) p
-    go l (TPSnd p) = go (LyPair mempty l) p

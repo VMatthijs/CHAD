@@ -107,7 +107,7 @@ simplifyLet a e
       CLet a1 $
         CLet (sinkCt (wSucc wId) a2) $
           substCt wId re' (sinkCt (wSink (wSucc (wSucc wId))) e)
-  | duplicable a || (fold (usesOf' Z e) :: Mon.Sum Natural) <= 1
+  | duplicable a || (fold (usesOfCt' Z e) :: Mon.Sum Natural) <= 1
   = simplifyCTerm' $ substCt wId a e
   | otherwise
   = CLet a e

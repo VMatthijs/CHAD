@@ -19,6 +19,7 @@ import           Data.Type.Equality        ((:~:) (Refl))
 import qualified Data.Vector.Unboxed.Sized as V (map, replicate, sum)
 import           GHC.TypeNats              (KnownNat)
 
+import           Count
 import           Env
 import           Operation
 import           Types
@@ -399,74 +400,47 @@ prettyLTt t = evalState (printLTt 0 [] [] t) 1 ""
 -- instance Show (TTerm env a) where
 --   showsPrec p term = evalState (printLam p [] term) 1
 
-data Layout t a where
-  LyLeaf :: a -> Layout t a
-  LyPair :: Layout t1 a -> Layout t2 a -> Layout (t1, t2) a
-deriving instance Show a => Show (Layout t a)
-
-instance Functor (Layout t) where
-  fmap f (LyLeaf x)     = LyLeaf (f x)
-  fmap f (LyPair l1 l2) = LyPair (fmap f l1) (fmap f l2)
-
-instance Foldable (Layout t) where
-  foldMap f (LyLeaf x)     = f x
-  foldMap f (LyPair l1 l2) = foldMap f l1 <> foldMap f l2
-
-instance Semigroup a => Semigroup (Layout t a) where
-  LyLeaf a <> LyLeaf b = LyLeaf (a <> b)
-  LyLeaf n <> LyPair l1 l2 = LyPair (fmap (n <>) l1) (fmap (n <>) l2)
-  LyPair l1 l2 <> LyLeaf n = LyPair (fmap (<> n) l1) (fmap (<> n) l2)
-  LyPair l1 l2 <> LyPair l3 l4 = LyPair (l1 <> l3) (l2 <> l4)
-
-instance Monoid a => Monoid (Layout t a) where
-  mempty = LyLeaf mempty
-
 -- | Count the uses of a variable in an expression
-usesOf :: Idx env t -> TTerm env a -> Integer
-usesOf x t = getSum (fold (usesOf' x t))
+usesOfTt :: Idx env t -> TTerm env a -> Integer
+usesOfTt x t = getSum (fold (usesOfTt' x t))
 
 -- | Count the uses of the components of a variable in an expression
-usesOf' :: (Num s, Monoid s) => Idx env t -> TTerm env a -> Layout t s
-usesOf' i (Var i')
+usesOfTt' :: (Num s, Monoid s) => Idx env t -> TTerm env a -> Layout t s
+usesOfTt' i (Var i')
   | Just Refl <- geq i i' = LyLeaf 1
   | otherwise = mempty
-usesOf' i (Lambda e) = usesOf' (S i) e
-usesOf' i (Let rhs e) = usesOf' i rhs <> usesOf' (S i) e
-usesOf' i (App f a) = usesOf' i f <> usesOf' i a
-usesOf' _ Unit = mempty
-usesOf' i (Pair a b) = usesOf' i a <> usesOf' i b
-usesOf' i p@(Fst p') = maybe (usesOf' i p') layoutFromPick (getPick i p)
-usesOf' i p@(Snd p') = maybe (usesOf' i p') layoutFromPick (getPick i p)
-usesOf' i (Op _ a) = usesOf' i a
-usesOf' i (Map a b) = usesOf' i a <> usesOf' i b
-usesOf' i (Replicate x) = usesOf' i x
-usesOf' i (Sum a) = usesOf' i a
--- usesOf' i (AdjPlus a b) = usesOf' i a <> usesOf' i b
-usesOf' _ Zero = mempty
-usesOf' i (LinFun f) = usesOfL i f
+usesOfTt' i (Lambda e) = usesOfTt' (S i) e
+usesOfTt' i (Let rhs e) = usesOfTt' i rhs <> usesOfTt' (S i) e
+usesOfTt' i (App f a) = usesOfTt' i f <> usesOfTt' i a
+usesOfTt' _ Unit = mempty
+usesOfTt' i (Pair a b) = usesOfTt' i a <> usesOfTt' i b
+usesOfTt' i p@(Fst p') = maybe (usesOfTt' i p') layoutFromPick (getPick i p)
+usesOfTt' i p@(Snd p') = maybe (usesOfTt' i p') layoutFromPick (getPick i p)
+usesOfTt' i (Op _ a) = usesOfTt' i a
+usesOfTt' i (Map a b) = usesOfTt' i a <> usesOfTt' i b
+usesOfTt' i (Replicate x) = usesOfTt' i x
+usesOfTt' i (Sum a) = usesOfTt' i a
+-- usesOfTt' i (AdjPlus a b) = usesOfTt' i a <> usesOfTt' i b
+usesOfTt' _ Zero = mempty
+usesOfTt' i (LinFun f) = usesOfTtL i f
 
 -- | Count the uses of the components of a variable in an expression in the linear sublanguage of the target language
-usesOfL :: (Num s, Monoid s) => Idx env t -> LinTTerm env lenv b -> Layout t s
-usesOfL i (LinApp term f) = usesOf' i term <> usesOfL i f
-usesOfL i (LinLet f g) = usesOfL i f <> usesOfL i g
-usesOfL _ (LinVar _) = mempty
-usesOfL i (LinPair f g) = usesOfL i f <> usesOfL i g
-usesOfL i (LinFst f) = usesOfL i f
-usesOfL i (LinSnd f) = usesOfL i f
-usesOfL i (LinLOp _ term arg) = usesOf' i term <> usesOfL i arg
-usesOfL _ LinZero = mempty
-usesOfL i (LinPlus f g) = usesOfL i f <> usesOfL i g
-usesOfL i (LinSingleton term f) = usesOf' i term <> usesOfL i f
-usesOfL i (LinCopowFold term f) = usesOf' i term <> usesOfL i f
-usesOfL i (LinZip term f) = usesOf' i term <> usesOfL i f
-usesOfL i (LinZipWith term term' f) = usesOf' i term <> usesOf' i term' <> usesOfL i f
-usesOfL i (LinReplicate f) = usesOfL i f
-usesOfL i (LinSum f) = usesOfL i f
-
-data TupPick large small where
-  TPHere :: TupPick t t
-  TPFst :: TupPick t (a, b) -> TupPick t a
-  TPSnd :: TupPick t (a, b) -> TupPick t b
+usesOfTtL :: (Num s, Monoid s) => Idx env t -> LinTTerm env lenv b -> Layout t s
+usesOfTtL i (LinApp term f) = usesOfTt' i term <> usesOfTtL i f
+usesOfTtL i (LinLet f g) = usesOfTtL i f <> usesOfTtL i g
+usesOfTtL _ (LinVar _) = mempty
+usesOfTtL i (LinPair f g) = usesOfTtL i f <> usesOfTtL i g
+usesOfTtL i (LinFst f) = usesOfTtL i f
+usesOfTtL i (LinSnd f) = usesOfTtL i f
+usesOfTtL i (LinLOp _ term arg) = usesOfTt' i term <> usesOfTtL i arg
+usesOfTtL _ LinZero = mempty
+usesOfTtL i (LinPlus f g) = usesOfTtL i f <> usesOfTtL i g
+usesOfTtL i (LinSingleton term f) = usesOfTt' i term <> usesOfTtL i f
+usesOfTtL i (LinCopowFold term f) = usesOfTt' i term <> usesOfTtL i f
+usesOfTtL i (LinZip term f) = usesOfTt' i term <> usesOfTtL i f
+usesOfTtL i (LinZipWith term term' f) = usesOfTt' i term <> usesOfTt' i term' <> usesOfTtL i f
+usesOfTtL i (LinReplicate f) = usesOfTtL i f
+usesOfTtL i (LinSum f) = usesOfTtL i f
 
 getPick :: Idx env t -> TTerm env a -> Maybe (TupPick t a)
 getPick i (Var j) | Just Refl <- geq i j = Just TPHere
@@ -479,14 +453,6 @@ getPickLin i (LinVar j) | Just Refl <- geq i j = Just TPHere
 getPickLin i (LinFst e) = TPFst <$> getPickLin i e
 getPickLin i (LinSnd e) = TPSnd <$> getPickLin i e
 getPickLin _ _ = Nothing
-
-layoutFromPick :: (Num s, Monoid s) => TupPick t t' -> Layout t s
-layoutFromPick = go (LyLeaf 1)
-  where
-    go :: (Num s, Monoid s) => Layout t' s -> TupPick t t' -> Layout t s
-    go l TPHere = l
-    go l (TPFst p) = go (LyPair l mempty) p
-    go l (TPSnd p) = go (LyPair mempty l) p
 
 usesOfLinVar :: (Num s, Monoid s) => Idx lenv t -> LinTTerm env lenv b -> Layout t s
 usesOfLinVar i (LinApp _ f) = usesOfLinVar i f

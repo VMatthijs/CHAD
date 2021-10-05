@@ -19,8 +19,9 @@ import           Data.Foldable      (fold)
 import qualified Data.Monoid        as Mon
 import           Numeric.Natural
 
-import           TargetLanguage
+import           Count
 import           Env
+import           TargetLanguage
 import           Types
 
 -- | Simplify a 'TTerm' using some basic rewriting optimisations.
@@ -91,7 +92,7 @@ simplifyLet (Pair a1 a2) e =
     simplifyLet (sinkTt (wSucc wId) a2) $
       simplifyTTerm $ substTt (wSucc (wSucc wId)) (Pair (Var (S Z)) (Var Z)) e
 simplifyLet a e
-  | duplicable a || (fold (usesOf' Z e) :: Mon.Sum Natural) <= 1
+  | duplicable a || (fold (usesOfTt' Z e) :: Mon.Sum Natural) <= 1
   = simplifyTTerm $ substTt wId a e
   | otherwise
   = Let a e
