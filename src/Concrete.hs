@@ -51,7 +51,7 @@ data CTerm env t where
   CLMap :: CTerm env (a -> b) -> CTerm env [a] -> CTerm env [b]
   CLFoldr :: CTerm env (a -> b -> b) -> CTerm env b -> CTerm env [a] -> CTerm env b
   CLSum :: LT a => CTerm env [a] -> CTerm env a
-  CLZipWith :: CTerm env (a -> b -> c) -> CTerm env [a] -> CTerm env [b] -> CTerm env [c]
+  CLZip :: CTerm env [a] -> CTerm env [b] -> CTerm env [(a, b)]
 
   CZero :: LT a => CTerm env a
   CPlus :: LT a => CTerm env a -> CTerm env a -> CTerm env a
@@ -92,7 +92,7 @@ substCt' i v w (CSum x) = CSum (substCt' i v w x)
 substCt' i v w (CToList p) = CToList (substCt' i v w p)
 substCt' _ _ _ CLNil = CLNil
 substCt' i v w (CLCons a b) = CLCons (substCt' i v w a) (substCt' i v w b)
-substCt' i v w (CLZipWith f a b) = CLZipWith (substCt' i v w f) (substCt' i v w a) (substCt' i v w b)
+substCt' i v w (CLZip a b) = CLZip (substCt' i v w a) (substCt' i v w b)
 substCt' i v w (CLMap a b) = CLMap (substCt' i v w a) (substCt' i v w b)
 substCt' i v w (CLFoldr a b c) = CLFoldr (substCt' i v w a) (substCt' i v w b) (substCt' i v w c)
 substCt' i v w (CLSum a) = CLSum (substCt' i v w a)
@@ -124,7 +124,7 @@ evalCt' env (CLCons a b) = evalCt' env a : evalCt' env b
 evalCt' env (CLMap a b) = map (evalCt' env a) (evalCt' env b)
 evalCt' env (CLFoldr a b c) = foldr (evalCt' env a) (evalCt' env b) (evalCt' env c)
 evalCt' env (CLSum x) = foldr plus zero (evalCt' env x)
-evalCt' env (CLZipWith f a b) = zipWith (evalCt' env f) (evalCt' env a) (evalCt' env b)
+evalCt' env (CLZip a b) = zip (evalCt' env a) (evalCt' env b)
 evalCt' _   CZero = zero
 evalCt' env (CPlus a b) = plus (evalCt' env a) (evalCt' env b)
 
@@ -148,7 +148,7 @@ sinkCt w (CLCons a b)   = CLCons (sinkCt w a) (sinkCt w b)
 sinkCt w (CLMap a b)    = CLMap (sinkCt w a) (sinkCt w b)
 sinkCt w (CLFoldr a b c) = CLFoldr (sinkCt w a) (sinkCt w b) (sinkCt w c)
 sinkCt w (CLSum x)      = CLSum (sinkCt w x)
-sinkCt w (CLZipWith f a b) = CLZipWith (sinkCt w f) (sinkCt w a) (sinkCt w b)
+sinkCt w (CLZip a b)    = CLZip (sinkCt w a) (sinkCt w b)
 sinkCt _ CZero          = CZero
 sinkCt w (CPlus a b)    = CPlus (sinkCt w a) (sinkCt w b)
 
@@ -224,7 +224,7 @@ printCt d env (CLCons a b) = do
 printCt d env (CLMap f a) = showFunction d env "map" [Some f, Some a]
 printCt d env (CLFoldr a b c) = showFunction d env "foldr" [Some a, Some b, Some c]
 printCt d env (CLSum x) = showFunction d env "sum" [Some x]
-printCt d env (CLZipWith f a b) = showFunction d env "zipWith" [Some f, Some a, Some b]
+printCt d env (CLZip a b) = showFunction d env "zip" [Some a, Some b]
 printCt _ _ CZero = pure $ showString "zero"
 printCt d env (CPlus a b) = showFunction d env "plus" [Some a, Some b]
 
@@ -291,7 +291,7 @@ usesOf' i (CLCons a b) = usesOf' i a <> usesOf' i b
 usesOf' i (CLMap a b) = usesOf' i a <> usesOf' i b
 usesOf' i (CLFoldr a b c) = usesOf' i a <> usesOf' i b <> usesOf' i c
 usesOf' i (CLSum x) = usesOf' i x
-usesOf' i (CLZipWith f a b) = usesOf' i f <> usesOf' i a <> usesOf' i b
+usesOf' i (CLZip a b) = usesOf' i a <> usesOf' i b
 usesOf' _ CZero = mempty
 usesOf' i (CPlus a b) = usesOf' i a <> usesOf' i b
 

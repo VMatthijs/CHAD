@@ -86,6 +86,13 @@ paper_ex2 =
 -- in ys
 --
 -- TEST: simplifyTTerm (stConvert (paper_ex3 @5)) == simplifyTTerm (Fst (dr (paper_ex3 @5)))
+--
+-- Simplified, this program is equivalent to:
+--   map (\z -> x * z + 1) (replicate x)
+--   = replicate (x * x + 1)
+-- and hence the reverse derivative, given x : Scal and d : dScal^n, is:
+--   sum (map (\dx -> dx * 2 * x) d)
+--   = 2 * sum (map (*x) d)
 paper_ex3 :: KnownNat n => STerm '[Scal] (Vect n)
 paper_ex3 =
   SLet (SLambda $ SVar (S Z) `scalprod` SVar Z `scaladd` constant 1) $  -- f
@@ -102,6 +109,14 @@ paper_ex3 =
 -- in w
 --
 -- TEST: simplifyTTerm (stConvert (paper_ex4 @5)) == simplifyTTerm (Fst (dr (paper_ex4 @5)))
+--
+-- Simplified, this program is equivalent to:
+--   sum (map (x1 *) x2)
+-- and hence the reverse derivative, given x1 : Scal, x2 : Scal^n and d : dScal, is:
+--   - with respect to x1:
+--       d * sum x2
+--   - with respect to x2:
+--       replicate (d * x1)
 paper_ex4 :: KnownNat n => STerm '[Vect n, Scal] Scal
 paper_ex4 =
   SLet (SLambda $ SVar (S (S Z)) `scalprod` SVar Z) $  -- f

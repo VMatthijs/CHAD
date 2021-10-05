@@ -66,7 +66,7 @@ toConcreteL' w = \case
                                                 `CApp` CFst (CVar Z)
                                                 `CApp` CSnd (CVar Z))
                                    (toConcreteL' w a))
-  LinZip a b -> CLZipWith (CLambda $ CLambda $ CPair (CVar (S Z)) (CVar Z)) (CToList (toConcrete (sinkTt w a))) (CToList (toConcreteL' w b))
+  LinZip a b -> CLZip (CToList (toConcrete (sinkTt w a))) (CToList (toConcreteL' w b))
   LinZipWith f a b -> CZipWith (toConcrete (sinkTt w f)) (toConcrete (sinkTt w a)) (toConcreteL' w b)
   LinReplicate a -> CReplicate (toConcreteL' w a)
   LinSum a -> CSum (toConcreteL' w a)
