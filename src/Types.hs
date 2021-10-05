@@ -217,9 +217,10 @@ class LTctx a =>
 -- inverse cannot be inferred because type class instances need not be
 -- injective. This type family explicitly requires the context 'LT b' on the
 -- instance for 'LT (a -> b)', and due to the rules for injectivity of type
--- family, this is allowed.
--- At the time of writing, this is used in exactly one place: the case for Zero
--- in simplifyLComp in Simplify.hs.
+-- families, this is allowed.
+-- At the time of writing, this is used in a few places:
+-- - the case for Zero in simplifyApp in Simplify.hs;
+-- - makeProj in the case for LinVar in evalLTt' in TargetLanguage.hs.
 --
 -- The superclass constraint 'LTctx a =>' on 'LT' requires UndecidableSuperClasses.
 type family LTctx a :: Constraint
