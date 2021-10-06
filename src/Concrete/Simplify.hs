@@ -26,12 +26,34 @@ import           Env
 import           Types
 
 data Settings = Settings
-  { simpLetLamSplit :: Bool }
-  deriving (Show)
+  { simpLamAppLet :: Bool        -- ^ @(\x -> e) a@  ~>  @let x = a in e@
+  , simpZeroApp :: Bool          -- ^ @zero a@ = @zero@
+  , simpLetRotate :: Bool        -- ^ @let x = (let y = a in b) in e@  ~>  @let y = a in let x = b in e@
+  , simpLetPairSplit :: Bool     -- ^ @let x = (a, b) in @e  ~>  @let x1 = a in let x2 = b in e[(x1,x2)/x]@
+  , simpLetInline :: Bool        -- ^ @let x = a in e@  ~>  @e[a/x]@  (if @a@ is cheap or used at most once in e)
+  , simpLetLamPairSplit :: Bool  -- ^ @let f = \x -> (a, b) in e@  ~>  @let f1 = \x -> a ; f2 = \x -> b in e[(\x->(f1 x,f2 x))/f]@
+  , simpPairProj :: Bool         -- ^ @fst (a, b)@  ~>  @a@  (and similarly for @snd@)
+  , simpLetProj :: Bool          -- ^ @fst (let x = a in e)@  ~>  @let x = a in fst e@  (and similarly for @snd@)
+  , simpPlusZero :: Bool         -- ^ @plus zero a@  ~>  @a@  (also symmetrically)
+  , simpPlusPair :: Bool         -- ^ @plus (a, b) (c, d)@  ~>  @(plus a c, plus b d)@
+  , simpPlusLet :: Bool          -- ^ @plus (let x = e in a) b@  ~>  @let x = e in plus a b@  (also symmetrically)
+  }
+  deriving (Show, Eq)
 
 defaultSettings :: Settings
 defaultSettings = Settings
-  { simpLetLamSplit = False }
+  { simpLamAppLet = True
+  , simpZeroApp = True
+  , simpLetRotate = True
+  , simpLetPairSplit = True
+  , simpLetInline = True
+  , simpLetLamPairSplit = False
+  , simpPairProj = True
+  , simpLetProj = True
+  , simpPlusZero = True
+  , simpPlusPair = True
+  , simpPlusLet = True
+  }
 
 simplifyCTerm :: Settings -> CTerm env a -> CTerm env a
 simplifyCTerm settings = let ?settings = settings in simplifyCTerm'
@@ -67,8 +89,8 @@ simplifyCTerm' (CPlus a b) = simplifyPlus (simplifyCTerm' a) (simplifyCTerm' b)
 -- | Simplify the App form. This converts immediate lambda application into
 -- let-binding.
 simplifyApp :: (?settings :: Settings) => CTerm env (a -> b) -> CTerm env a -> CTerm env b
-simplifyApp (CLambda e) a = simplifyLet a e
-simplifyApp CZero _ = CZero
+simplifyApp (CLambda e) a | simpLamAppLet ?settings = simplifyLet a e
+simplifyApp CZero _ | simpZeroApp ?settings = CZero
 simplifyApp f a = CApp f a
 
 data SplitLambda env t where
@@ -93,21 +115,22 @@ splitLambda _ = Nothing
 --
 -- We perform let-of-pair splitting, also when that pair is hidden behind a lambda.
 simplifyLet :: (?settings :: Settings) => CTerm env a -> CTerm (a ': env) b -> CTerm env b
-simplifyLet (CLet rhs e) body =
+simplifyLet (CLet rhs e) body | simpLetRotate ?settings =
   simplifyLet rhs (simplifyLet e (sinkCt (wSink (wSucc wId)) body))
-simplifyLet (CPair a1 a2) e =
+simplifyLet (CPair a1 a2) e | simpLetPairSplit ?settings =
   simplifyLet a1 $
     simplifyLet (sinkCt (wSucc wId) a2) $
       simplifyCTerm' $ substCt (wSucc (wSucc wId)) (CPair (CVar (S Z)) (CVar Z)) e
 simplifyLet a e
-  | simpLetLamSplit ?settings
+  | simpLetLamPairSplit ?settings
   , Just (SLam a1 a2 re) <- splitLambda a
   , let re' = substCt wId (CVar (S Z)) . substCt wId (CVar (S Z)) $ re
   = simplifyCTerm' $
       CLet a1 $
         CLet (sinkCt (wSucc wId) a2) $
           substCt wId re' (sinkCt (wSink (wSucc (wSucc wId))) e)
-  | duplicable a || (fold (usesOfCt' Z e) :: Mon.Sum Natural) <= 1
+  | simpLetInline ?settings
+  , duplicable a || (fold (usesOfCt' Z e) :: Mon.Sum Natural) <= 1
   = simplifyCTerm' $ substCt wId a e
   | otherwise
   = CLet a e
@@ -124,22 +147,22 @@ duplicable _ = False
 
 -- | Simplify the Fst form
 simplifyFst :: (?settings :: Settings) => CTerm env (a, b) -> CTerm env a
-simplifyFst (CPair t _)  = t
-simplifyFst (CLet rhs e) = simplifyLet rhs (simplifyFst e)
+simplifyFst (CPair t _)  | simpPairProj ?settings = t
+simplifyFst (CLet rhs e) | simpLetProj ?settings = simplifyLet rhs (simplifyFst e)
 simplifyFst p            = CFst p
 
 -- | Simplify the Snd form
 simplifySnd :: (?settings :: Settings) => CTerm env (a, b) -> CTerm env b
-simplifySnd (CPair _ s)  = s
-simplifySnd (CLet rhs e) = simplifyLet rhs (simplifySnd e)
+simplifySnd (CPair _ s)  | simpPairProj ?settings = s
+simplifySnd (CLet rhs e) | simpLetProj ?settings = simplifyLet rhs (simplifySnd e)
 simplifySnd p            = CSnd p
 
 -- | Simplify the Plus form
 simplifyPlus :: (LT a, ?settings :: Settings) => CTerm env a -> CTerm env a -> CTerm env a
-simplifyPlus a CZero = a
-simplifyPlus CZero b = b
-simplifyPlus (CPair a b) (CPair a' b') =
+simplifyPlus a CZero | simpPlusZero ?settings = a
+simplifyPlus CZero b | simpPlusZero ?settings = b
+simplifyPlus (CPair a b) (CPair a' b') | simpPlusPair ?settings =
   simplifyCTerm' (CPair (CPlus a a') (CPlus b b'))
-simplifyPlus (CLet rhs a) b = simplifyLet rhs (simplifyPlus a (sinkCt (wSucc wId) b))
-simplifyPlus a (CLet rhs b) = simplifyLet rhs (simplifyPlus (sinkCt (wSucc wId) a) b)
+simplifyPlus (CLet rhs a) b | simpPlusLet ?settings = simplifyLet rhs (simplifyPlus a (sinkCt (wSucc wId) b))
+simplifyPlus a (CLet rhs b) | simpPlusLet ?settings = simplifyLet rhs (simplifyPlus (sinkCt (wSucc wId) a) b)
 simplifyPlus a b     = CPlus a b
