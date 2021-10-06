@@ -54,13 +54,11 @@ dr = \case
       Pair (Lambda $
               Let (Var (S Z) `App` Var Z) $
                 Pair (Fst (Var Z))
-                     (LinFun $
-                        LinSnd (Snd (Var Z) `LinApp` LinVar Z)))
+                     (LinFun $ LinSnd (Snd (Var Z) `LinApp` LinVar Z)))
            (LinFun $
               LinCopowFold
                   (Lambda $ LinFun $
-                     LinFst (Snd (Var (S Z) `App` Var Z)
-                               `LinApp` LinVar Z))
+                     LinFst (Snd (Var (S Z) `App` Var Z) `LinApp` LinVar Z))
                   (LinVar Z))
 
   SLet rhs body ->
@@ -96,16 +94,12 @@ dr = \case
   SFst e ->
     Let (dr e) $
       Pair (Fst (Fst (Var Z)))
-           (LinFun $
-              Snd (Var Z)
-                `LinApp` LinPair (LinVar Z) LinZero)
+           (LinFun $ Snd (Var Z) `LinApp` LinPair (LinVar Z) LinZero)
 
   SSnd e ->
     Let (dr e) $
       Pair (Snd (Fst (Var Z)))
-           (LinFun $
-              Snd (Var Z)
-                `LinApp` LinPair LinZero (LinVar Z))
+           (LinFun $ Snd (Var Z) `LinApp` LinPair LinZero (LinVar Z))
 
   SOp op arg ->
     Let (dr arg) $
@@ -118,9 +112,13 @@ dr = \case
     Let (dr f) $
     Let (sinkTt1 (dr e)) $
       Pair (Map (Lambda $ Fst (Fst (Var (S (S Z))) `App` Var Z)) (Fst (Var Z)))
-           (LinFun $ LinPlus (Snd (Var (S Z)) `LinApp` LinZip (Fst (Var Z)) (LinVar Z))
-                             (Snd (Var Z) `LinApp` LinZipWith (Lambda $ LinFun $ Snd (Fst (Var (S (S Z))) `App` Var Z) `LinApp` LinVar Z)
-                                                              (Fst (Var Z)) (LinVar Z)))
+           (LinFun $
+              LinPlus (Snd (Var (S Z)) `LinApp` LinZip (Fst (Var Z)) (LinVar Z))
+                      (Snd (Var Z) `LinApp`
+                         LinZipWith (Lambda $ LinFun $
+                                       Snd (Fst (Var (S (S Z))) `App` Var Z)
+                                         `LinApp` LinVar Z)
+                                    (Fst (Var Z)) (LinVar Z)))
 
   SReplicate e ->
     Let (dr e) $
