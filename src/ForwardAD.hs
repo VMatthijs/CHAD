@@ -1,105 +1,132 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs            #-}
+{-# LANGUAGE LambdaCase       #-}
+{-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE TypeOperators    #-}
 
 -- | Forward-AD Functions
+--
+-- Given the following term:
+--   Γ |- t : τ
+-- We produce this term:
+--   Df₁[Γ] |- Df[t] : (Df₁[τ] * (Df₂[Γ] -o Df₂[τ]))
 module ForwardAD where
 
--- import           Operation          (LinearOperation (..), Operation (..))
--- import qualified SourceLanguage     as SL
--- import qualified TargetLanguage     as TL
--- import           TargetLanguage.Env (Idx (..))
--- import           Types              (Df1, Df2, LFun)
+import           Operation          (LinearOperation (..), Operation (..))
+import           SourceLanguage
+import           TargetLanguage
+import           Env
+import           Types              (LT, LTU, UnLin, Df1, Df2, LFun)
 
--- -- | Primal calculation (forward pass)
--- d1 :: SL.STerm a b -> TL.TTerm env (Df1 a -> Df1 b)
--- d1 SL.Id = TL.Lambda $ TL.Var Z
--- d1 (SL.Comp f g) = TL.Lambda $ TL.App (d1 g) (TL.App (d1 f) (TL.Var Z))
--- d1 SL.Unit = TL.Lambda TL.Unit
--- d1 (SL.Pair t s) =
---   TL.Lambda $ TL.Pair (TL.App (d1 t) (TL.Var Z)) (TL.App (d1 s) (TL.Var Z))
--- d1 SL.Fst = TL.Lambda $ TL.Fst (TL.Var Z)
--- d1 SL.Snd = TL.Lambda $ TL.Snd (TL.Var Z)
--- -- \x -> fst ((fst x) (snd x))
--- d1 SL.Ev = TL.Lambda $ TL.Fst (TL.App (TL.Fst (TL.Var Z)) (TL.Snd (TL.Var Z)))
--- d1 (SL.Curry t) =
---   let d1tTt = TL.App (d1 t) (TL.Pair (TL.Var (S Z)) (TL.Var Z))
---       d2tTt = TL.App (d2 t) (TL.Pair (TL.Var (S Z)) (TL.Var Z))
---    in TL.Lambda $
---       TL.Lambda $ TL.Pair d1tTt (TL.LComp (TL.LPair TL.Zero TL.LId) d2tTt)
--- d1 SL.Inl = TL.Lambda $ TL.Inl (TL.Var Z)
--- d1 SL.Inr = TL.Lambda $ TL.Inr (TL.Var Z)
--- d1 (SL.CoPair s t) = TL.Lambda $ TL.Case (TL.Var Z) (d1 s) (d1 t)
--- d1 (SL.Op op) = TL.Lambda $ TL.Op op (TL.Var Z)
--- d1 SL.Map =
---   TL.Lambda $
---   TL.Map
---     (TL.Lambda $ TL.Fst $ TL.App (TL.Fst (TL.Var (S Z))) (TL.Var Z))
---     (TL.Snd (TL.Var Z))
--- d1 SL.Foldr =
---   TL.Lambda $
---   TL.Foldr
---     (TL.Lambda $ TL.Fst $ TL.Fst (TL.Fst (TL.Var (S Z))) `TL.App` TL.Var Z)
---     (TL.Snd (TL.Fst (TL.Var Z)))
---     (TL.Snd (TL.Var Z))
--- d1 (SL.Rec t) = TL.Rec (d1 t)
--- d1 (SL.It t) = TL.It (d1 t)
--- d1 SL.Sign = TL.Lambda $ TL.Sign (TL.Var Z)
+type family Df1Env env where
+  Df1Env '[] = '[]
+  Df1Env (t ': env) = Df1 t ': Df1Env env
 
--- -- | Tangent (aka sensitivity) calculation (forward pass)
--- d2 :: SL.STerm a b -> TL.TTerm env (Df1 a -> LFun (Df2 a) (Df2 b))
--- d2 SL.Id = TL.Lambda TL.LId
--- d2 (SL.Comp f g) =
---   let d1fTt = TL.App (d1 f) (TL.Var Z)
---       d2fTt = TL.App (d2 f) (TL.Var Z)
---       d2gTt = TL.App (d2 g) d1fTt
---    in TL.Lambda $ TL.LComp d2fTt d2gTt
--- d2 SL.Unit = TL.Lambda TL.LUnit
--- d2 (SL.Pair t s) =
---   TL.Lambda $ TL.LPair (TL.App (d2 t) (TL.Var Z)) (TL.App (d2 s) (TL.Var Z))
--- d2 SL.Fst = TL.Lambda TL.LFst
--- d2 SL.Snd = TL.Lambda TL.LSnd
--- d2 SL.Ev =
---   let y = TL.Snd (TL.Var Z)
---       plusLhs = TL.LComp TL.LFst (TL.LEval y)
---       plusRhs = TL.LComp TL.LSnd (TL.Snd (TL.App (TL.Fst (TL.Var Z)) y))
---    in TL.Lambda $ TL.Plus plusLhs plusRhs
--- d2 (SL.Curry t) =
---   let d2tTt = TL.App (d2 t) (TL.Pair (TL.Var (S Z)) (TL.Var Z))
---    in TL.Lambda $
---       TL.LSwap $ TL.Lambda $ TL.LComp (TL.LPair TL.LId TL.Zero) d2tTt
--- d2 SL.Inl = TL.Lambda TL.LInl
--- d2 SL.Inr = TL.Lambda TL.LInr
--- d2 (SL.CoPair f g) =
---   TL.Lambda $
---   TL.Case
---     (TL.Var Z)
---     (TL.Lambda $
---      TL.LCoPair
---        (d2 f `TL.App` TL.Var Z)
---        (TL.Error "Incompatible primal and tangent to coproduct."))
---     (TL.Lambda $
---      TL.LCoPair
---        (TL.Error "Incompatible primal and tangent to coproduct.")
---        (d2 g `TL.App` TL.Var Z))
--- -- Map
--- -- x := (f, v)
--- -- y := (g, w)
--- d2 SL.Map = TL.Lambda $ TL.DMap (TL.Fst (TL.Var Z)) (TL.Snd (TL.Var Z))
--- d2 SL.Foldr =
---   TL.Lambda $
---   TL.DFoldr
---     (TL.Fst (TL.Fst (TL.Var Z)))
---     (TL.Snd (TL.Fst (TL.Var Z)))
---     (TL.Snd (TL.Var Z))
--- -- Dop
--- d2 (SL.Op (Constant _)) = TL.LOp DConstant
--- d2 (SL.Op EAdd) = TL.LOp DEAdd
--- d2 (SL.Op EProd) = TL.LOp DEProd
--- d2 (SL.Op EScalAdd) = TL.LOp DEScalAdd
--- d2 (SL.Op EScalSubt) = TL.LOp DEScalSubt
--- d2 (SL.Op EScalProd) = TL.LOp DEScalProd
--- d2 (SL.Op Sum) = TL.LOp DSum
--- d2 (SL.Rec t) =
---   let body = d2 t `TL.App` TL.Pair (TL.Var Z) (TL.Rec (d1 t) `TL.App` TL.Var Z)
---    in TL.Lambda $ TL.LRec body
--- d2 (SL.It t) = TL.DIt (d1 t) (d2 t)
--- d2 SL.Sign = TL.Lambda TL.Zero
+type family Df2Env env where
+  Df2Env '[] = ()
+  Df2Env (t ': env) = (Df2Env env, Df2 t)
+
+cvtDf1EnvIdx :: Idx env t -> Idx (Df1Env env) (Df1 t)
+cvtDf1EnvIdx Z = Z
+cvtDf1EnvIdx (S i) = S (cvtDf1EnvIdx i)
+
+linPrj :: (LTenv lenv, LT (Df2Env env))
+       => Idx env t -> LinTTerm env' lenv (Df2Env env) -> LinTTerm env' lenv (Df2 t)
+linPrj Z env = LinSnd env
+linPrj (S i) env = linPrj i (LinFst env)
+
+dfOp :: LT (UnLin (Df2 b)) => Operation a b -> TTerm env (a -> LFun (Df2 a) (Df2 b))
+dfOp (Constant _) = Lambda Zero
+dfOp EAdd = Lambda $ LinFun $ LinPlus (LinFst (LinVar Z)) (LinSnd (LinVar Z))
+dfOp EProd = Lambda $ LinFun $ LinPlus (LinLOp LProd (Fst (Var Z)) (LinSnd (LinVar Z)))
+                                       (LinLOp LProd (Snd (Var Z)) (LinFst (LinVar Z)))
+dfOp EScalAdd = Lambda $ LinFun $ LinPlus (LinFst (LinVar Z)) (LinSnd (LinVar Z))
+dfOp EScalSubt = Lambda $ LinFun $ LinPlus (LinFst (LinVar Z)) (LinLOp LScalNeg Unit (LinSnd (LinVar Z)))
+dfOp EScalProd = Lambda $ LinFun $ LinPlus (LinLOp LScalProd (Fst (Var Z)) (LinSnd (LinVar Z)))
+                                           (LinLOp LScalProd (Snd (Var Z)) (LinFst (LinVar Z)))
+dfOp EScalSin = Lambda $ LinFun $ LinLOp LScalProd (Op EScalCos (Var Z)) (LinVar Z)
+dfOp EScalCos = Lambda $ LinFun $ LinLOp LScalProd (neg (Op EScalSin (Var Z))) (LinVar Z)
+  where neg x = Op EScalSubt (Pair (Op (Constant 0.0) Unit) x)
+
+df :: LTU (Df2Env env) => STerm env t -> TTerm (Df1Env env) (Df1 t, LFun (Df2Env env) (Df2 t))
+df = \case
+  SVar i ->
+    Pair (Var (cvtDf1EnvIdx i))
+         (LinFun (linPrj i (LinVar Z)))
+
+  SLambda body ->
+    Let (Lambda $ df body) $
+      Pair (Lambda $
+              Let (Var (S Z) `App` Var Z) $
+                Pair (Fst (Var Z))
+                     (LinFun $ Snd (Var Z) `LinApp` LinPair LinZero (LinVar Z)))
+           (LinFun $ LinLam $
+              Snd (Var (S Z) `App` Var Z) `LinApp` LinPair (LinVar Z) LinZero)
+
+  SLet rhs body ->
+    Let (df rhs) $
+    Let (substTt (wSucc wId) (Fst (Var Z)) (df body)) $
+      Pair (Fst (Var Z))
+           (LinFun $
+              Snd (Var Z) `LinApp` LinPair (LinVar Z)
+                                           (Snd (Var (S Z)) `LinApp` LinVar Z))
+
+  SApp fun arg ->
+    Let (df arg) $
+    Let (sinkTt1 (df fun)) $
+    Let (Fst (Var Z) `App` Fst (Var (S Z))) $
+      Pair (Fst (Var Z))
+           (LinFun $
+              LinPlus ((Snd (Var (S Z)) `LinApp` LinVar Z) `LinApp'` Fst (Var (S (S Z))))
+                      (Snd (Var Z) `LinApp` (Snd (Var (S (S Z))) `LinApp` LinVar Z)))
+
+  SUnit -> Pair Unit Zero
+
+  SPair e1 e2 ->
+    Let (df e1) $
+    Let (sinkTt1 (df e2)) $
+      Pair (Pair (Fst (Var (S Z))) (Fst (Var Z)))
+           (LinFun $
+              LinPair (Snd (Var (S Z)) `LinApp` LinVar Z)
+                      (Snd (Var Z    ) `LinApp` LinVar Z))
+
+  SFst e ->
+    Let (df e) $
+      Pair (Fst (Fst (Var Z)))
+           (LinFun $ LinFst (Snd (Var Z) `LinApp` LinVar Z))
+
+  SSnd e ->
+    Let (df e) $
+      Pair (Snd (Fst (Var Z)))
+           (LinFun $ LinSnd (Snd (Var Z) `LinApp` LinVar Z))
+
+  SOp op arg ->
+    Let (df arg) $
+      Pair (Op op (Fst (Var Z)))
+           (LinFun $
+              (dfOp op `App` Fst (Var Z))
+                `LinApp` (Snd (Var Z) `LinApp` LinVar Z))
+
+  SMap f e ->
+    Let (df f) $
+    Let (sinkTt1 (df e)) $
+      Pair (Map (Lambda $ Fst (Fst (Var (S (S Z))) `App` Var Z)) (Fst (Var Z)))
+           (LinFun $
+              LinPlus (LinZipWith (Lambda $ LinFun $
+                                     Snd (Fst (Var (S (S Z))) `App` Var Z)
+                                       `LinApp` LinVar Z)
+                                  (Fst (Var Z))
+                                  (Snd (Var Z) `LinApp` LinVar Z))
+                      (LinMap (Snd (Var (S Z)) `LinApp` LinVar Z)
+                              (Fst (Var Z))))
+
+  SReplicate e ->
+    Let (df e) $
+      Pair (Replicate (Fst (Var Z)))
+           (LinFun $ LinReplicate (Snd (Var Z) `LinApp` LinVar Z))
+
+  SSum e ->
+    Let (df e) $
+      Pair (Sum (Fst (Var Z)))
+           (LinFun $ LinSum (Snd (Var Z) `LinApp` LinVar Z))

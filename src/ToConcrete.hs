@@ -5,7 +5,11 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-module ToConcrete where
+module ToConcrete (
+  toConcrete,
+) where
+
+import Data.Proxy
 
 import Concrete
 import Env
@@ -47,14 +51,39 @@ toConcrete = \case
   Zero -> CZero
   LinFun f -> toConcreteL f
 
+wSwap :: (a ': b ': env) :> (b ': a ': env)
+wSwap = Weaken (\case Z -> S Z
+                      S Z -> Z
+                      S (S i) -> S (S i))
+
+class SkippableEnv env where
+  wSkipEnv :: env' :> Append env env'
+  wOverEnvUnLin :: Proxy a -> Proxy env' -> UnLinEnv (Append env (a ': env')) :> (UnLin a ': UnLinEnv (Append env env'))
+
+instance SkippableEnv '[] where
+  wSkipEnv = wId
+  wOverEnvUnLin _ _ = wId
+
+instance SkippableEnv env => SkippableEnv (a ': env) where
+  wSkipEnv = wSucc (wSkipEnv @env)
+  wOverEnvUnLin a env' = wSwap .> wSink (wOverEnvUnLin @env a env')
+
 toConcreteL :: LinTTerm env '[a] b -> CTerm (UnLinEnv env) (UnLin a -> UnLin b)
 toConcreteL = CLambda . toConcreteL' (wSucc wId)
 
-toConcreteL' :: forall env lenv t. env :> Append lenv env -> LinTTerm env lenv t -> CTerm (UnLinEnv (Append lenv env)) (UnLin t)
+toConcreteL' :: forall env lenv t. SkippableEnv lenv
+             => env :> Append lenv env
+             -> LinTTerm env lenv t
+             -> CTerm (UnLinEnv (Append lenv env)) (UnLin t)
 toConcreteL' w = \case
   LinVar i -> CVar (cvtUnLinIdx (subIdx @env i))
+  LinLam t -> go t
+    where
+      go :: forall a t'. LinTTerm (a ': env) lenv t' -> CTerm (UnLinEnv (Append lenv env)) (UnLin a -> UnLin t')
+      go t' = CLambda (sinkCt (wOverEnvUnLin @lenv (Proxy @a) (Proxy @env)) $ toConcreteL' (wSkipEnv @lenv) t')
   LinLet a b -> CLet (toConcreteL' w a) (toConcreteL' (wSucc w) b)
   LinApp a b -> CApp (toConcrete (sinkTt w a)) (toConcreteL' w b)
+  LinApp' a b -> CApp (toConcreteL' w a) (toConcrete (sinkTt w b))
   LinPair a b -> CPair (toConcreteL' w a) (toConcreteL' w b)
   LinFst t -> CFst (toConcreteL' w t)
   LinSnd t -> CSnd (toConcreteL' w t)
@@ -67,6 +96,7 @@ toConcreteL' w = \case
                                                 `CApp` CSnd (CVar Z))
                                    (toConcreteL' w a))
   LinZip a b -> CLZip (CToList (toConcrete (sinkTt w a))) (CToList (toConcreteL' w b))
+  LinMap f a -> CMap (toConcreteL' w f) (toConcrete (sinkTt w a))
   LinZipWith f a b -> CZipWith (toConcrete (sinkTt w f)) (toConcrete (sinkTt w a)) (toConcreteL' w b)
   LinReplicate a -> CReplicate (toConcreteL' w a)
   LinSum a -> CSum (toConcreteL' w a)

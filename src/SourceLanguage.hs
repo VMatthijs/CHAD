@@ -19,12 +19,12 @@ data STerm env a where
   SVar :: LT2 a => Idx env a -> STerm env a
   SLambda :: (LT2U a, LT2 b) => STerm (a ': env) b -> STerm env (a -> b)
   SLet :: (LT2U a, LT2 b) => STerm env a -> STerm (a ': env) b -> STerm env b
-  SApp :: (LT2 a, LT2 b) => STerm env (a -> b) -> STerm env a -> STerm env b
+  SApp :: (LT2 a, LT2U b) => STerm env (a -> b) -> STerm env a -> STerm env b
   SUnit :: STerm env ()
   SPair :: (LT2 a, LT2 b) => STerm env a -> STerm env b -> STerm env (a, b)
   SFst :: (LT2 a, LT2U b) => STerm env (a, b) -> STerm env a
   SSnd :: (LT2U a, LT2 b) => STerm env (a, b) -> STerm env b
-  SOp :: (a ~ Dr1 a, b ~ Dr1 b, a ~ UnLin a, b ~ UnLin b, LT2 a, LT2 b) => Operation a b -> STerm env a -> STerm env b
+  SOp :: (a ~ Df1 a, b ~ Df1 b, a ~ Dr1 a, b ~ Dr1 b, a ~ UnLin a, b ~ UnLin b, LT2 a, LT2 b, LT (UnLin (Df2 b))) => Operation a b -> STerm env a -> STerm env b
 
   SMap :: KnownNat n => STerm env (Scal -> Scal) -> STerm env (Vect n) -> STerm env (Vect n)
   SReplicate :: KnownNat n => STerm env Scal -> STerm env (Vect n)

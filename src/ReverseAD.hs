@@ -6,6 +6,11 @@
 {-# LANGUAGE TypeOperators    #-}
 
 -- | Reverse-AD functions
+--
+-- Given the following term:
+--   Γ |- t : τ
+-- We produce this term:
+--   Dr₁[Γ] |- Dr[t] : (Dr₁[τ] * (Dr₂[τ] -o Dr₂[Γ]))
 module ReverseAD where
 
 import           Operation          (LinearOperation (..), Operation (..))
@@ -30,7 +35,7 @@ onehotEnv :: (LTenv lenv, LTU (Dr2Env env), LT (Dr2 t)) => Idx env t -> LinTTerm
 onehotEnv Z = LinPair LinZero (LinVar Z)
 onehotEnv (S i) = LinPair (onehotEnv i) LinZero
 
-drOp :: a ~ Dr1 a => Operation a b -> TTerm env (a -> LFun (Dr2 b) (Dr2 a))
+drOp :: Operation a b -> TTerm env (a -> LFun (Dr2 b) (Dr2 a))
 drOp (Constant _) = Lambda Zero
 drOp EAdd = Lambda $ LinFun $ LinPair (LinVar Z) (LinVar Z)
 drOp EProd = Lambda $ LinFun $ LinPair (LinLOp LProd (Snd (Var Z)) (LinVar Z))

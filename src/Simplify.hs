@@ -49,6 +49,8 @@ simplifyTTerm (LinFun f) = LinFun (simplifyLinTTerm f)
 -- | Simplify a 'LinTTerm' using some basic rewriting optimisations.
 simplifyLinTTerm :: LinTTerm env lenv b -> LinTTerm env lenv b
 simplifyLinTTerm (LinApp term a) = simplifyLinApp (simplifyTTerm term) (simplifyLinTTerm a)
+simplifyLinTTerm (LinApp' a term) = LinApp' (simplifyLinTTerm a) (simplifyTTerm term)
+simplifyLinTTerm (LinLam e) = LinLam (simplifyLinTTerm e)
 simplifyLinTTerm (LinLet rhs e) = simplifyLinLet (simplifyLinTTerm rhs) (simplifyLinTTerm e)
 simplifyLinTTerm (LinVar i) = LinVar i
 simplifyLinTTerm (LinPair a b) = LinPair (simplifyLinTTerm a) (simplifyLinTTerm b)
@@ -60,6 +62,7 @@ simplifyLinTTerm (LinPlus a b) = simplifyLinPlus (simplifyLinTTerm a) (simplifyL
 simplifyLinTTerm (LinSingleton term b) = LinSingleton (simplifyTTerm term) (simplifyLinTTerm b)
 simplifyLinTTerm (LinCopowFold term b) = LinCopowFold (simplifyTTerm term) (simplifyLinTTerm b)
 simplifyLinTTerm (LinZip term b) = LinZip (simplifyTTerm term) (simplifyLinTTerm b)
+simplifyLinTTerm (LinMap b arg) = LinMap (simplifyLinTTerm b) (simplifyTTerm arg)
 simplifyLinTTerm (LinZipWith fun term b) = LinZipWith (simplifyTTerm fun) (simplifyTTerm term) (simplifyLinTTerm b)
 simplifyLinTTerm (LinReplicate b) = LinReplicate (simplifyLinTTerm b)
 simplifyLinTTerm (LinSum b) = LinSum (simplifyLinTTerm b)
