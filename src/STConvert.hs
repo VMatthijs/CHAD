@@ -3,7 +3,9 @@
 -- | Convert a source-language program to a target-language program. This is
 -- always possible because the target language is a superset of the source
 -- language.
-module STConvert where
+module STConvert (
+  stConvert,
+) where
 
 import SourceLanguage
 import TargetLanguage

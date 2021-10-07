@@ -11,7 +11,10 @@
 --   Γ |- t : τ
 -- We produce this term:
 --   Dr₁[Γ] |- Dr[t] : (Dr₁[τ] * (Dr₂[τ] -o Dr₂[Γ]))
-module ReverseAD where
+module ReverseAD (
+  dr, drOp,
+  Dr1Env, Dr2Env,
+) where
 
 import           Operation          (LinearOperation (..), Operation (..))
 import           SourceLanguage     as SL
