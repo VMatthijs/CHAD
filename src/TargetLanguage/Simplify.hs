@@ -147,17 +147,17 @@ simplifyLinFst (LinPair t _) = t
 -- simplifyLinFst (Let rhs e) = simplifyLet rhs (simplifyLinFst e)
 simplifyLinFst p             = LinFst p
 
--- | Simplify the LinSnd form
-simplifyLinSnd :: (LTenv lenv, LT a, LT b) => LinTTerm env lenv (a, b) -> LinTTerm env lenv b
-simplifyLinSnd (LinPair _ t) = t
--- simplifyLinSnd (Let rhs e) = simplifyLet rhs (simplifyLinSnd e)
-simplifyLinSnd p             = LinSnd p
-
 -- | Simplify the Snd form
 simplifySnd :: TTerm env (a, b) -> TTerm env b
 simplifySnd (Pair _ s)  = s
 simplifySnd (Let rhs e) = simplifyLet rhs (simplifySnd e)
 simplifySnd p           = Snd p
+
+-- | Simplify the LinSnd form
+simplifyLinSnd :: (LTenv lenv, LT a, LT b) => LinTTerm env lenv (a, b) -> LinTTerm env lenv b
+simplifyLinSnd (LinPair _ t) = t
+-- simplifyLinSnd (Let rhs e) = simplifyLet rhs (simplifyLinSnd e)
+simplifyLinSnd p             = LinSnd p
 
 -- -- | Simplify the Plus form
 -- simplifyPlus :: LT a => TTerm env a -> TTerm env a -> TTerm env a
