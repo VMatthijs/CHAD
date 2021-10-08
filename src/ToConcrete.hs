@@ -6,6 +6,11 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+
+-- | Interpret a target-language program in a concrete language as defined in
+-- "Concrete". This chooses an interpretation of the abstract copower
+-- operations and forgets linearity of arrows. The transformation on types is
+-- given by 'UnLin'.
 module ToConcrete (
   toConcrete,
   UnLinEnv,

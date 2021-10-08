@@ -437,23 +437,30 @@ usesOfTt x t = getSum (fold (usesOfTt' x t))
 
 -- | Count the uses of the components of a variable in an expression
 usesOfTt' :: (Num s, Monoid s) => Idx env t -> TTerm env a -> Layout t s
-usesOfTt' i (Var i')
-  | Just Refl <- geq i i' = LyLeaf 1
-  | otherwise = mempty
-usesOfTt' i (Lambda e) = usesOfTt' (S i) e
-usesOfTt' i (Let rhs e) = usesOfTt' i rhs <> usesOfTt' (S i) e
-usesOfTt' i (App f a) = usesOfTt' i f <> usesOfTt' i a
-usesOfTt' _ Unit = mempty
-usesOfTt' i (Pair a b) = usesOfTt' i a <> usesOfTt' i b
-usesOfTt' i p@(Fst p') = maybe (usesOfTt' i p') layoutFromPick (getPick i p)
-usesOfTt' i p@(Snd p') = maybe (usesOfTt' i p') layoutFromPick (getPick i p)
-usesOfTt' i (Op _ a) = usesOfTt' i a
-usesOfTt' i (Map a b) = usesOfTt' i a <> usesOfTt' i b
-usesOfTt' i (Replicate x) = usesOfTt' i x
-usesOfTt' i (Sum a) = usesOfTt' i a
--- usesOfTt' i (AdjPlus a b) = usesOfTt' i a <> usesOfTt' i b
-usesOfTt' _ Zero = mempty
-usesOfTt' i (LinFun f) = usesOfTtL i f
+usesOfTt' i = \case
+  Var i'
+    | Just Refl <- geq i i' -> LyLeaf 1
+    | otherwise -> mempty
+  Lambda e -> usesOfTt' (S i) e
+  Let rhs e -> usesOfTt' i rhs <> usesOfTt' (S i) e
+  App f a -> usesOfTt' i f <> usesOfTt' i a
+  Unit -> mempty
+  Pair a b -> usesOfTt' i a <> usesOfTt' i b
+  p@(Fst p') -> maybe (usesOfTt' i p') layoutFromPick (getPick i p)
+  p@(Snd p') -> maybe (usesOfTt' i p') layoutFromPick (getPick i p)
+  Op _ a -> usesOfTt' i a
+  Map a b -> usesOfTt' i a <> usesOfTt' i b
+  Replicate x -> usesOfTt' i x
+  Sum a -> usesOfTt' i a
+  -- AdjPlus a b -> usesOfTt' i a <> usesOfTt' i b
+  Zero -> mempty
+  LinFun f -> usesOfTtL i f
+  where
+    getPick :: Idx env t -> TTerm env a -> Maybe (TupPick t a)
+    getPick j (Var j') | Just Refl <- geq j j' = Just TPHere
+    getPick j (Fst e) = TPFst <$> getPick j e
+    getPick j (Snd e) = TPSnd <$> getPick j e
+    getPick _ _ = Nothing
 
 -- | Count the uses of the components of a variable in an expression in the linear sublanguage of the target language
 usesOfTtL :: (Num s, Monoid s) => Idx env t -> LinTTerm env lenv b -> Layout t s
@@ -476,36 +483,31 @@ usesOfTtL i (LinZipWith term term' f) = usesOfTt' i term <> usesOfTt' i term' <>
 usesOfTtL i (LinReplicate f) = usesOfTtL i f
 usesOfTtL i (LinSum f) = usesOfTtL i f
 
-getPick :: Idx env t -> TTerm env a -> Maybe (TupPick t a)
-getPick i (Var j) | Just Refl <- geq i j = Just TPHere
-getPick i (Fst e) = TPFst <$> getPick i e
-getPick i (Snd e) = TPSnd <$> getPick i e
-getPick _ _ = Nothing
-
-getPickLin :: Idx lenv t -> LinTTerm env lenv b -> Maybe (TupPick t b)
-getPickLin i (LinVar j) | Just Refl <- geq i j = Just TPHere
-getPickLin i (LinFst e) = TPFst <$> getPickLin i e
-getPickLin i (LinSnd e) = TPSnd <$> getPickLin i e
-getPickLin _ _ = Nothing
-
 usesOfLinVar :: (Num s, Monoid s) => Idx lenv t -> LinTTerm env lenv b -> Layout t s
-usesOfLinVar i (LinApp _ f) = usesOfLinVar i f
-usesOfLinVar i (LinApp' f _) = usesOfLinVar i f
-usesOfLinVar i (LinLam f) = usesOfLinVar i f
-usesOfLinVar i (LinLet f g) = usesOfLinVar i f <> usesOfLinVar (S i) g
-usesOfLinVar i (LinVar j)
-  | Just Refl <- geq i j = LyLeaf 1
-  | otherwise = mempty
-usesOfLinVar i (LinPair f g) = usesOfLinVar i f <> usesOfLinVar i g
-usesOfLinVar i f@(LinFst g) = maybe (usesOfLinVar i g) layoutFromPick (getPickLin i f)
-usesOfLinVar i f@(LinSnd g) = maybe (usesOfLinVar i g) layoutFromPick (getPickLin i f)
-usesOfLinVar i (LinLOp _ _ arg) = usesOfLinVar i arg
-usesOfLinVar _ LinZero = mempty
-usesOfLinVar i (LinPlus f g) = usesOfLinVar i f <> usesOfLinVar i g
-usesOfLinVar i (LinSingleton _ f) = usesOfLinVar i f
-usesOfLinVar i (LinCopowFold _ f) = usesOfLinVar i f
-usesOfLinVar i (LinZip _ f) = usesOfLinVar i f
-usesOfLinVar i (LinMap f _) = usesOfLinVar i f
-usesOfLinVar i (LinZipWith _ _ f) = usesOfLinVar i f
-usesOfLinVar i (LinReplicate f) = usesOfLinVar i f
-usesOfLinVar i (LinSum f) = usesOfLinVar i f
+usesOfLinVar i = \case
+  LinApp _ f -> usesOfLinVar i f
+  LinApp' f _ -> usesOfLinVar i f
+  LinLam f -> usesOfLinVar i f
+  LinLet f g -> usesOfLinVar i f <> usesOfLinVar (S i) g
+  LinVar j
+    | Just Refl <- geq i j -> LyLeaf 1
+    | otherwise -> mempty
+  LinPair f g -> usesOfLinVar i f <> usesOfLinVar i g
+  f@(LinFst g) -> maybe (usesOfLinVar i g) layoutFromPick (getPickLin i f)
+  f@(LinSnd g) -> maybe (usesOfLinVar i g) layoutFromPick (getPickLin i f)
+  LinLOp _ _ arg -> usesOfLinVar i arg
+  LinZero -> mempty
+  LinPlus f g -> usesOfLinVar i f <> usesOfLinVar i g
+  LinSingleton _ f -> usesOfLinVar i f
+  LinCopowFold _ f -> usesOfLinVar i f
+  LinZip _ f -> usesOfLinVar i f
+  LinMap f _ -> usesOfLinVar i f
+  LinZipWith _ _ f -> usesOfLinVar i f
+  LinReplicate f -> usesOfLinVar i f
+  LinSum f -> usesOfLinVar i f
+  where
+    getPickLin :: Idx lenv t -> LinTTerm env lenv b -> Maybe (TupPick t b)
+    getPickLin j (LinVar j') | Just Refl <- geq j j' = Just TPHere
+    getPickLin j (LinFst e) = TPFst <$> getPickLin j e
+    getPickLin j (LinSnd e) = TPSnd <$> getPickLin j e
+    getPickLin _ _ = Nothing

@@ -8,10 +8,14 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ViewPatterns #-}
 
--- | Simplify terms in the target language to aid legibility.
+-- | Simplify terms in the concrete language to aid legibility.
 --
 -- This should only do simplifications that any basic compiler
 -- would also perform.
+--
+-- The simplifier in this module is /parametrised/: all the individual
+-- simplifications can be turned on or off by setting the corresponding flag in
+-- the 'Settings' object passed to 'simplifyCTerm'.
 module Concrete.Simplify (
   simplifyCTerm,
   Settings(..), defaultSettings,
@@ -27,7 +31,7 @@ import           Types
 
 data Settings = Settings
   { simpLamAppLet :: Bool        -- ^ @(\x -> e) a@  ~>  @let x = a in e@
-  , simpZeroApp :: Bool          -- ^ @zero a@ = @zero@
+  , simpZeroApp :: Bool          -- ^ @zero a@  ~>  @zero@
   , simpLetRotate :: Bool        -- ^ @let x = (let y = a in b) in e@  ~>  @let y = a in let x = b in e@
   , simpLetPairSplit :: Bool     -- ^ @let x = (a, b) in @e  ~>  @let x1 = a in let x2 = b in e[(x1,x2)/x]@
   , simpLetInline :: Bool        -- ^ @let x = a in e@  ~>  @e[a/x]@  (if @a@ is cheap or used at most once in e)

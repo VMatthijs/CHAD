@@ -1,8 +1,8 @@
 {-# LANGUAGE GADTs #-}
 
--- | Convert a source-language program to a target-language program. This is
--- always possible because the target language is a superset of the source
--- language.
+-- | Convert a source-language program to a target-language program without
+-- changing semantics. This is always possible because the target language is a
+-- superset of the source language.
 module STConvert (
   stConvert,
 ) where

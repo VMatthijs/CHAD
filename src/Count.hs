@@ -1,8 +1,17 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
+
+-- | Utilities for occurrence counting in functional languages.
 module Count where
 
 
+-- | A @Layout t a@ is a tree that counts usages of a variable of type @t@,
+-- split out over components of nested pairs. The count is expressed using the
+-- type @a@.
+--
+-- For example, the occurrence of @x@ in @f x@ would count as @'LyLeaf' 1@,
+-- whereas the occurrence of @x@ in @f (fst x)@ would count as
+-- @'LyPair' ('LyLeaf' 1) ('LyLeaf' 0)@.
 data Layout t a where
   LyLeaf :: a -> Layout t a
   LyPair :: Layout t1 a -> Layout t2 a -> Layout (t1, t2) a

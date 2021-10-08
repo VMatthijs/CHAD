@@ -27,8 +27,13 @@ import           Types
 -- | Simplify a 'TTerm' using some basic rewriting optimisations.
 --
 -- Note: inlining of variable definitions is only performed if the variable in
--- question is only used once, or, if it is a 'Pair' expression, if its
--- components are each used at most once due to uses of 'Fst' and 'Snd'.
+-- question is only used once. Let-splitting is performed.
+--
+-- For the linear sublanguage, we do not perform let-splitting, but instead
+-- perform intelligent counting: if the right-hand side is a 'LinPair'
+-- expression and the variable is used only once in a 'LinFst' and once in a
+-- 'LinSnd', then inlining is still performed. (This applies also for nested
+-- pair structures.)
 simplifyTTerm :: TTerm env a -> TTerm env a
 simplifyTTerm (Var i) = Var i
 simplifyTTerm (Lambda e) = Lambda (simplifyTTerm e)
@@ -47,6 +52,10 @@ simplifyTTerm Zero = Zero
 simplifyTTerm (LinFun f) = LinFun (simplifyLinTTerm f)
 
 -- | Simplify a 'LinTTerm' using some basic rewriting optimisations.
+--
+-- Note: inlining of variable definitions is only performed if the variable in
+-- question is only used once, or, if it is a 'LinPair' expression, if its
+-- components are each used at most once due to uses of 'LinFst' and 'LinSnd'.
 simplifyLinTTerm :: LinTTerm env lenv b -> LinTTerm env lenv b
 simplifyLinTTerm (LinApp term a) = simplifyLinApp (simplifyTTerm term) (simplifyLinTTerm a)
 simplifyLinTTerm (LinApp' a term) = LinApp' (simplifyLinTTerm a) (simplifyTTerm term)

@@ -6,8 +6,8 @@
 {-# LANGUAGE UndecidableSuperClasses #-}
 
 -- | Supporting definitions for finite differencing in the test suite, as well
--- as Jacobian computation given a forward-ad/reverse-ad/finite-differencing
--- transformed version of a function.
+-- as Jacobian computation using a function transformed with forward-ad,
+-- reverse-ad or finite-differencing.
 module FinDiff where
 
 import Data.Proxy
@@ -21,7 +21,10 @@ import Types
 class LT a => FinDiff a where
   type Element a
   elements :: a -> [Element a]
-  rebuild' :: [Element a] -> (a, [Element a])  -- ^ returns any excess elements
+  -- | Returns any excess elements.
+  rebuild' :: [Element a] -> (a, [Element a])
+  -- | The "one" element of the 'Element' type of this thing. For 'Scal' this
+  -- is @1.0@.
   oneElement :: Proxy a -> Element a
 
   -- | Rebuild a value from the list of elements. Assumes that the list has the

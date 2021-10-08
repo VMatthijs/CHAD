@@ -3,6 +3,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
+-- | Examples of programs in the source languages. The testsuite checks that AD
+-- on these programs does the right thing.
 module Examples where
 
 import GHC.TypeNats

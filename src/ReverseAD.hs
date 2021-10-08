@@ -8,9 +8,12 @@
 -- | Reverse-AD functions
 --
 -- Given the following term:
---   Γ |- t : τ
+--
+-- > Γ |- t : τ
+--
 -- We produce this term:
---   Dr₁[Γ] |- Dr[t] : (Dr₁[τ] * (Dr₂[τ] -o Dr₂[Γ]))
+--
+-- > Dr₁[Γ] |- Dr[t] : (Dr₁[τ] * (Dr₂[τ] -o Dr₂[Γ]))
 module ReverseAD (
   dr, drOp,
   Dr1Env, Dr2Env,

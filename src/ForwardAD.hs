@@ -8,9 +8,12 @@
 -- | Forward-AD Functions
 --
 -- Given the following term:
---   Γ |- t : τ
+--
+-- > Γ |- t : τ
+--
 -- We produce this term:
---   Df₁[Γ] |- Df[t] : (Df₁[τ] * (Df₂[Γ] -o Df₂[τ]))
+--
+-- > Df₁[Γ] |- Df[t] : (Df₁[τ] * (Df₂[Γ] -o Df₂[τ]))
 module ForwardAD (
   df, dfOp,
   Df1Env, Df2Env,

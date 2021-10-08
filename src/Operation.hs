@@ -47,7 +47,7 @@ evalOp EScalProd    = uncurry (*)
 evalOp EScalSin     = sin
 evalOp EScalCos     = cos
 
--- | @a -> LFun b c@
+-- | @a -> 'LFun' b c@
 data LinearOperation a b c where
   LProd :: KnownNat n => LinearOperation (Vect n) (Vect n) (Vect n)
   LReplicate :: KnownNat n => LinearOperation () Scal (Vect n)
