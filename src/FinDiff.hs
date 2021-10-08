@@ -4,6 +4,10 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
+
+-- | Supporting definitions for finite differencing in the test suite, as well
+-- as Jacobian computation given a forward-ad/reverse-ad/finite-differencing
+-- transformed version of a function.
 module FinDiff where
 
 import Data.Proxy
