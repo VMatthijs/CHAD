@@ -33,9 +33,9 @@ constant x = SOp (Constant x) SUnit
 square :: STerm env (Scal -> Scal)
 square = SLambda (SOp EScalProd (SPair (SVar Z) (SVar Z)))
 
--- \x -> 2 * x * x + 7 * x + 3, using 'square' for the squaring
-polynomial :: STerm env (Scal -> Scal)
-polynomial = SLambda $
+-- x:Scal |- 2 * x * x + 7 * x + 3, using 'square' for the squaring
+polynomial :: STerm '[Scal] Scal
+polynomial =
   constant 2 `scalprod` (square `SApp` SVar Z)
   `scaladd` constant 7 `scalprod` SVar Z
   `scaladd` constant 3

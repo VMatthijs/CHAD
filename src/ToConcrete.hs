@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeOperators #-}
 module ToConcrete (
   toConcrete,
+  UnLinEnv,
 ) where
 
 import Concrete
@@ -20,10 +21,6 @@ import Types
 type family UnLinEnv env where
   UnLinEnv '[] = '[]
   UnLinEnv (t ': ts) = UnLin t ': UnLinEnv ts
-
-type family Append as bs where
-  Append '[] bs = bs
-  Append (a ': as) bs = a ': Append as bs
 
 cvtUnLinIdx :: Idx env t -> Idx (UnLinEnv env) (UnLin t)
 cvtUnLinIdx Z = Z

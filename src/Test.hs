@@ -1,8 +1,14 @@
 {-# LANGUAGE DataKinds                 #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE GADTs                     #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TupleSections             #-}
+{-# LANGUAGE TypeApplications          #-}
 {-# LANGUAGE TypeFamilies              #-}
+{-# LANGUAGE TypeOperators             #-}
 {-# LANGUAGE UndecidableSuperClasses   #-}
 {-# OPTIONS -Wno-orphans #-} -- for Arbitrary
 
@@ -17,446 +23,279 @@
 -- numerical instability.
 module Test where
 
-import           Data.List                 (mapAccumL)
-import           Data.Maybe
-import           Data.Tuple                (swap)
+import Control.Monad (replicateM)
+import Data.Proxy
+import Data.Maybe (fromJust)
 import qualified Data.Vector.Unboxed.Sized as V
-import           GHC.TypeLits              (KnownNat, SomeNat (..), someNatVal)
-import           Test.Tasty
-import           Test.Tasty.QuickCheck
+import GHC.TypeNats
+import Test.Tasty
+import Test.Tasty.QuickCheck
 
-import qualified Examples                  as E
-import qualified ForwardAD                 as F
-import qualified ReverseAD                 as R
-import qualified SourceLanguage            as SL
-import qualified TargetLanguage            as TL
-import           Types
+import Concrete
+import Concrete.Simplify
+import Env
+import ForwardAD
+import FinDiff
+import Lambda.Examples
+import ReverseAD
+import Simplify
+import SourceLanguage
+import STConvert
+import TargetLanguage
+import ToConcrete
+import Types
 
-class LT a =>
-      FinDiff a
-  where
-  type Element a
-  -- Takes primal value
-  oneHotVecs :: a -> [a]
-  -- Input should have same length as oneHotVecs
-  rebuild :: a -> [Element a] -> a
-  rebuild primal l =
-    case rebuild' primal l of
-      (res, []) -> res
-      _         -> error "rebuild: Invalid length"
-  rebuild' :: a -> [Element a] -> (a, [Element a]) -- returns excess
-  dotprod :: a -> a -> Element a
-  genWithPrimal :: a -> Gen a
-  -- Helper methods for finite differencing on numeric-like types
-  scalProd :: Scal -> a -> a
-  scalDiv :: a -> Scal -> a
-  minus :: a -> a -> a
-
-instance FinDiff Scal where
-  type Element Scal = Scal
-  oneHotVecs _ = [1]
-  rebuild' _ (x:xs) = (x, xs)
-  rebuild' _ []     = error "rebuild: Invalid length"
-  dotprod = (*)
-  genWithPrimal _ = arbitrary
-  scalProd = (*)
-  scalDiv = (/)
-  minus = (-)
-
-instance KnownNat n => FinDiff (Vect n) where
-  type Element (Vect n) = Scal
-  oneHotVecs primal =
-    [ V.generate
-      (\k ->
-         if k == i
-           then itemvec
-           else zero)
-    | i <- [minBound .. maxBound]
-    , itemvec <- oneHotVecs (primal `V.index` i)
-    ]
-  rebuild' primal l =
-    let result =
-          mapAccumL (\l' prim -> swap (rebuild' prim l')) l (V.toList primal)
-     in swap (fromJust . V.fromList <$> result)
-  dotprod u v = V.sum (V.zipWith dotprod u v)
-  genWithPrimal _ = genVect
-  scalProd r = V.map (* r)
-  scalDiv v r = V.map (/ r) v
-  minus = V.zipWith (-)
-
-instance (FinDiff a, FinDiff b, Element a ~ Element b, Element a ~ Scal) =>
-         FinDiff (a, b) where
-  type Element (a, b) = Element a
-  oneHotVecs (x, y) = map (, zero) (oneHotVecs x) ++ map (zero, ) (oneHotVecs y)
-  rebuild' (x, y) l =
-    let (a, l') = rebuild' x l
-        (b, l'') = rebuild' y l'
-     in ((a, b), l'')
-  dotprod (a, b) (c, d) = dotprod a c + dotprod b d
-  genWithPrimal (x, y) = (,) <$> genWithPrimal x <*> genWithPrimal y
-  scalProd r a = (scalProd r (fst a), scalProd r (snd a))
-  scalDiv a r = (scalDiv (fst a) r, scalDiv (snd a) r)
-  minus a b = (fst a `minus` fst b, snd a `minus` snd b)
-
-instance FinDiff () where
-  type Element () = ()
-  oneHotVecs _ = [()]
-  rebuild' _ l = ((), l)
-  dotprod _ _ = ()
-  genWithPrimal _ = return ()
-  scalProd _ _ = ()
-  scalDiv _ _ = ()
-  minus _ _ = ()
 
 instance KnownNat n => Arbitrary (Vect n) where
-  arbitrary = genVect
+  arbitrary = fromJust . V.fromList <$> replicateM (fromIntegral (natVal (Proxy @n))) arbitrary
 
-genVect :: KnownNat n => Gen (Vect n)
-genVect = V.generateM (const arbitrary)
-
-data SomeVect =
-  forall n. SomeVect (Vect n)
-
-genSomeVect :: Int -> Gen SomeVect
-genSomeVect len =
-  case someNatVal (fromIntegral len) of
-    Just (SomeNat n) -> SomeVect <$> V.replicateM' n arbitrary
-    _                -> error "Negative length in genSomeVect"
 
 -- Minimum of the relative difference and the absolute difference
 relAbsDiff :: Scal -> Scal -> Scal
 relAbsDiff x y = abs (x - y) / max 1 (max (abs x) (abs y))
 
-class Show a =>
-      Approx a
-  where
+class Show a => Approx a where
+  -- | Return whether the values are close together, as well as a description
+  -- of the error between them.
   isApprox' :: a -> a -> (Bool, String)
+
+  -- | Return whether the values are close together (using 'isApprox'').
   isApprox :: a -> a -> Bool
   x `isApprox` y = fst (x `isApprox'` y)
-  isApproxQC :: a -> a -> Property
-  x `isApproxQC` y =
+
+  -- | Given names of what the two inputs represent, produce a QuickCheck
+  -- property that puts the error description string in the 'counterexample'. (Uses 'isApprox''.)
+  isApproxQC :: (String, a) -> (String, a) -> Property
+  (xdesc, x) `isApproxQC` (ydesc, y) =
     let (ok, errs) = x `isApprox'` y
+        xprefix = xdesc ++ ": "
+        yprefix = ydesc ++ ": "
+        errprefix = "Errors: "
+        len = maximum (map length [xprefix, yprefix, errprefix])
+        xprefix' = xprefix ++ replicate (max 0 (len - length xprefix)) ' '
+        yprefix' = yprefix ++ replicate (max 0 (len - length yprefix)) ' '
+        errprefix' = errprefix ++ replicate (max 0 (len - length errprefix)) ' '
      in counterexample
-          (unlines
-             ["Control: " ++ show x, "AD:      " ++ show y, "Errors:  " ++ errs])
+          (unlines [xprefix' ++ show x, yprefix' ++ show y, errprefix' ++ errs])
           ok
 
 instance Approx Scal where
   x `isApprox'` y =
     let err = relAbsDiff x y
-     in (err < 0.001, show err)
+    in (err < 0.001, show err)
 
 instance Approx (Vect n) where
   x `isApprox'` y =
-    let results = zipWith isApprox' (V.toList x) (V.toList y)
-     in (and (map fst results), show (map snd results))
+    let (oks, errs) = unzip $ zipWith isApprox' (V.toList x) (V.toList y)
+    in (and oks, show errs)
 
 instance (Approx a, Approx b) => Approx (a, b) where
   (a, b) `isApprox'` (x, y) =
     let (ok1, errs1) = a `isApprox'` x
         (ok2, errs2) = b `isApprox'` y
-     in (ok1 && ok2, "(" ++ errs1 ++ ", " ++ errs2 ++ ")")
+    in (ok1 && ok2, "(" ++ errs1 ++ ", " ++ errs2 ++ ")")
 
-evalFwdFinDiff :: (FinDiff a, FinDiff b) => SL.STerm a b -> a -> a -> b
-evalFwdFinDiff f x y =
-  (SL.evalSt f (x `plus` (delta `scalProd` y)) `minus` SL.evalSt f x) `scalDiv`
-  delta
-  where
-    delta = 0.0000001
+instance Approx a => Approx [a] where
+  x `isApprox'` y
+    | length x == length y =
+        let (oks, errs) = unzip $ zipWith isApprox' x y
+        in (and oks, show errs)
+    | otherwise =
+        error "Unequal list lengths in Approx on lists"
 
-propAll ::
-     ( Arbitrary a
-     , Arbitrary b
-     , Show a
-     , LT a
-     , LT b
-     , Approx a
-     , Approx b
-     , FinDiff a
-     , FinDiff b
-     , Element a ~ Element b
-     , Element a ~ Scal
-     , a ~ Df1 a
-     , a ~ Df2 a
-     , b ~ Df1 b
-     , b ~ Df2 b
-     , a ~ Dr1 a
-     , a ~ Dr2 a
-     , b ~ Dr1 b
-     , b ~ Dr2 b
-     )
-  => SL.STerm a b
-  -> Property
-propAll = propAll' arbitrary genWithPrimal genWithPrimal (const id)
 
--- The @a -> Property -> Property@ argument can be used to e.g. 'label'
--- generated arguments in QuickCheck.
-propAll' ::
-     ( Arbitrary a
-     , Arbitrary b
-     , Show a
-     , LT a
-     , LT b
-     , Approx a
-     , Approx b
-     , FinDiff a
-     , FinDiff b
-     , Element a ~ Element b
-     , Element a ~ Scal
-     , a ~ Df1 a
-     , a ~ Df2 a
-     , b ~ Df1 b
-     , b ~ Df2 b
-     , a ~ Dr1 a
-     , a ~ Dr2 a
-     , b ~ Dr1 b
-     , b ~ Dr2 b
-     )
-  => Gen a
-  -> (a -> Gen a)
-  -> (b -> Gen b)
-  -> (a -> Property -> Property)
-  -> SL.STerm a b
-  -> Property
-propAll' arggen dirgen adjgen propfun sterm =
-  conjoin
-    [ counterexample
-        "testing: fwd1"
-        (forAll arggen $ \arg -> propfun arg $ propFwd1 sterm arg)
-    , counterexample
-        "testing: fwd2"
-        (forAll arggen $ \arg ->
-           propfun arg $ forAll (dirgen arg) $ propFwd2 sterm arg)
-    , counterexample
-        "testing: rev1"
-        (forAll arggen $ \arg -> propfun arg $ propRev1 sterm arg)
-    , counterexample
-        "testing: rev2"
-        (forAll arggen $ \arg -> propfun arg $ propRev2 sterm arg adjgen)
-    ]
+data ShowVal env where
+  SVZ :: ShowVal '[]
+  SVS :: Show t => t -> ShowVal env -> ShowVal (t ': env)
+deriving instance Show (ShowVal env)
 
-propFwd1 ::
-     (Show a, Approx b, a ~ Df1 a, b ~ Df1 b) => SL.STerm a b -> a -> Property
-propFwd1 sterm arg =
-  let resEval = SL.evalSt sterm arg
-      resAD = TL.evalTt (F.d1 sterm) arg
-   in resEval `isApproxQC` resAD
+makeVal :: ShowVal env -> Val env
+makeVal SVZ = VZ
+makeVal (SVS x env) = VS x (makeVal env)
 
-propFwd2 ::
-     (Approx b, FinDiff a, FinDiff b, a ~ Df1 a, a ~ Df2 a, b ~ Df2 b)
-  => SL.STerm a b
-  -> a
-  -> a
-  -> Property
-propFwd2 sterm arg dir =
-  let resFD = evalFwdFinDiff sterm arg dir
-      resAD = lApp (TL.evalTt (F.d2 sterm) arg) dir
-   in resFD `isApproxQC` resAD
+instance Arbitrary (ShowVal '[]) where
+  arbitrary = pure SVZ
 
-propRev1 :: (Approx b, a ~ Dr1 a, b ~ Dr1 b) => SL.STerm a b -> a -> Property
-propRev1 sterm arg =
-  let resEval = SL.evalSt sterm arg
-      resAD = TL.evalTt (R.d1 sterm) arg
-   in resEval `isApproxQC` resAD
+instance (Show t, Arbitrary t, Arbitrary (ShowVal ts))
+      => Arbitrary (ShowVal (t ': ts)) where
+  arbitrary = SVS <$> arbitrary <*> arbitrary
 
--- Finite differencing approach: Function to approximate is (arg :: a) -> (adjoint :: b) -> a
--- 1. Enumerate the basis vectors of the type 'a'; let L :: [a] be that list, with as length the number of values in 'a'
--- 2. Call finite differencing with 'arg' and 'v' for each 'v' in 'L'; the result is a list M :: [b] with as length the number of values in 'a'
--- 3. Compute the dot product of each element in 'M' with 'adjoint', producing a list N :: [Scal] ('fdvals' below) with as length the number of values in 'a'
--- 4. Return the 'a' value produced by initialising it with the values in 'N'.
-propRev2 ::
-     ( FinDiff a
-     , FinDiff b
-     , Element a ~ Element b
-     , Approx a
-     , Show b
-     , a ~ Dr1 a
-     , a ~ Dr2 a
-     , b ~ Dr2 b
-     )
-  => SL.STerm a b
-  -> a
-  -> (b -> Gen b)
-  -> Property
-propRev2 sterm arg adjgen =
-  forAll (adjgen (SL.evalSt sterm arg)) $ \adjoint ->
-    let fdvals =
-          [dotprod adjoint (evalFwdFinDiff sterm arg v) | v <- oneHotVecs arg]
-        resFD = rebuild arg fdvals
-        resAD = lApp (TL.evalTt (R.d2 sterm) arg) adjoint
-     in resFD `isApproxQC` resAD
+type family EnvType env where
+  EnvType '[] = ()
+  EnvType (t ': ts) = (t, EnvType ts)
 
-propFwdVsRev ::
-     ( Arbitrary a
-     , Arbitrary b
-     , Show b
-     , FinDiff a
-     , FinDiff b
-     , Element a ~ Element b
-     , Approx a
-     , a ~ Df1 a
-     , a ~ Df2 a
-     , a ~ Dr1 a
-     , a ~ Dr2 a
-     , b ~ Df2 b
-     , b ~ Dr2 b
-     )
-  => SL.STerm a b
-  -> Property
-propFwdVsRev = propFwdVsRev' arbitrary arbitrary
+class TypeEnvironment env where
+  envToTup :: ShowVal env -> EnvType env
+  tupToEnv :: EnvType env -> ShowVal env
 
-propFwdVsRev' ::
-     ( Arbitrary a
-     , Arbitrary b
-     , Show b
-     , FinDiff a
-     , FinDiff b
-     , Element a ~ Element b
-     , Approx a
-     , a ~ Df1 a
-     , a ~ Df2 a
-     , a ~ Dr1 a
-     , a ~ Dr2 a
-     , b ~ Df2 b
-     , b ~ Dr2 b
-     )
-  => Gen a
-  -> Gen b
-  -> SL.STerm a b
-  -> Property
-propFwdVsRev' arggen adjgen sterm =
-  forAll arggen $ \arg ->
-    forAll adjgen $ \adjoint ->
-      let fdvals =
-            [ dotprod adjoint (lApp (TL.evalTt (F.d2 sterm) arg) v)
-            | v <- oneHotVecs arg
-            ]
-          resFD = rebuild arg fdvals
-          resAD = lApp (TL.evalTt (R.d2 sterm) arg) adjoint
-       in resFD `isApproxQC` resAD
+instance TypeEnvironment '[] where
+  envToTup SVZ = ()
+  tupToEnv () = SVZ
 
-floorf :: RealFrac a => a -> a
-floorf x = fromIntegral (floor x :: Integer)
+instance (Show t, TypeEnvironment ts) =>TypeEnvironment (t ': ts) where
+  envToTup (SVS x env) = (x, envToTup env)
+  tupToEnv (x, xs) = SVS x (tupToEnv xs)
+
+data Program env t = Program
+  { progProgram :: STerm env t
+  , progInpGen :: Gen (ShowVal env)
+  -- , progTanGen :: Gen (ShowVal (Df1Env env))
+  -- , progAdjGen :: Gen (Df2 t)
+  }
+
+-- Tests:
+-- testEvalT: evalSt ~= evalTt . stConvert
+-- testEvalST: evalSt ~= evalTt . simplifyTTerm . stConvert
+-- testEvalCT: evalSt ~= evalCt . toConcrete . stConvert
+-- testEvalSCT: evalSt ~= evalCt . simplifyCTerm . toConcrete . stConvert
+-- testEvalSCST: evalSt ~= evalCt . simplifyCTerm . toConcrete . simplifyTTerm . stConvert
+-- testPrimalF: forward_primal ~= evalSt
+-- testPrimalR: reverse_primal ~= evalSt
+-- testJacFR: forward_jacobian ~= reverse_jacobian
+-- testJacFD: forward_jacobian ~= fd_jacobian
+-- testJacRD: reverse_jacobian ~= fd_jacobian
+
+testEvalStVersus :: Approx t
+                 => (Val env -> STerm env t -> t) -> Program env t -> Property
+testEvalStVersus transform prog = forAll (progInpGen prog) $ \inp ->
+  isApproxQC ("evalSt", evalSt (makeVal inp) (progProgram prog))
+             ("evalTt", transform (makeVal inp) (progProgram prog))
+
+testEvalT :: Approx t => Program env t -> Property
+testEvalT = testEvalStVersus (\val -> evalTt' val . stConvert)
+
+testEvalST :: Approx t => Program env t -> Property
+testEvalST = testEvalStVersus (\val -> evalTt' val . simplifyTTerm . stConvert)
+
+testEvalCT :: (Approx t, t ~ UnLin t, env ~ UnLinEnv env) => Program env t -> Property
+testEvalCT = testEvalStVersus (\val -> evalCt' val . toConcrete . stConvert)
+
+testEvalSCT :: (Approx t, t ~ UnLin t, env ~ UnLinEnv env) => Program env t -> Property
+testEvalSCT = testEvalStVersus (\val ->
+  evalCt' val . simplifyCTerm defaultSettings . toConcrete . stConvert)
+
+testEvalSCST :: (Approx t, t ~ UnLin t, env ~ UnLinEnv env) => Program env t -> Property
+testEvalSCST = testEvalStVersus (\val ->
+  evalCt' val . simplifyCTerm defaultSettings . toConcrete . simplifyTTerm . stConvert)
+
+testPrimalF :: (Approx t
+               ,t ~ UnLin (Df1 t)
+               ,env ~ UnLinEnv (Df1Env env)
+               ,LT (Df2Env env), LT (UnLin (Df2Env env)))
+            => Program env t -> Property
+testPrimalF prog = forAll (progInpGen prog) $ \inp ->
+  isApproxQC ("evalSt", evalSt (makeVal inp) (progProgram prog))
+             ("fwdprim", fst (evalCt' (makeVal inp) cterm))
+  where cterm = simplifyCTerm defaultSettings (toConcrete (df (progProgram prog)))
+
+testPrimalR :: (Approx t
+               ,t ~ UnLin (Dr1 t)
+               ,env ~ UnLinEnv (Dr1Env env)
+               ,LT (Dr2Env env), LT (UnLin (Dr2Env env)))
+            => Program env t -> Property
+testPrimalR prog = forAll (progInpGen prog) $ \inp ->
+  isApproxQC ("evalSt", evalSt (makeVal inp) (progProgram prog))
+             ("revprim", fst (evalCt' (makeVal inp) cterm))
+  where cterm = simplifyCTerm defaultSettings (toConcrete (dr (progProgram prog)))
+
+computeJacF :: (env ~ UnLinEnv (Df1Env env)
+               ,FinDiff (UnLin (Df2Env env))
+               ,FinDiff (UnLin (Df2 t)), Element (UnLin (Df2 t)) ~ Scal
+               ,LT (Df2Env env))
+            => Program env t -> ShowVal env -> [[Scal]]
+computeJacF prog = jacobianByCols (\x dx -> snd (evalCt' (makeVal x) fwdterm) dx)
+  where fwdterm = simplifyCTerm defaultSettings (toConcrete (df (progProgram prog)))
+
+computeJacR :: (env ~ UnLinEnv (Dr1Env env)
+               ,FinDiff (UnLin (Dr2 t))
+               ,FinDiff (UnLin (Dr2Env env)), Element (UnLin (Dr2Env env)) ~ Scal
+               ,LT (Dr2Env env))
+            => Program env t -> ShowVal env -> [[Scal]]
+computeJacR prog = jacobianByRows (\x dy -> snd (evalCt' (makeVal x) revterm) dy)
+  where revterm = simplifyCTerm defaultSettings (toConcrete (dr (progProgram prog)))
+
+computeJacD :: (TypeEnvironment env
+               ,FinDiff t, Element t ~ Scal
+               ,FinDiff (EnvType env), Element (EnvType env) ~ Scal)
+            => Program env t -> ShowVal env -> [[Scal]]
+computeJacD prog sval =
+  let fun tupinp = evalSt (makeVal (tupToEnv tupinp)) (progProgram prog)
+  in jacobianByElts (finiteDifference fun) (envToTup sval)
+
+testJacFR :: (env ~ UnLinEnv (Df1Env env)
+             ,env ~ UnLinEnv (Dr1Env env)
+             ,FinDiff (UnLin (Df2Env env))
+             ,FinDiff (UnLin (Df2 t)), Element (UnLin (Df2 t)) ~ Scal
+             ,FinDiff (UnLin (Dr2 t))
+             ,FinDiff (UnLin (Dr2Env env)), Element (UnLin (Dr2Env env)) ~ Scal
+             ,LT (Df2Env env), LT (Dr2Env env))
+          => Program env t -> Property
+testJacFR prog = forAll (progInpGen prog) $ \inp ->
+  isApproxQC ("fwdad", computeJacF prog inp)
+             ("revad", computeJacR prog inp)
+
+testJacFD :: (TypeEnvironment env
+             ,env ~ UnLinEnv (Df1Env env)
+             ,FinDiff (UnLin (Df2Env env))
+             ,FinDiff (UnLin (Df2 t)), Element (UnLin (Df2 t)) ~ Scal
+             ,FinDiff t, Element t ~ Scal
+             ,FinDiff (EnvType env), Element (EnvType env) ~ Scal
+             ,LT (Df2Env env))
+          => Program env t -> Property
+testJacFD prog = forAll (progInpGen prog) $ \inp ->
+  isApproxQC ("fwdad", computeJacF prog inp)
+             ("findiff", computeJacD prog inp)
+
+testJacRD :: (TypeEnvironment env
+             ,env ~ UnLinEnv (Dr1Env env)
+             ,FinDiff (UnLin (Dr2 t))
+             ,FinDiff (UnLin (Dr2Env env)), Element (UnLin (Dr2Env env)) ~ Scal
+             ,FinDiff t, Element t ~ Scal
+             ,FinDiff (EnvType env), Element (EnvType env) ~ Scal
+             ,LT (Dr2Env env))
+          => Program env t -> Property
+testJacRD prog = forAll (progInpGen prog) $ \inp ->
+  isApproxQC ("revad", computeJacR prog inp)
+             ("findiff", computeJacD prog inp)
+
+
+testAll :: (TypeEnvironment env
+           ,Approx t
+           -- Forward AD
+           ,FinDiff (UnLin (Df2Env env))
+           ,FinDiff (UnLin (Df2 t)), Element (UnLin (Df2 t)) ~ Scal
+           ,LT (Df2Env env)
+           ,UnLinEnv (Df1Env env) ~ env
+           ,UnLin (Df1 t) ~ t
+           -- Reverse AD
+           ,FinDiff (UnLin (Dr2 t))
+           ,FinDiff (UnLin (Dr2Env env)), Element (UnLin (Dr2Env env)) ~ Scal
+           ,LT (Dr2Env env)
+           ,UnLinEnv (Dr1Env env) ~ env
+           ,UnLin (Dr1 t) ~ t
+           -- Finite differencing
+           ,FinDiff t, Element t ~ Scal
+           ,FinDiff (EnvType env), Element (EnvType env) ~ Scal
+           ,UnLinEnv env ~ env
+           ,UnLin t ~ t)
+        => TestName -> Program env t -> TestTree
+testAll name prog = testGroup name
+  [testProperty "evalSt = evalTt" $ testEvalT prog
+  ,testProperty "evalSt = simpT . evalTt" $ testEvalST prog
+  ,testProperty "evalSt = evalCt" $ testEvalCT prog
+  ,testProperty "evalSt = simpC . evalCt" $ testEvalSCT prog
+  ,testProperty "evalSt = simpC . evalCt . simpT" $ testEvalSCST prog
+  ,testProperty "Forward primal" $ testPrimalF prog
+  ,testProperty "Reverse primal" $ testPrimalR prog
+  ,testProperty "Jacobian Fwd=Rev" $ testJacFR prog
+  ,testProperty "Jacobian Fwd=FinDiff" $ testJacFD prog
+  ,testProperty "Jacobian Rev=FinDiff" $ testJacRD prog
+  ]
 
 main :: IO ()
-main =
-  defaultMain $
-  testGroup
-    "AD"
-    [ localOption (QuickCheckTests 10000) fastTests
-    , localOption (QuickCheckTests 1000) slowTests
-    , localOption (QuickCheckTests 100) superSlowTests
-    ]
-
-fastTests :: TestTree
-fastTests =
-  testGroup
-    "Fast"
-    [ testProperty "id" (propAll E.slid)
-    , testProperty "pair" (propAll E.pair)
-    , testProperty "add" (propAll E.add)
-    , testProperty "prod" (propAll E.prod)
-    , testProperty "addCopy" (propAll E.addCopy)
-    , testProperty "cX" (\c -> propAll (E.cX c))
-    , testProperty "xSquared" (propAll E.xSquared)
-    , testProperty "xCubed" (propAll E.xCubed)
-    , testProperty "quadratic" (\c -> propAll (E.quadratic c))
-    , testProperty "mapQuadratic" (\c -> propAll (E.mapQuadratic c))
-    -- foldProd: For small inputs, finite differencing is still accurate enough
-    , testProperty
-        "foldProd-small"
-        (propAll'
-           (genVect :: Gen (Vect 4))
-           (resize 1 . genWithPrimal)
-           (const arbitrarySizedFractional)
-           (const id)
-           E.foldProd)
-    -- foldProd: For larger inputs, we only compare forward AD versus reverse AD
-    , testProperty
-        "foldProd-noFD"
-        (propFwdVsRev'
-           (genVect :: Gen (Vect 8))
-           arbitrarySizedFractional
-           E.foldProd)
-    , testProperty "foldProd2" (propAll E.foldProd2)
-    -- foldrSum: For small inputs, finite differencing is still accurate enough
-    , testProperty
-        "foldrSum-small"
-        (propAll'
-           (genVect :: Gen (Vect 4))
-           (resize 1 . genWithPrimal)
-           (const arbitrarySizedFractional)
-           (const id)
-           E.foldrSum)
-    -- foldrSum: For larger inputs, we only compare forward AD versus reverse AD
-    , testProperty
-        "foldrSum-noFD"
-        (propFwdVsRev'
-           (genVect :: Gen (Vect 8))
-           arbitrarySizedFractional
-           E.foldrSum)
-    ]
-
-slowTests :: TestTree
-slowTests =
-  testGroup
-    "Slow"
-    [ testProperty
-        "fact"
-        (propAll'
-           (choose (-2, 20) `suchThat`
-            (\x -> x - fromIntegral (floor x :: Int) > 0.1))
-           (\_ -> choose (0.1, 0.5))
-           (\_ -> choose (0.1, 0.5))
-           (const id)
-           E.fact)
-    , testProperty
-        "factExtra"
-        (propAll'
-           ((,) <$> (choose (-2, 20) `suchThat` (\x -> x /= floorf x)) <*>
-            arbitrarySizedFractional)
-           (\_ -> (,) <$> choose (0.1, 0.5) <*> arbitrarySizedFractional)
-           (\_ -> choose (0.1, 0.5))
-           (const id)
-           E.factExtra)
-    , testProperty
-        "fact2"
-        (propAll'
-           (choose (-2, 5) `suchThat` (\x -> x /= floorf x))
-           (\_ -> choose (0.1, 0.5))
-           (\_ -> choose (0.1, 0.5))
-           (const id)
-           E.fact2)
-    , testProperty
-        "fact2Extra"
-        (propAll'
-           ((,) <$> (choose (-2, 5) `suchThat` (\x -> x /= floorf x)) <*>
-            arbitrarySizedFractional)
-           (\_ -> (,) <$> choose (0.1, 0.5) <*> arbitrarySizedFractional)
-           (\_ -> choose (0.1, 0.5))
-           (const id)
-           E.fact2Extra)
-    ]
-
-superSlowTests :: TestTree
-superSlowTests =
-  testGroup
-    "Super slow"
-    [ testProperty
-        "tree"
-        (propAll'
-           (choose (-2, 10) `suchThat` (\x -> x /= floorf x))
-           (\_ -> choose (0.1, 0.5))
-           (\_ -> choose (0.1, 0.5))
-           (const id)
-           E.tree)
-    , testProperty
-        "treeExtra"
-        (propAll'
-           ((,) <$> (choose (-2, 10) `suchThat` (\x -> x /= floorf x)) <*>
-            arbitrarySizedFractional)
-           (\_ -> (,) <$> choose (0.1, 0.5) <*> arbitrarySizedFractional)
-           (\_ -> choose (0.1, 0.5))
-           (const id)
-           E.treeExtra)
-    ]
+main = defaultMain $ testGroup "AD"
+  [testAll "Paper example 1" (Program paper_ex1 arbitrary)
+  ,testAll "Paper example 2" (Program paper_ex2 arbitrary)
+  ,testAll "Paper example 3" (Program (paper_ex3 @5) arbitrary)
+  ,testAll "Paper example 4" (Program (paper_ex4 @5) arbitrary)
+  ]
