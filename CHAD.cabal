@@ -28,9 +28,9 @@ library
       Concrete.Simplify
       Count
       Env
+      Examples
       FinDiff
       ForwardAD
-      Lambda.Examples
       Operation
       ReverseAD
       Simplify

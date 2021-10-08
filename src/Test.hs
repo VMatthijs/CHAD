@@ -36,7 +36,7 @@ import Concrete.Simplify
 import Env
 import ForwardAD
 import FinDiff
-import Lambda.Examples
+import Examples
 import ReverseAD
 import Simplify
 import SourceLanguage

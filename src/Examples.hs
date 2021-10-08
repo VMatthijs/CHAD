@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Lambda.Examples where
+module Examples where
 
 import GHC.TypeNats
 
