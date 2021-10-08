@@ -46,3 +46,17 @@ evalSt env (SOp op a) = evalOp op (evalSt env a)
 evalSt env (SMap a b) = V.map (evalSt env a) (evalSt env b)
 evalSt env (SReplicate x) = V.replicate (evalSt env x)
 evalSt env (SSum v) = V.sum (evalSt env v)
+
+sinkSt :: env :> env' -> STerm env t -> STerm env' t
+sinkSt w (SVar i)       = SVar (w >:> i)
+sinkSt w (SLambda e)    = SLambda (sinkSt (wSink w) e)
+sinkSt w (SLet rhs e)   = SLet (sinkSt w rhs) (sinkSt (wSink w) e)
+sinkSt w (SApp e1 e2)   = SApp (sinkSt w e1) (sinkSt w e2)
+sinkSt _ SUnit          = SUnit
+sinkSt w (SPair a b)    = SPair (sinkSt w a) (sinkSt w b)
+sinkSt w (SFst p)       = SFst (sinkSt w p)
+sinkSt w (SSnd p)       = SSnd (sinkSt w p)
+sinkSt w (SOp op a)     = SOp op (sinkSt w a)
+sinkSt w (SMap a b)     = SMap (sinkSt w a) (sinkSt w b)
+sinkSt w (SReplicate x) = SReplicate (sinkSt w x)
+sinkSt w (SSum a)       = SSum (sinkSt w a)

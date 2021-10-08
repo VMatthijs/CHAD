@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE EmptyCase          #-}
 {-# LANGUAGE GADTs              #-}
 {-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE RankNTypes         #-}
@@ -70,3 +71,6 @@ wRaise = (.> Weaken S)
 
 wSink :: env :> env' -> (t ': env) :> (t ': env')
 wSink w = Weaken (\case Z -> Z ; S i -> S (w >:> i))
+
+wNil :: '[] :> env
+wNil = Weaken (\case {})

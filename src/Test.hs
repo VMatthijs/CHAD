@@ -145,6 +145,10 @@ data Program env t = Program
     progInpGenFD :: Gen (ShowVal env)
   }
 
+instance Show (Program env t) where
+  showsPrec p (Program prog _ _) = showParen (p > 10) $
+    showString "Program " . showsPrec 11 prog . showString " _ _"
+
 -- Tests:
 -- testEvalT: evalSt ~= evalTt . stConvert
 -- testEvalST: evalSt ~= evalTt . simplifyTTerm . stConvert
@@ -280,18 +284,18 @@ testAll :: (TypeEnvironment env
            ,FinDiff (EnvType env), Element (EnvType env) ~ Scal
            ,UnLinEnv env ~ env
            ,UnLin t ~ t)
-        => TestName -> Program env t -> TestTree
+        => TestName -> Gen (Program env t) -> TestTree
 testAll name prog = testGroup name
-  [testProperty "evalSt = evalTt" $ testEvalT prog
-  ,testProperty "evalSt = simpT . evalTt" $ testEvalST prog
-  ,testProperty "evalSt = evalCt" $ testEvalCT prog
-  ,testProperty "evalSt = simpC . evalCt" $ testEvalSCT prog
-  ,testProperty "evalSt = simpC . evalCt . simpT" $ testEvalSCST prog
-  ,testProperty "Forward primal is id" $ testPrimalF prog
-  ,testProperty "Reverse primal is id" $ testPrimalR prog
-  ,testProperty "Jacobian Fwd=Rev" $ testJacFR prog
-  ,testProperty "Jacobian Fwd=FinDiff" $ testJacFD prog
-  ,testProperty "Jacobian Rev=FinDiff" $ testJacRD prog
+  [testProperty "evalSt = evalTt" $ forAll prog testEvalT
+  ,testProperty "evalSt = simpT . evalTt" $ forAll prog testEvalST
+  ,testProperty "evalSt = evalCt" $ forAll prog testEvalCT
+  ,testProperty "evalSt = simpC . evalCt" $ forAll prog testEvalSCT
+  ,testProperty "evalSt = simpC . evalCt . simpT" $ forAll prog testEvalSCST
+  ,testProperty "Forward primal is id" $ forAll prog testPrimalF
+  ,testProperty "Reverse primal is id" $ forAll prog testPrimalR
+  ,testProperty "Jacobian Fwd=Rev" $ forAll prog testJacFR
+  ,testProperty "Jacobian Fwd=FinDiff" $ forAll prog testJacFD
+  ,testProperty "Jacobian Rev=FinDiff" $ forAll prog testJacRD
   ]
 
 -- | Use this operator to build environment generators. In particular, read
@@ -300,14 +304,35 @@ testAll name prog = testGroup name
 mx <: menv = SVS <$> mx <*> menv
 infixr <:
 
+programGen :: Gen (STerm env t) -> Gen (ShowVal env) -> Gen (ShowVal env) -> Gen (Program env t)
+programGen proggen inp fdinp = (\prog -> Program prog inp fdinp) <$> proggen
+
+programArb :: Arbitrary (ShowVal env) => STerm env t -> Gen (Program env t)
+programArb prog = pure (Program prog arbitrary arbitrary)
+
 main :: IO ()
 main =
   defaultMain $
   localOption (QuickCheckTests 1000) $
   testGroup "AD"
-    [testAll "polynomial" (Program polynomial arbitrary arbitrary)
-    ,testAll "Paper example 1" (Program paper_ex1 arbitrary (choose (-6, 6) <: pure SVZ))
-    ,testAll "Paper example 2" (Program paper_ex2 arbitrary (choose (-6, 6) <: choose (-6, 6) <: choose (-6, 6) <: choose (-6, 6) <: pure SVZ))
-    ,testAll "Paper example 3" (Program (paper_ex3 @5) arbitrary arbitrary)
-    ,testAll "Paper example 4" (Program (paper_ex4 @5) arbitrary arbitrary)
+    [testAll "polynomial" (programArb polynomial)
+    ,testAll "slid" (programArb slid)
+    ,testAll "pair" (programArb pair)
+    ,testAll "add" (programArb add)
+    ,testAll "add2" (programArb add2)
+    ,testAll "prod" (programArb prod)
+    ,testAll "prod2" (programArb prod2)
+    ,testAll "addCopy" (programArb addCopy)
+    ,testAll "cX" (programGen (cX <$> arbitrary) arbitrary arbitrary)
+    ,testAll "xSquared" (programArb xSquared)
+    ,testAll "xCubed" (programArb xCubed)
+    ,testAll "quadratic" (programGen (quadratic <$> arbitrary) arbitrary arbitrary)
+    ,testAll "mapQuadratic" (programGen (mapQuadratic <$> arbitrary) arbitrary arbitrary)
+    ,testAll "Paper example 1" (pure $
+        Program paper_ex1 arbitrary (choose (-6, 6) <: pure SVZ))
+    ,testAll "Paper example 2" (pure $
+        Program paper_ex2 arbitrary (choose (-6, 6) <: choose (-6, 6) <:
+                                     choose (-6, 6) <: choose (-6, 6) <: pure SVZ))
+    ,testAll "Paper example 3" (programArb (paper_ex3 @5))
+    ,testAll "Paper example 4" (programArb (paper_ex4 @5))
     ]

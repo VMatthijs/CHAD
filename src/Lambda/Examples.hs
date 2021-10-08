@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Lambda.Examples where
 
@@ -28,17 +29,6 @@ scalprod = bin EScalProd
 
 constant :: (a ~ Df1 a, a ~ Dr1 a, a ~ UnLin a, LT a, LT2 a, LT (UnLin (Df2 a)), Show a) => a -> STerm env a
 constant x = SOp (Constant x) SUnit
-
--- \x -> x * x
-square :: STerm env (Scal -> Scal)
-square = SLambda (SOp EScalProd (SPair (SVar Z) (SVar Z)))
-
--- x:Scal |- 2 * x * x + 7 * x + 3, using 'square' for the squaring
-polynomial :: STerm '[Scal] Scal
-polynomial =
-  constant 2 `scalprod` (square `SApp` SVar Z)
-  `scaladd` constant 7 `scalprod` SVar Z
-  `scaladd` constant 3
 
 -- First example program in the paper
 --
@@ -125,3 +115,64 @@ paper_ex4 =
   SLet (SMap (SVar Z) (SVar (S Z))) $  -- ys
   SLet (SSum (SVar Z)) $  -- w
     SVar Z
+
+-- x:Scal |- 2 * ((\y -> y * y) x) + 7 * x + 3
+polynomial :: STerm '[Scal] Scal
+polynomial =
+  constant 2 `scalprod` (square `SApp` SVar Z)
+  `scaladd` constant 7 `scalprod` SVar Z
+  `scaladd` constant 3
+  where square :: STerm env (Scal -> Scal)
+        square = SLambda (SVar Z `scalprod` SVar Z)
+
+-- x
+slid :: STerm '[Scal] Scal
+slid = SVar Z
+
+-- (x, x)
+pair :: STerm '[Scal] (Scal, Scal)
+pair = SPair (SVar Z) (SVar Z)
+
+-- x + y
+add :: STerm '[Scal, Scal] Scal
+add = SVar (S Z) `scaladd` SVar Z
+
+-- x + y, from a tuple
+add2 :: STerm '[(Scal, Scal)] Scal
+add2 = SOp EScalAdd (SVar Z)
+
+-- x * y
+prod :: STerm '[Scal, Scal] Scal
+prod = SVar (S Z) `scalprod` SVar Z
+
+-- x * y, from a tuple
+prod2 :: STerm '[(Scal, Scal)] Scal
+prod2 = SOp EScalProd (SVar Z)
+
+-- let z = x + y in (z, z)
+addCopy :: STerm '[Scal, Scal] (Scal, Scal)
+addCopy = SLet (SVar (S Z) `scaladd` SVar Z)
+               (SPair (SVar Z) (SVar Z))
+
+-- c * x
+cX :: Double -> STerm '[Scal] Scal
+cX c = SOp (Constant c) SUnit `scalprod` SVar Z
+
+-- x^2
+xSquared :: STerm '[Scal] Scal
+xSquared = SVar Z `scalprod` SVar Z
+
+-- x^3
+xCubed :: STerm '[Scal] Scal
+xCubed = xSquared `scalprod` SVar Z
+
+-- c * x + x^2
+quadratic :: Double -> STerm '[Scal] Scal
+quadratic c = cX c `scaladd` xSquared
+
+-- Map a quadratic function (c*x + x^2) over an input vector
+mapQuadratic :: Double -> STerm '[Vect 3] (Vect 3)
+mapQuadratic c = SMap (SLambda (generaliseEnv (quadratic c))) (SVar Z)
+  where
+    generaliseEnv :: STerm '[a] t -> STerm (a ': env) t
+    generaliseEnv = sinkSt (wSink wNil)
