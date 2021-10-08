@@ -3,8 +3,6 @@ cabal-version: 1.12
 -- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
---
--- hash: aa963d66f3abd76a05c4f4288fdf55429bf46523deeb24f10952543435be9a5d
 
 name:           CHAD
 version:        0.1.0.0
@@ -31,6 +29,7 @@ library
       Count
       Env
       Examples
+      FinDiff
       ForwardAD
       Lambda.Examples
       Operation
