@@ -33,10 +33,10 @@ library
       ForwardAD
       Operation
       ReverseAD
-      Simplify
       SourceLanguage
       STConvert
       TargetLanguage
+      TargetLanguage.Simplify
       Test
       ToConcrete
       Types

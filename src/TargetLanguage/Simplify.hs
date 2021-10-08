@@ -11,7 +11,7 @@
 --
 -- This should only do simplifications that any basic compiler
 -- would also perform.
-module Simplify (
+module TargetLanguage.Simplify (
   simplifyTTerm,
 ) where
 

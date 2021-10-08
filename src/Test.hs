@@ -34,10 +34,10 @@ import ForwardAD
 import FinDiff
 import Examples
 import ReverseAD
-import Simplify
 import SourceLanguage
 import STConvert
 import TargetLanguage
+import TargetLanguage.Simplify
 import ToConcrete
 import Types
 
