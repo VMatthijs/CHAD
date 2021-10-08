@@ -28,7 +28,6 @@ library
       Concrete.Simplify
       Count
       Env
-      Examples
       FinDiff
       ForwardAD
       Lambda.Examples
