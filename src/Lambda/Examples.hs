@@ -67,6 +67,8 @@ paper_ex1 =
 --     v = sin w
 -- in v
 --
+-- Simplified: sin (x1 * x4 * x3 + 2 * x2 * x3 + x4)
+--
 -- TEST: simplifyTTerm (stConvert paper_ex2) == simplifyTTerm (Fst (dr paper_ex2))
 paper_ex2 :: STerm '[Scal, Scal, Scal, Scal] Scal
 paper_ex2 =

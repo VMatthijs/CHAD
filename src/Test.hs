@@ -122,7 +122,7 @@ instance (Show t, Arbitrary t, Arbitrary (ShowVal ts))
 
 type family EnvType env where
   EnvType '[] = ()
-  EnvType (t ': ts) = (t, EnvType ts)
+  EnvType (t ': ts) = (EnvType ts, t)
 
 class TypeEnvironment env where
   envToTup :: ShowVal env -> EnvType env
@@ -132,15 +132,17 @@ instance TypeEnvironment '[] where
   envToTup SVZ = ()
   tupToEnv () = SVZ
 
-instance (Show t, TypeEnvironment ts) =>TypeEnvironment (t ': ts) where
-  envToTup (SVS x env) = (x, envToTup env)
-  tupToEnv (x, xs) = SVS x (tupToEnv xs)
+instance (Show t, TypeEnvironment ts) => TypeEnvironment (t ': ts) where
+  envToTup (SVS x env) = (envToTup env, x)
+  tupToEnv (xs, x) = SVS x (tupToEnv xs)
 
 data Program env t = Program
   { progProgram :: STerm env t
   , progInpGen :: Gen (ShowVal env)
-  -- , progTanGen :: Gen (ShowVal (Df1Env env))
-  -- , progAdjGen :: Gen (Df2 t)
+  , -- | Special input generator when comparing with finite differencing.
+    -- Because of the limited precision of FD, this usually needs to be a
+    -- smaller range of values where the derivative isn't too large yet.
+    progInpGenFD :: Gen (ShowVal env)
   }
 
 -- Tests:
@@ -242,7 +244,7 @@ testJacFD :: (TypeEnvironment env
              ,FinDiff (EnvType env), Element (EnvType env) ~ Scal
              ,LT (Df2Env env))
           => Program env t -> Property
-testJacFD prog = forAll (progInpGen prog) $ \inp ->
+testJacFD prog = forAll (progInpGenFD prog) $ \inp ->
   isApproxQC ("fwdad", computeJacF prog inp)
              ("findiff", computeJacD prog inp)
 
@@ -254,7 +256,7 @@ testJacRD :: (TypeEnvironment env
              ,FinDiff (EnvType env), Element (EnvType env) ~ Scal
              ,LT (Dr2Env env))
           => Program env t -> Property
-testJacRD prog = forAll (progInpGen prog) $ \inp ->
+testJacRD prog = forAll (progInpGenFD prog) $ \inp ->
   isApproxQC ("revad", computeJacR prog inp)
              ("findiff", computeJacD prog inp)
 
@@ -285,17 +287,27 @@ testAll name prog = testGroup name
   ,testProperty "evalSt = evalCt" $ testEvalCT prog
   ,testProperty "evalSt = simpC . evalCt" $ testEvalSCT prog
   ,testProperty "evalSt = simpC . evalCt . simpT" $ testEvalSCST prog
-  ,testProperty "Forward primal" $ testPrimalF prog
-  ,testProperty "Reverse primal" $ testPrimalR prog
+  ,testProperty "Forward primal is id" $ testPrimalF prog
+  ,testProperty "Reverse primal is id" $ testPrimalR prog
   ,testProperty "Jacobian Fwd=Rev" $ testJacFR prog
   ,testProperty "Jacobian Fwd=FinDiff" $ testJacFD prog
   ,testProperty "Jacobian Rev=FinDiff" $ testJacRD prog
   ]
 
+-- | Use this operator to build environment generators. In particular, read
+-- this with @f ~ Gen@.
+(<:) :: (Applicative f, Show t) => f t -> f (ShowVal env) -> f (ShowVal (t ': env))
+mx <: menv = SVS <$> mx <*> menv
+infixr <:
+
 main :: IO ()
-main = defaultMain $ testGroup "AD"
-  [testAll "Paper example 1" (Program paper_ex1 arbitrary)
-  ,testAll "Paper example 2" (Program paper_ex2 arbitrary)
-  ,testAll "Paper example 3" (Program (paper_ex3 @5) arbitrary)
-  ,testAll "Paper example 4" (Program (paper_ex4 @5) arbitrary)
-  ]
+main =
+  defaultMain $
+  localOption (QuickCheckTests 1000) $
+  testGroup "AD"
+    [testAll "polynomial" (Program polynomial arbitrary arbitrary)
+    ,testAll "Paper example 1" (Program paper_ex1 arbitrary (choose (-6, 6) <: pure SVZ))
+    ,testAll "Paper example 2" (Program paper_ex2 arbitrary (choose (-6, 6) <: choose (-6, 6) <: choose (-6, 6) <: choose (-6, 6) <: pure SVZ))
+    ,testAll "Paper example 3" (Program (paper_ex3 @5) arbitrary arbitrary)
+    ,testAll "Paper example 4" (Program (paper_ex4 @5) arbitrary arbitrary)
+    ]

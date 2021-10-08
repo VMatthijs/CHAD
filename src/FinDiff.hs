@@ -109,4 +109,4 @@ finiteDifference f x dx dy =
       scale e a = veczip (*) (rebuild (e <$ elements (zero @a))) a
   in recip h * ((f (x `add` scale h dx) `sub` f x) `dot` dy)
   where
-    h = 0.00001 :: Scal
+    h = 0.000001 :: Scal
