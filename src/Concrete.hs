@@ -248,30 +248,31 @@ usesOfCt x t = fold (usesOfCt' x t)
 
 -- | Count the uses of the components of a variable in an expression
 usesOfCt' :: Idx env t -> CTerm env a -> Layout t OccCount
-usesOfCt' i (CVar i')
-  | Just Refl <- geq i i' = LyLeaf (OccCount 1 1)
-  | otherwise = mempty
-usesOfCt' i (CLambda e) = occRepeatRuntime <$> usesOfCt' (S i) e  -- the lambda may be invoked many times!
-usesOfCt' i (CLet rhs e) = usesOfCt' i rhs <> usesOfCt' (S i) e
-usesOfCt' i (CApp f a) = usesOfCt' i f <> usesOfCt' i a
-usesOfCt' _ CUnit = mempty
-usesOfCt' i (CPair a b) = usesOfCt' i a <> usesOfCt' i b
-usesOfCt' i p@(CFst p') = maybe (usesOfCt' i p') (layoutFromPick (OccCount 1 1)) (getPick i p)
-usesOfCt' i p@(CSnd p') = maybe (usesOfCt' i p') (layoutFromPick (OccCount 1 1)) (getPick i p)
-usesOfCt' i (COp _ a) = usesOfCt' i a
-usesOfCt' i (CMap a b) = usesOfCt' i a <> usesOfCt' i b
-usesOfCt' i (CZipWith a b c) = usesOfCt' i a <> usesOfCt' i b <> usesOfCt' i c
-usesOfCt' i (CReplicate x) = usesOfCt' i x
-usesOfCt' i (CSum x) = usesOfCt' i x
-usesOfCt' i (CToList x) = usesOfCt' i x
-usesOfCt' _ CLNil = mempty
-usesOfCt' i (CLCons a b) = usesOfCt' i a <> usesOfCt' i b
-usesOfCt' i (CLMap a b) = usesOfCt' i a <> usesOfCt' i b
-usesOfCt' i (CLFoldr a b c) = usesOfCt' i a <> usesOfCt' i b <> usesOfCt' i c
-usesOfCt' i (CLSum x) = usesOfCt' i x
-usesOfCt' i (CLZip a b) = usesOfCt' i a <> usesOfCt' i b
-usesOfCt' _ CZero = mempty
-usesOfCt' i (CPlus a b) = usesOfCt' i a <> usesOfCt' i b
+usesOfCt' i = \case
+  CVar i'
+    | Just Refl <- geq i i' -> LyLeaf (OccCount 1 1)
+    | otherwise -> mempty
+  CLambda e -> occRepeatRuntime <$> usesOfCt' (S i) e  -- the lambda may be invoked many times!
+  CLet rhs e -> usesOfCt' i rhs <> usesOfCt' (S i) e
+  CApp f a -> usesOfCt' i f <> usesOfCt' i a
+  CUnit -> mempty
+  CPair a b -> usesOfCt' i a <> usesOfCt' i b
+  p@(CFst p') -> maybe (usesOfCt' i p') (layoutFromPick (OccCount 1 1)) (getPick i p)
+  p@(CSnd p') -> maybe (usesOfCt' i p') (layoutFromPick (OccCount 1 1)) (getPick i p)
+  COp _ a -> usesOfCt' i a
+  CMap a b -> usesOfCt' i a <> usesOfCt' i b
+  CZipWith a b c -> usesOfCt' i a <> usesOfCt' i b <> usesOfCt' i c
+  CReplicate x -> usesOfCt' i x
+  CSum x -> usesOfCt' i x
+  CToList x -> usesOfCt' i x
+  CLNil -> mempty
+  CLCons a b -> usesOfCt' i a <> usesOfCt' i b
+  CLMap a b -> usesOfCt' i a <> usesOfCt' i b
+  CLFoldr a b c -> usesOfCt' i a <> usesOfCt' i b <> usesOfCt' i c
+  CLSum x -> usesOfCt' i x
+  CLZip a b -> usesOfCt' i a <> usesOfCt' i b
+  CZero -> mempty
+  CPlus a b -> usesOfCt' i a <> usesOfCt' i b
 
 getPick :: Idx env t -> CTerm env a -> Maybe (TupPick t a)
 getPick i (CVar j) | Just Refl <- geq i j = Just TPHere

@@ -463,24 +463,25 @@ usesOfTt' i = \case
 
 -- | Count the uses of the components of a variable in an expression in the linear sublanguage of the target language
 usesOfTtL :: Idx env t -> LinTTerm env lenv b -> Layout t OccCount
-usesOfTtL i (LinApp term f) = usesOfTt' i term <> usesOfTtL i f
-usesOfTtL i (LinApp' f term) = usesOfTtL i f <> usesOfTt' i term
-usesOfTtL i (LinLam f) = occRepeatRuntime <$> usesOfTtL (S i) f  -- the lambda may be invoked many times!
-usesOfTtL i (LinLet f g) = usesOfTtL i f <> usesOfTtL i g
-usesOfTtL _ (LinVar _) = mempty
-usesOfTtL i (LinPair f g) = usesOfTtL i f <> usesOfTtL i g
-usesOfTtL i (LinFst f) = usesOfTtL i f
-usesOfTtL i (LinSnd f) = usesOfTtL i f
-usesOfTtL i (LinLOp _ term arg) = usesOfTt' i term <> usesOfTtL i arg
-usesOfTtL _ LinZero = mempty
-usesOfTtL i (LinPlus f g) = usesOfTtL i f <> usesOfTtL i g
-usesOfTtL i (LinSingleton term f) = usesOfTt' i term <> usesOfTtL i f
-usesOfTtL i (LinCopowFold term f) = usesOfTt' i term <> usesOfTtL i f
-usesOfTtL i (LinZip term f) = usesOfTt' i term <> usesOfTtL i f
-usesOfTtL i (LinMap f term) = usesOfTtL i f <> usesOfTt' i term
-usesOfTtL i (LinZipWith term term' f) = usesOfTt' i term <> usesOfTt' i term' <> usesOfTtL i f
-usesOfTtL i (LinReplicate f) = usesOfTtL i f
-usesOfTtL i (LinSum f) = usesOfTtL i f
+usesOfTtL i = \case
+  LinApp term f -> usesOfTt' i term <> usesOfTtL i f
+  LinApp' f term -> usesOfTtL i f <> usesOfTt' i term
+  LinLam f -> occRepeatRuntime <$> usesOfTtL (S i) f  -- the lambda may be invoked many times!
+  LinLet f g -> usesOfTtL i f <> usesOfTtL i g
+  LinVar _ -> mempty
+  LinPair f g -> usesOfTtL i f <> usesOfTtL i g
+  LinFst f -> usesOfTtL i f
+  LinSnd f -> usesOfTtL i f
+  LinLOp _ term arg -> usesOfTt' i term <> usesOfTtL i arg
+  LinZero -> mempty
+  LinPlus f g -> usesOfTtL i f <> usesOfTtL i g
+  LinSingleton term f -> usesOfTt' i term <> usesOfTtL i f
+  LinCopowFold term f -> usesOfTt' i term <> usesOfTtL i f
+  LinZip term f -> usesOfTt' i term <> usesOfTtL i f
+  LinMap f term -> usesOfTtL i f <> usesOfTt' i term
+  LinZipWith term term' f -> usesOfTt' i term <> usesOfTt' i term' <> usesOfTtL i f
+  LinReplicate f -> usesOfTtL i f
+  LinSum f -> usesOfTtL i f
 
 usesOfLinVar :: Idx lenv t -> LinTTerm env lenv b -> Layout t OccCount
 usesOfLinVar i = \case
