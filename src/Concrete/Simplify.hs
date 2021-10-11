@@ -18,13 +18,13 @@
 -- the 'Settings' object passed to 'simplifyCTerm'.
 module Concrete.Simplify (
   simplifyCTerm,
-  Settings(..), defaultSettings,
+  Settings(..), defaultSettings, allSettings,
 ) where
 
-import           Concrete
-import           Count
-import           Env
-import           Types
+import Concrete
+import Count
+import Env
+import Types
 
 data Settings = Settings
   { simpLamAppLet :: Bool        -- ^ @(\x -> e) a@  ~>  @let x = a in e@
@@ -32,28 +32,67 @@ data Settings = Settings
   , simpLetRotate :: Bool        -- ^ @let x = (let y = a in b) in e@  ~>  @let y = a in let x = b in e@
   , simpLetPairSplit :: Bool     -- ^ @let x = (a, b) in @e  ~>  @let x1 = a in let x2 = b in e[(x1,x2)/x]@
   , simpLetInline :: Bool        -- ^ @let x = a in e@  ~>  @e[a/x]@  (if @a@ is cheap or used at most once in e)
-  , simpLetLamPairSplit :: Bool  -- ^ @let f = \x -> (a, b) in e@  ~>  @let f1 = \x -> a ; f2 = \x -> b in e[(\x->(f1 x,f2 x))/f]@
   , simpPairProj :: Bool         -- ^ @fst (a, b)@  ~>  @a@  (and similarly for @snd@)
   , simpLetProj :: Bool          -- ^ @fst (let x = a in e)@  ~>  @let x = a in fst e@  (and similarly for @snd@)
   , simpPlusZero :: Bool         -- ^ @plus zero a@  ~>  @a@  (also symmetrically)
   , simpPlusPair :: Bool         -- ^ @plus (a, b) (c, d)@  ~>  @(plus a c, plus b d)@
   , simpPlusLet :: Bool          -- ^ @plus (let x = e in a) b@  ~>  @let x = e in plus a b@  (also symmetrically)
+  , simpLetLamPairSplit :: Bool  -- ^ @let f = \x -> (a, b) in e@  ~>  @let f1 = \x -> a ; f2 = \x -> b in e[(\x->(f1 x,f2 x))/f]@
+  , simpMapPairSplit :: Bool     -- ^ @map (\x -> (b, c)) a@  ~>  @let a' = a in (map (\x -> b) a', map (\x -> c) a')@
+  , simpMapZero :: Bool          -- ^ @map (\x -> zero) a@  ~>  @zero@
+  , simpSumZip :: Bool           -- ^ @sum (zip a b)@  ~>  @(sum a, sum b)@
+  , simpSumZero :: Bool          -- ^ @sum zero@  ~>  @zero@
   }
   deriving (Show, Eq)
 
+instance Semigroup Settings where
+  Settings a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 <>
+      Settings b1 b2 b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14 b15 =
+    Settings (a1 || b1) (a2 || b2) (a3 || b3) (a4 || b4) (a5 || b5)
+             (a6 || b6) (a7 || b7) (a8 || b8) (a9 || b9) (a10 || b10)
+             (a11 || b11) (a12 || b12) (a13 || b13) (a14 || b14)
+             (a15 || b15)
+
+instance Monoid Settings where
+  mempty = Settings False False False False False False False False
+                    False False False False False False False
+
 defaultSettings :: Settings
 defaultSettings = Settings
-  { simpLamAppLet = True
-  , simpZeroApp = True
-  , simpLetRotate = True
-  , simpLetPairSplit = True
-  , simpLetInline = True
+  { simpLamAppLet       = True
+  , simpZeroApp         = True
+  , simpLetRotate       = True
+  , simpLetPairSplit    = True
+  , simpLetInline       = True
+  , simpPairProj        = True
+  , simpLetProj         = True
+  , simpPlusZero        = True
+  , simpPlusPair        = True
+  , simpPlusLet         = True
   , simpLetLamPairSplit = False
-  , simpPairProj = True
-  , simpLetProj = True
-  , simpPlusZero = True
-  , simpPlusPair = True
-  , simpPlusLet = True
+  , simpMapPairSplit    = False
+  , simpMapZero         = False
+  , simpSumZip          = False
+  , simpSumZero         = False
+  }
+
+allSettings :: Settings
+allSettings = Settings
+  { simpLamAppLet       = True
+  , simpZeroApp         = True
+  , simpLetRotate       = True
+  , simpLetPairSplit    = True
+  , simpLetInline       = True
+  , simpPairProj        = True
+  , simpLetProj         = True
+  , simpPlusZero        = True
+  , simpPlusPair        = True
+  , simpPlusLet         = True
+  , simpLetLamPairSplit = True
+  , simpMapPairSplit    = True
+  , simpMapZero         = True
+  , simpSumZip          = True
+  , simpSumZero         = True
   }
 
 simplifyCTerm :: Settings -> CTerm env a -> CTerm env a
@@ -80,9 +119,9 @@ simplifyCTerm' (CSum a) = CSum (simplifyCTerm' a)
 simplifyCTerm' (CToList a) = CToList (simplifyCTerm' a)
 simplifyCTerm' CLNil = CLNil
 simplifyCTerm' (CLCons a b) = CLCons (simplifyCTerm' a) (simplifyCTerm' b)
-simplifyCTerm' (CLMap a b) = CLMap (simplifyCTerm' a) (simplifyCTerm' b)
+simplifyCTerm' (CLMap a b) = simplifyCLMap (simplifyCTerm' a) (simplifyCTerm' b)
 simplifyCTerm' (CLFoldr a b c) = CLFoldr (simplifyCTerm' a) (simplifyCTerm' b) (simplifyCTerm' c)
-simplifyCTerm' (CLSum a) = CLSum (simplifyCTerm' a)
+simplifyCTerm' (CLSum a) = simplifyCLSum (simplifyCTerm' a)
 simplifyCTerm' (CLZip b c) = CLZip (simplifyCTerm' b) (simplifyCTerm' c)
 simplifyCTerm' CZero = CZero
 simplifyCTerm' (CPlus a b) = simplifyPlus (simplifyCTerm' a) (simplifyCTerm' b)
@@ -166,6 +205,21 @@ simplifySnd :: (?settings :: Settings) => CTerm env (a, b) -> CTerm env b
 simplifySnd (CPair _ s)  | simpPairProj ?settings = s
 simplifySnd (CLet rhs e) | simpLetProj ?settings = simplifyLet rhs (simplifySnd e)
 simplifySnd p            = CSnd p
+
+simplifyCLMap :: (?settings :: Settings) => CTerm env (a -> b) -> CTerm env [a] -> CTerm env [b]
+simplifyCLMap (CLambda (CPair a b)) l | simpMapPairSplit ?settings =
+  simplifyCTerm' $
+    CLet l $
+      CLZip (CLMap (CLambda (sinkCt (wSink (wSucc wId)) a)) (CVar Z))
+            (CLMap (CLambda (sinkCt (wSink (wSucc wId)) b)) (CVar Z))
+simplifyCLMap (CLambda CZero) _ | simpMapZero ?settings = CZero
+simplifyCLMap f l = CLMap f l
+
+simplifyCLSum :: (?settings :: Settings, LT a) => CTerm env [a] -> CTerm env a
+simplifyCLSum (CLZip a b) | simpSumZip ?settings =
+  simplifyCTerm' $ CPair (simplifyCLSum a) (simplifyCLSum b)
+simplifyCLSum CZero | simpSumZero ?settings = CZero
+simplifyCLSum l = CLSum l
 
 -- | Simplify the Plus form
 simplifyPlus :: (LT a, ?settings :: Settings) => CTerm env a -> CTerm env a -> CTerm env a
