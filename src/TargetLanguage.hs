@@ -14,7 +14,6 @@ import           Control.Monad.State.Strict
 import           Data.Foldable             (fold)
 import           Data.GADT.Compare         (GEq (..))
 import           Data.List                 (intersperse)
-import           Data.Monoid               (getSum)
 import           Data.Type.Equality        ((:~:) (Refl))
 import qualified Data.Vector.Unboxed.Sized as V (map, replicate, sum)
 import           GHC.TypeNats              (KnownNat)
@@ -432,22 +431,22 @@ prettyLTt t = evalState (printLTt 0 [] [] t) 1 ""
 --   showsPrec p term = evalState (printLam p [] term) 1
 
 -- | Count the uses of a variable in an expression
-usesOfTt :: Idx env t -> TTerm env a -> Integer
-usesOfTt x t = getSum (fold (usesOfTt' x t))
+usesOfTt :: Idx env t -> TTerm env a -> OccCount
+usesOfTt x t = fold (usesOfTt' x t)
 
 -- | Count the uses of the components of a variable in an expression
-usesOfTt' :: (Num s, Monoid s) => Idx env t -> TTerm env a -> Layout t s
+usesOfTt' :: Idx env t -> TTerm env a -> Layout t OccCount
 usesOfTt' i = \case
   Var i'
-    | Just Refl <- geq i i' -> LyLeaf 1
+    | Just Refl <- geq i i' -> LyLeaf (OccCount 1 1)
     | otherwise -> mempty
-  Lambda e -> usesOfTt' (S i) e
+  Lambda e -> occRepeatRuntime <$> usesOfTt' (S i) e  -- the lambda may be invoked many times!
   Let rhs e -> usesOfTt' i rhs <> usesOfTt' (S i) e
   App f a -> usesOfTt' i f <> usesOfTt' i a
   Unit -> mempty
   Pair a b -> usesOfTt' i a <> usesOfTt' i b
-  p@(Fst p') -> maybe (usesOfTt' i p') layoutFromPick (getPick i p)
-  p@(Snd p') -> maybe (usesOfTt' i p') layoutFromPick (getPick i p)
+  p@(Fst p') -> maybe (usesOfTt' i p') (layoutFromPick (OccCount 1 1)) (getPick i p)
+  p@(Snd p') -> maybe (usesOfTt' i p') (layoutFromPick (OccCount 1 1)) (getPick i p)
   Op _ a -> usesOfTt' i a
   Map a b -> usesOfTt' i a <> usesOfTt' i b
   Replicate x -> usesOfTt' i x
@@ -463,10 +462,10 @@ usesOfTt' i = \case
     getPick _ _ = Nothing
 
 -- | Count the uses of the components of a variable in an expression in the linear sublanguage of the target language
-usesOfTtL :: (Num s, Monoid s) => Idx env t -> LinTTerm env lenv b -> Layout t s
+usesOfTtL :: Idx env t -> LinTTerm env lenv b -> Layout t OccCount
 usesOfTtL i (LinApp term f) = usesOfTt' i term <> usesOfTtL i f
 usesOfTtL i (LinApp' f term) = usesOfTtL i f <> usesOfTt' i term
-usesOfTtL i (LinLam f) = usesOfTtL (S i) f
+usesOfTtL i (LinLam f) = occRepeatRuntime <$> usesOfTtL (S i) f  -- the lambda may be invoked many times!
 usesOfTtL i (LinLet f g) = usesOfTtL i f <> usesOfTtL i g
 usesOfTtL _ (LinVar _) = mempty
 usesOfTtL i (LinPair f g) = usesOfTtL i f <> usesOfTtL i g
@@ -483,18 +482,18 @@ usesOfTtL i (LinZipWith term term' f) = usesOfTt' i term <> usesOfTt' i term' <>
 usesOfTtL i (LinReplicate f) = usesOfTtL i f
 usesOfTtL i (LinSum f) = usesOfTtL i f
 
-usesOfLinVar :: (Num s, Monoid s) => Idx lenv t -> LinTTerm env lenv b -> Layout t s
+usesOfLinVar :: Idx lenv t -> LinTTerm env lenv b -> Layout t OccCount
 usesOfLinVar i = \case
   LinApp _ f -> usesOfLinVar i f
   LinApp' f _ -> usesOfLinVar i f
-  LinLam f -> usesOfLinVar i f
+  LinLam f -> occRepeatRuntime <$> usesOfLinVar i f  -- the lambda may be invoked many times!
   LinLet f g -> usesOfLinVar i f <> usesOfLinVar (S i) g
   LinVar j
-    | Just Refl <- geq i j -> LyLeaf 1
+    | Just Refl <- geq i j -> LyLeaf (OccCount 1 1)
     | otherwise -> mempty
   LinPair f g -> usesOfLinVar i f <> usesOfLinVar i g
-  f@(LinFst g) -> maybe (usesOfLinVar i g) layoutFromPick (getPickLin i f)
-  f@(LinSnd g) -> maybe (usesOfLinVar i g) layoutFromPick (getPickLin i f)
+  f@(LinFst g) -> maybe (usesOfLinVar i g) (layoutFromPick (OccCount 1 1)) (getPickLin i f)
+  f@(LinSnd g) -> maybe (usesOfLinVar i g) (layoutFromPick (OccCount 1 1)) (getPickLin i f)
   LinLOp _ _ arg -> usesOfLinVar i arg
   LinZero -> mempty
   LinPlus f g -> usesOfLinVar i f <> usesOfLinVar i g

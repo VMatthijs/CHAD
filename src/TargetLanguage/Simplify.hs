@@ -15,14 +15,12 @@ module TargetLanguage.Simplify (
   simplifyTTerm,
 ) where
 
-import           Data.Foldable      (fold)
-import qualified Data.Monoid        as Mon
-import           Numeric.Natural
+import Data.Foldable (fold)
 
-import           Count
-import           Env
-import           TargetLanguage
-import           Types
+import Count
+import Env
+import TargetLanguage
+import Types
 
 -- | Simplify a 'TTerm' using some basic rewriting optimisations.
 --
@@ -104,7 +102,10 @@ simplifyLet (Pair a1 a2) e =
     simplifyLet (sinkTt (wSucc wId) a2) $
       simplifyTTerm $ substTt (wSucc (wSucc wId)) (Pair (Var (S Z)) (Var Z)) e
 simplifyLet a e
-  | duplicable a || (fold (usesOfTt' Z e) :: Mon.Sum Natural) <= 1
+  | -- Occurrence counting for variable inlining is tricky. See the documentation of 'OccCount'.
+    let OccCount synUses runUses = usesOfTt Z e
+  , duplicableSyntactic a || synUses <= 1
+  , duplicableRuntime a || runUses <= 1
   = simplifyTTerm $ substTt wId a e
   | otherwise
   = Let a e
@@ -119,30 +120,45 @@ simplifyLinLet rhs body
   | otherwise
   = LinLet rhs body
 
-decideInlinableLin :: Layout b (Mon.Sum Natural) -> LinTTerm env a b -> Bool
+decideInlinableLin :: Layout b OccCount -> LinTTerm env a b -> Bool
 decideInlinableLin (LyPair ly1 ly2) (LinPair e1 e2) =
   decideInlinableLin ly1 e1 && decideInlinableLin ly2 e2
-decideInlinableLin (fold -> count) e = count <= 1 || duplicableLin e
+decideInlinableLin (fold -> OccCount synUses runUses) e =
+  -- Occurrence counting for variable inlining is tricky. See the documentation of 'OccCount'.
+  (duplicableLinSyntactic e || synUses <= 1) &&
+  (duplicableLinRuntime e || runUses <= 1)
 
-duplicable :: TTerm env a -> Bool
-duplicable Var{} = True
-duplicable Unit{} = True
-duplicable (Pair a b) = duplicable a && duplicable b
-duplicable (Fst e) = duplicable e
-duplicable (Snd e) = duplicable e
--- duplicable (AdjPlus a b) = duplicable a && duplicable b
-duplicable Zero = True
-duplicable (LinFun _) = False  -- TODO: something here?
-duplicable _ = False
+duplicableRuntime :: TTerm env a -> Bool
+duplicableRuntime = \case
+  Lambda{} -> True
+  LinFun{} -> True
+  t -> duplicableSyntactic t
 
-duplicableLin :: LinTTerm env a b -> Bool
-duplicableLin (LinVar _) = True
-duplicableLin (LinPair a b) = duplicableLin a && duplicableLin b
-duplicableLin (LinFst e) = duplicableLin e
-duplicableLin (LinSnd e) = duplicableLin e
-duplicableLin (LinPlus a b) = duplicableLin a && duplicableLin b
-duplicableLin LinZero = True
-duplicableLin _ = False
+duplicableSyntactic :: TTerm env a -> Bool
+duplicableSyntactic = \case
+  Var{} -> True
+  Unit{} -> True
+  Zero -> True
+  Pair a b -> duplicableSyntactic a && duplicableSyntactic b
+  Fst e -> duplicableSyntactic e
+  Snd e -> duplicableSyntactic e
+  -- AdjPlus a b -> duplicableSyntactic a && duplicableSyntactic b
+  _ -> False
+
+duplicableLinRuntime :: LinTTerm env a b -> Bool
+duplicableLinRuntime = \case
+  LinLam{} -> True
+  t -> duplicableLinSyntactic t
+
+duplicableLinSyntactic :: LinTTerm env a b -> Bool
+duplicableLinSyntactic = \case
+  LinVar _ -> True
+  LinPair a b -> duplicableLinSyntactic a && duplicableLinSyntactic b
+  LinFst e -> duplicableLinSyntactic e
+  LinSnd e -> duplicableLinSyntactic e
+  LinPlus a b -> duplicableLinSyntactic a && duplicableLinSyntactic b
+  LinZero -> True
+  _ -> False
 
 -- | Simplify the Fst form
 simplifyFst :: TTerm env (a, b) -> TTerm env a

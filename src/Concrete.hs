@@ -18,7 +18,6 @@ import           Control.Monad.State.Strict
 import           Data.Foldable             (fold)
 import           Data.GADT.Compare         (GEq (..))
 import           Data.List                 (intersperse)
-import           Data.Monoid               (getSum)
 import           Data.Some
 import           Data.Type.Equality        ((:~:) (Refl))
 import qualified Data.Vector.Unboxed.Sized as V (map, zipWith, replicate, sum, toList)
@@ -244,21 +243,21 @@ prettyCt term = evalState (printCt 0 [] term) 1 ""
 --   showsPrec p term = evalState (printLam p [] term) 1
 
 -- | Count the uses of a variable in an expression
-usesOfCt :: Idx env t -> CTerm env a -> Integer
-usesOfCt x t = getSum (fold (usesOfCt' x t))
+usesOfCt :: Idx env t -> CTerm env a -> OccCount
+usesOfCt x t = fold (usesOfCt' x t)
 
 -- | Count the uses of the components of a variable in an expression
-usesOfCt' :: (Num s, Monoid s) => Idx env t -> CTerm env a -> Layout t s
+usesOfCt' :: Idx env t -> CTerm env a -> Layout t OccCount
 usesOfCt' i (CVar i')
-  | Just Refl <- geq i i' = LyLeaf 1
+  | Just Refl <- geq i i' = LyLeaf (OccCount 1 1)
   | otherwise = mempty
-usesOfCt' i (CLambda e) = usesOfCt' (S i) e
+usesOfCt' i (CLambda e) = occRepeatRuntime <$> usesOfCt' (S i) e  -- the lambda may be invoked many times!
 usesOfCt' i (CLet rhs e) = usesOfCt' i rhs <> usesOfCt' (S i) e
 usesOfCt' i (CApp f a) = usesOfCt' i f <> usesOfCt' i a
 usesOfCt' _ CUnit = mempty
 usesOfCt' i (CPair a b) = usesOfCt' i a <> usesOfCt' i b
-usesOfCt' i p@(CFst p') = maybe (usesOfCt' i p') layoutFromPick (getPick i p)
-usesOfCt' i p@(CSnd p') = maybe (usesOfCt' i p') layoutFromPick (getPick i p)
+usesOfCt' i p@(CFst p') = maybe (usesOfCt' i p') (layoutFromPick (OccCount 1 1)) (getPick i p)
+usesOfCt' i p@(CSnd p') = maybe (usesOfCt' i p') (layoutFromPick (OccCount 1 1)) (getPick i p)
 usesOfCt' i (COp _ a) = usesOfCt' i a
 usesOfCt' i (CMap a b) = usesOfCt' i a <> usesOfCt' i b
 usesOfCt' i (CZipWith a b c) = usesOfCt' i a <> usesOfCt' i b <> usesOfCt' i c

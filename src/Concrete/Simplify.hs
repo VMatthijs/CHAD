@@ -21,11 +21,8 @@ module Concrete.Simplify (
   Settings(..), defaultSettings,
 ) where
 
-import           Data.Foldable      (fold)
-import qualified Data.Monoid        as Mon
-import           Numeric.Natural
-
 import           Concrete
+import           Count
 import           Env
 import           Types
 
@@ -134,20 +131,29 @@ simplifyLet a e
         CLet (sinkCt (wSucc wId) a2) $
           substCt wId re' (sinkCt (wSink (wSucc (wSucc wId))) e)
   | simpLetInline ?settings
-  , duplicable a || (fold (usesOfCt' Z e) :: Mon.Sum Natural) <= 1
+  , -- Occurrence counting for variable inlining is tricky. See the documentation of 'OccCount'.
+    let OccCount synUses runUses = usesOfCt Z e
+  , duplicableSyntactic a || synUses <= 1
+  , duplicableRuntime a || runUses <= 1
   = simplifyCTerm' $ substCt wId a e
   | otherwise
   = CLet a e
 
-duplicable :: CTerm env a -> Bool
-duplicable CVar{} = True
-duplicable CUnit{} = True
-duplicable (CPair a b) = duplicable a && duplicable b
-duplicable (CFst e) = duplicable e
-duplicable (CSnd e) = duplicable e
-duplicable (CPlus a b) = duplicable a && duplicable b
-duplicable CZero = True
-duplicable _ = False
+duplicableRuntime :: CTerm env a -> Bool
+duplicableRuntime = \case
+  CLambda{} -> True
+  t -> duplicableSyntactic t
+
+duplicableSyntactic :: CTerm env a -> Bool
+duplicableSyntactic = \case
+  CVar{} -> True
+  CUnit{} -> True
+  CPair a b -> duplicableSyntactic a && duplicableSyntactic b
+  CFst e -> duplicableSyntactic e
+  CSnd e -> duplicableSyntactic e
+  CPlus a b -> duplicableSyntactic a && duplicableSyntactic b
+  CZero -> True
+  _ -> False
 
 -- | Simplify the Fst form
 simplifyFst :: (?settings :: Settings) => CTerm env (a, b) -> CTerm env a
