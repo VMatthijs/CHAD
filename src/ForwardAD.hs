@@ -127,6 +127,13 @@ df = \case
                       (LinMap (Snd (Var (S Z)) `LinApp` LinVar Z)
                               (Fst (Var Z))))
 
+  -- SMap1 f e ->
+  --   Let (Lambda (df f)) $
+  --   Let (sinkTt1 (df e)) $
+  --     _
+
+  -- SMap2 -> _
+
   SReplicate e ->
     Let (df e) $
       Pair (Replicate (Fst (Var Z)))

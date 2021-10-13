@@ -131,6 +131,21 @@ dr = \case
                                          `LinApp` LinVar Z)
                                     (Fst (Var Z)) (LinVar Z)))
 
+  SMap1 f e ->
+    Let (Lambda (dr f)) $
+    Let (sinkTt1 (dr e)) $
+      Pair (Map (Lambda (Fst (Var (S (S Z)) `App` Var Z))) (Fst (Var Z)))
+           (LinFun $
+              LinPlus (LinCopowFold (Lambda $ LinFun $ LinFst (Snd (Var (S (S Z)) `App` Var Z) `LinApp` LinVar Z))
+                                    (LinZip (Fst (Var Z))
+                                            (LinVar Z)))
+                      (Snd (Var Z) `LinApp`
+                         LinZipWith (Lambda $ LinFun $ LinSnd (Snd (Var (S (S Z)) `App` Var Z) `LinApp` LinVar Z))
+                                    (Fst (Var Z))
+                                    (LinVar Z)))
+
+  -- SMap2 -> _
+
   SReplicate e ->
     Let (dr e) $
       Pair (Replicate (Fst (Var Z)))

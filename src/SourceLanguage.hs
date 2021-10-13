@@ -27,6 +27,8 @@ data STerm env a where
   SOp :: (a ~ Df1 a, b ~ Df1 b, a ~ Dr1 a, b ~ Dr1 b, a ~ UnLin a, b ~ UnLin b, LT2 a, LT2 b, LT (UnLin (Df2 b))) => Operation a b -> STerm env a -> STerm env b
 
   SMap :: KnownNat n => STerm env (Scal -> Scal) -> STerm env (Vect n) -> STerm env (Vect n)
+  SMap1 :: KnownNat n => STerm (Scal ': env) Scal -> STerm env (Vect n) -> STerm env (Vect n)
+  -- SMap2 :: KnownNat n => STerm env ((Scal -> Scal, Vect n) -> Vect n)
   SReplicate :: KnownNat n => STerm env Scal -> STerm env (Vect n)
   SSum :: KnownNat n => STerm env (Vect n) -> STerm env Scal
 
@@ -44,6 +46,8 @@ evalSt env (SFst p) = fst $ evalSt env p
 evalSt env (SSnd p) = snd $ evalSt env p
 evalSt env (SOp op a) = evalOp op (evalSt env a)
 evalSt env (SMap a b) = V.map (evalSt env a) (evalSt env b)
+evalSt env (SMap1 a b) = V.map (\v -> evalSt (VS v env) a) (evalSt env b)
+-- evalSt _   SMap2 = uncurry V.map
 evalSt env (SReplicate x) = V.replicate (evalSt env x)
 evalSt env (SSum v) = V.sum (evalSt env v)
 
@@ -58,5 +62,7 @@ sinkSt w (SFst p)       = SFst (sinkSt w p)
 sinkSt w (SSnd p)       = SSnd (sinkSt w p)
 sinkSt w (SOp op a)     = SOp op (sinkSt w a)
 sinkSt w (SMap a b)     = SMap (sinkSt w a) (sinkSt w b)
+sinkSt w (SMap1 a b)    = SMap1 (sinkSt (wSink w) a) (sinkSt w b)
+-- sinkSt _ SMap2          = SMap2
 sinkSt w (SReplicate x) = SReplicate (sinkSt w x)
 sinkSt w (SSum a)       = SSum (sinkSt w a)

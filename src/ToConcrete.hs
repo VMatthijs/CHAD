@@ -46,6 +46,8 @@ toConcrete' w = \case
   Snd t -> CSnd (toConcrete' w t)
   Op op t -> COp op (toConcrete' w t)
   Map a b -> CMap (toConcrete' w a) (toConcrete' w b)
+  Map1 a b -> CMap (CLambda (toConcrete' (wSink w) a)) (toConcrete' w b)
+  -- Map2 -> CLambda $ CMap (CFst (CVar Z)) (CSnd (CVar Z))
   Replicate a -> CReplicate (toConcrete' w a)
   Sum a -> CSum (toConcrete' w a)
   LinFun f -> CLambda $ toConcreteL' (wSucc w) wOnlyOne f
