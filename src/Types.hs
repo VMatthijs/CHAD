@@ -218,7 +218,6 @@ class LTctx a =>
 -- instance for 'LT (a -> b)', and due to the rules for injectivity of type
 -- families, this is allowed.
 -- At the time of writing, this is used in a few places:
--- - the case for Zero in simplifyApp in TargetLanguage/Simplify.hs;
 -- - makeProj in the case for LinVar in evalLTt' in TargetLanguage.hs.
 --
 -- The superclass constraint 'LTctx a =>' on 'LT' requires UndecidableSuperClasses.

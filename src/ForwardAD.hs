@@ -43,7 +43,7 @@ linPrj Z env = LinSnd env
 linPrj (S i) env = linPrj i (LinFst env)
 
 dfOp :: LT (UnLin (Df2 b)) => Operation a b -> TTerm env (a -> LFun (Df2 a) (Df2 b))
-dfOp (Constant _) = Lambda Zero
+dfOp (Constant _) = Lambda (LinFun LinZero)
 dfOp EAdd = Lambda $ LinFun $ LinPlus (LinFst (LinVar Z)) (LinSnd (LinVar Z))
 dfOp EProd = Lambda $ LinFun $ LinPlus (LinLOp LProd (Fst (Var Z)) (LinSnd (LinVar Z)))
                                        (LinLOp LProd (Snd (Var Z)) (LinFst (LinVar Z)))
@@ -87,7 +87,7 @@ df = \case
               LinPlus ((Snd (Var (S Z)) `LinApp` LinVar Z) `LinApp'` Fst (Var (S (S Z))))
                       (Snd (Var Z) `LinApp` (Snd (Var (S (S Z))) `LinApp` LinVar Z)))
 
-  SUnit -> Pair Unit Zero
+  SUnit -> Pair Unit (LinFun LinZero)
 
   SPair e1 e2 ->
     Let (df e1) $

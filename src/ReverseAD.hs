@@ -42,7 +42,7 @@ onehotEnv Z = LinPair LinZero (LinVar Z)
 onehotEnv (S i) = LinPair (onehotEnv i) LinZero
 
 drOp :: Operation a b -> TTerm env (a -> LFun (Dr2 b) (Dr2 a))
-drOp (Constant _) = Lambda Zero
+drOp (Constant _) = Lambda (LinFun LinZero)
 drOp EAdd = Lambda $ LinFun $ LinPair (LinVar Z) (LinVar Z)
 drOp EProd = Lambda $ LinFun $ LinPair (LinLOp LProd (Snd (Var Z)) (LinVar Z))
                                        (LinLOp LProd (Fst (Var Z)) (LinVar Z))
@@ -92,7 +92,7 @@ dr = \case
                       (Snd (Var (S Z))
                          `LinApp` LinSingleton (Fst (Var (S (S Z)))) (LinVar Z)))
 
-  SUnit -> Pair Unit Zero
+  SUnit -> Pair Unit (LinFun LinZero)
 
   SPair e1 e2 ->
     Let (dr e1) $

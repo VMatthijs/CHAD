@@ -39,9 +39,6 @@ data TTerm env t where
   Replicate :: KnownNat n => TTerm env Scal -> TTerm env (Vect n)
   Sum :: KnownNat n => TTerm env (Vect n) -> TTerm env Scal
 
-  -- AdjPlus :: LT a => TTerm env a -> TTerm env a -> TTerm env a
-  Zero :: LTU a => TTerm env a
-
   LinFun :: (LT a, LT b) => LinTTerm env '[a] b -> TTerm env (LFun a b)
 
 deriving instance Show (TTerm env a)
@@ -118,8 +115,6 @@ substTt' i v w (Op op y) = Op op (substTt' i v w y)
 substTt' i v w (Map a b) = Map (substTt' i v w a) (substTt' i v w b)
 substTt' i v w (Replicate x) = Replicate (substTt' i v w x)
 substTt' i v w (Sum a) = Sum (substTt' i v w a)
--- substTt' i v w (AdjPlus a b) = AdjPlus (substTt' i v w a) (substTt' i v w b)
-substTt' _ _ _ Zero = Zero
 substTt' i v w (LinFun f) = LinFun (substLTt' i v w f)
 
 -- | Substitute given variable with the given environment weakening action in a
@@ -198,8 +193,6 @@ evalTt' env (Op op a) = evalOp op (evalTt' env a)
 evalTt' env (Map a b) = V.map (evalTt' env a) (evalTt' env b)
 evalTt' env (Replicate x) = V.replicate (evalTt' env x)
 evalTt' env (Sum a) = V.sum (evalTt' env a)
--- evalTt' env (AdjPlus a b) = plus (evalTt' env a) (evalTt' env b)
-evalTt' _   Zero = zero
 evalTt' env (LinFun f) = lPair lUnit lId `lComp` evalLTt' env f
 
 type family LinEnvType lenv where
@@ -243,8 +236,6 @@ sinkTt w (Op op a)     = Op op (sinkTt w a)
 sinkTt w (Map a b)     = Map (sinkTt w a) (sinkTt w b)
 sinkTt w (Replicate x) = Replicate (sinkTt w x)
 sinkTt w (Sum a)       = Sum (sinkTt w a)
--- sinkTt w (AdjPlus a b) = AdjPlus (sinkTt w a) (sinkTt w b)
-sinkTt _ Zero          = Zero
 sinkTt w (LinFun f)    = LinFun (sinkTtL w f)
 
 sinkTt1 :: TTerm env t -> TTerm (a ': env) t
@@ -349,8 +340,6 @@ printTt d env (Op op a) = case (op, a) of
 printTt d env (Map a b) = showFunction d env [] "map" [SomeTTerm a, SomeTTerm b]
 printTt d env (Replicate x) = showFunction d env [] "replicate" [SomeTTerm x]
 printTt d env (Sum a) = showFunction d env [] "sum" [SomeTTerm a]
--- printTt d env (AdjPlus a b) = showFunction d env [] "plus" [SomeTTerm a, SomeTTerm b]
-printTt _ _ Zero = pure $ showString "zero"
 printTt d env (LinFun f) = do
     r1 <- printLTt d env ["v"] f
     pure $ showParen (d > 0) $ showString "\\v -> " . r1
@@ -451,8 +440,6 @@ usesOfTt' i = \case
   Map a b -> usesOfTt' i a <> usesOfTt' i b
   Replicate x -> usesOfTt' i x
   Sum a -> usesOfTt' i a
-  -- AdjPlus a b -> usesOfTt' i a <> usesOfTt' i b
-  Zero -> mempty
   LinFun f -> usesOfTtL i f
   where
     getPick :: Idx env t -> TTerm env a -> Maybe (TupPick t a)

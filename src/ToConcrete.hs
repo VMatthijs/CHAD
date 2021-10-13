@@ -48,7 +48,6 @@ toConcrete' w = \case
   Map a b -> CMap (toConcrete' w a) (toConcrete' w b)
   Replicate a -> CReplicate (toConcrete' w a)
   Sum a -> CSum (toConcrete' w a)
-  Zero -> CZero
   LinFun f -> CLambda $ toConcreteL' (wSucc w) wOnlyOne f
     where
       wOnlyOne :: '[a] :> (a ': env)

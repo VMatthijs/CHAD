@@ -45,8 +45,6 @@ simplifyTTerm (Op op a) = Op op (simplifyTTerm a)
 simplifyTTerm (Map a b) = Map (simplifyTTerm a) (simplifyTTerm b)
 simplifyTTerm (Replicate x) = Replicate (simplifyTTerm x)
 simplifyTTerm (Sum a) = Sum (simplifyTTerm a)
--- simplifyTTerm (AdjPlus a b) = simplifyPlus (simplifyTTerm a) (simplifyTTerm b)
-simplifyTTerm Zero = Zero
 simplifyTTerm (LinFun f) = LinFun (simplifyLinTTerm f)
 
 -- | Simplify a 'LinTTerm' using some basic rewriting optimisations.
@@ -78,7 +76,6 @@ simplifyLinTTerm (LinSum b) = LinSum (simplifyLinTTerm b)
 -- let-binding.
 simplifyApp :: TTerm env (a -> b) -> TTerm env a -> TTerm env b
 simplifyApp (Lambda e) a = simplifyLet a e
-simplifyApp Zero _ = Zero
 simplifyApp f a = App f a
 
 -- | Simplify the LinApp form. This converts immediate lambda application into
@@ -88,7 +85,6 @@ simplifyLinApp (LinFun e) a = simplifyLinLet a (sinkLinTt w e)
   where w :: '[a] :> (a ': lenv)
         w = Weaken (\case Z -> Z
                           S i -> case i of {})
-simplifyLinApp Zero _ = LinZero
 simplifyLinApp f a = LinApp f a
 
 -- | Simplify the Let form.
@@ -138,11 +134,9 @@ duplicableSyntactic :: TTerm env a -> Bool
 duplicableSyntactic = \case
   Var{} -> True
   Unit{} -> True
-  Zero -> True
   Pair a b -> duplicableSyntactic a && duplicableSyntactic b
   Fst e -> duplicableSyntactic e
   Snd e -> duplicableSyntactic e
-  -- AdjPlus a b -> duplicableSyntactic a && duplicableSyntactic b
   _ -> False
 
 duplicableLinRuntime :: LinTTerm env a b -> Bool
@@ -183,12 +177,6 @@ simplifyLinSnd :: (LTenv lenv, LT a, LT b) => LinTTerm env lenv (a, b) -> LinTTe
 simplifyLinSnd (LinPair _ t) = t
 -- simplifyLinSnd (Let rhs e) = simplifyLet rhs (simplifyLinSnd e)
 simplifyLinSnd p             = LinSnd p
-
--- -- | Simplify the Plus form
--- simplifyPlus :: LT a => TTerm env a -> TTerm env a -> TTerm env a
--- simplifyPlus a Zero = a
--- simplifyPlus Zero b = b
--- simplifyPlus a b    = AdjPlus a b
 
 simplifyLinPlus :: (LTenv lenv, LTU b) => LinTTerm env lenv b -> LinTTerm env lenv b -> LinTTerm env lenv b
 simplifyLinPlus a LinZero = a
