@@ -33,7 +33,7 @@
 --
 -- where @~=@ denotes elementwise approximate equality.
 --
--- The four paper exampes are additionally tested against their @_ref@
+-- The four paper examples are additionally tested against their @_ref@
 -- reference implementations in Haskell.
 module Test where
 
