@@ -127,10 +127,20 @@ df = \case
                       (LinMap (Snd (Var (S Z)) `LinApp` LinVar Z)
                               (Fst (Var Z))))
 
-  -- SMap1 f e ->
-  --   Let (Lambda (df f)) $
-  --   Let (sinkTt1 (df e)) $
-  --     _
+  SMap1 f e ->
+    Let (Lambda (df f)) $
+    Let (sinkTt1 (df e)) $
+      Pair (Map (Lambda $ Fst (Var (S (S Z)) `App` Var Z)) (Fst (Var Z)))
+           (LinFun $
+              LinPlus (LinZipWith (Lambda $ LinFun $
+                                     Snd (Var (S (S Z)) `App` Var Z)
+                                       `LinApp` LinPair LinZero (LinVar Z))
+                                  (Fst (Var Z))
+                                  (Snd (Var Z) `LinApp` LinVar Z))
+                      (LinMap (LinLam $
+                                 Snd (Var (S (S Z)) `App` Var Z)
+                                   `LinApp` LinPair (LinVar Z) LinZero)
+                              (Fst (Var Z))))
 
   -- SMap2 -> _
 
