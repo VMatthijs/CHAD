@@ -28,7 +28,6 @@ import Types
 
 data Settings = Settings
   { simpLamAppLet :: Bool        -- ^ @(\x -> e) a@  ~>  @let x = a in e@
-  , simpZeroApp :: Bool          -- ^ @zero a@  ~>  @zero@
   , simpLetRotate :: Bool        -- ^ @let x = (let y = a in b) in e@  ~>  @let y = a in let x = b in e@
   , simpLetPairSplit :: Bool     -- ^ @let x = (a, b) in @e  ~>  @let x1 = a in let x2 = b in e[(x1,x2)/x]@
   , simpLetInline :: Bool        -- ^ @let x = a in e@  ~>  @e[a/x]@  (if @a@ is cheap or used at most once in e)
@@ -46,21 +45,19 @@ data Settings = Settings
   deriving (Show, Eq)
 
 instance Semigroup Settings where
-  Settings a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 <>
-      Settings b1 b2 b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14 b15 =
+  Settings a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 <>
+      Settings b1 b2 b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14 =
     Settings (a1 || b1) (a2 || b2) (a3 || b3) (a4 || b4) (a5 || b5)
              (a6 || b6) (a7 || b7) (a8 || b8) (a9 || b9) (a10 || b10)
              (a11 || b11) (a12 || b12) (a13 || b13) (a14 || b14)
-             (a15 || b15)
 
 instance Monoid Settings where
   mempty = Settings False False False False False False False False
-                    False False False False False False False
+                    False False False False False False
 
 defaultSettings :: Settings
 defaultSettings = Settings
   { simpLamAppLet       = True
-  , simpZeroApp         = True
   , simpLetRotate       = True
   , simpLetPairSplit    = True
   , simpLetInline       = True
@@ -79,7 +76,6 @@ defaultSettings = Settings
 allSettings :: Settings
 allSettings = Settings
   { simpLamAppLet       = True
-  , simpZeroApp         = True
   , simpLetRotate       = True
   , simpLetPairSplit    = True
   , simpLetInline       = True
@@ -130,7 +126,6 @@ simplifyCTerm' (CPlus a b) = simplifyPlus (simplifyCTerm' a) (simplifyCTerm' b)
 -- let-binding.
 simplifyApp :: (?settings :: Settings) => CTerm env (a -> b) -> CTerm env a -> CTerm env b
 simplifyApp (CLambda e) a | simpLamAppLet ?settings = simplifyLet a e
-simplifyApp CZero _ | simpZeroApp ?settings = CZero
 simplifyApp f a = CApp f a
 
 data SplitLambda env t where
