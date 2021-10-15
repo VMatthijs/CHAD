@@ -23,6 +23,5 @@ stConvert (SSnd p) = Snd (stConvert p)
 stConvert (SOp op a) = Op op (stConvert a)
 stConvert (SMap a b) = Map (stConvert a) (stConvert b)
 stConvert (SMap1 a b) = Map1 (stConvert a) (stConvert b)
--- stConvert SMap2 = Map2
 stConvert (SReplicate x) = Replicate (stConvert x)
 stConvert (SSum x) = Sum (stConvert x)

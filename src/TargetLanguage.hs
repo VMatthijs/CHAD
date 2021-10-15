@@ -37,7 +37,6 @@ data TTerm env t where
 
   Map :: KnownNat n => TTerm env (Scal -> Scal) -> TTerm env (Vect n) -> TTerm env (Vect n)
   Map1 :: KnownNat n => TTerm (Scal ': env) Scal -> TTerm env (Vect n) -> TTerm env (Vect n)
-  -- Map2 :: KnownNat n => TTerm env ((Scal -> Scal, Vect n) -> Vect n)
   Replicate :: KnownNat n => TTerm env Scal -> TTerm env (Vect n)
   Sum :: KnownNat n => TTerm env (Vect n) -> TTerm env Scal
 
@@ -116,7 +115,6 @@ substTt' i v w (Snd p) = Snd (substTt' i v w p)
 substTt' i v w (Op op y) = Op op (substTt' i v w y)
 substTt' i v w (Map a b) = Map (substTt' i v w a) (substTt' i v w b)
 substTt' i v w (Map1 a b) = Map1 (substTt' (S i) (sinkTt1 v) (wSink w) a) (substTt' i v w b)
--- substTt' _ _ _ Map2 = Map2
 substTt' i v w (Replicate x) = Replicate (substTt' i v w x)
 substTt' i v w (Sum a) = Sum (substTt' i v w a)
 substTt' i v w (LinFun f) = LinFun (substLTt' i v w f)
@@ -196,7 +194,6 @@ evalTt' env (Snd p) = snd $ evalTt' env p
 evalTt' env (Op op a) = evalOp op (evalTt' env a)
 evalTt' env (Map a b) = V.map (evalTt' env a) (evalTt' env b)
 evalTt' env (Map1 a b) = V.map (\v -> evalTt' (VS v env) a) (evalTt' env b)
--- evalTt' _   Map2 = uncurry V.map
 evalTt' env (Replicate x) = V.replicate (evalTt' env x)
 evalTt' env (Sum a) = V.sum (evalTt' env a)
 evalTt' env (LinFun f) = lPair lUnit lId `lComp` evalLTt' env f
@@ -241,7 +238,6 @@ sinkTt w (Snd p)       = Snd (sinkTt w p)
 sinkTt w (Op op a)     = Op op (sinkTt w a)
 sinkTt w (Map a b)     = Map (sinkTt w a) (sinkTt w b)
 sinkTt w (Map1 a b)    = Map1 (sinkTt (wSink w) a) (sinkTt w b)
--- sinkTt _ Map2          = Map2
 sinkTt w (Replicate x) = Replicate (sinkTt w x)
 sinkTt w (Sum a)       = Sum (sinkTt w a)
 sinkTt w (LinFun f)    = LinFun (sinkTtL w f)
@@ -347,7 +343,6 @@ printTt d env (Op op a) = case (op, a) of
       pure $ showParen (d > prec) $ r1 . showString opstr . r2
 printTt d env (Map a b) = showFunction d env [] "map" [SomeTTerm a, SomeTTerm b]
 printTt d env (Map1 a b) = showFunction d env [] "map1" [SomeTTerm (Lambda a), SomeTTerm b]
--- printTt _ _ Map2 = pure $ showString "map2"
 printTt d env (Replicate x) = showFunction d env [] "replicate" [SomeTTerm x]
 printTt d env (Sum a) = showFunction d env [] "sum" [SomeTTerm a]
 printTt d env (LinFun f) = do
@@ -449,7 +444,6 @@ usesOfTt' i = \case
   Op _ a -> usesOfTt' i a
   Map a b -> usesOfTt' i a <> usesOfTt' i b
   Map1 a b -> usesOfTt' (S i) a <> usesOfTt' i b
-  -- Map2 -> mempty
   Replicate x -> usesOfTt' i x
   Sum a -> usesOfTt' i a
   LinFun f -> usesOfTtL i f

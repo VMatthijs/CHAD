@@ -142,8 +142,6 @@ df = \case
                                    `LinApp` LinPair (LinVar Z) LinZero)
                               (Fst (Var Z))))
 
-  -- SMap2 -> _
-
   SReplicate e ->
     Let (df e) $
       Pair (Replicate (Fst (Var Z)))

@@ -144,8 +144,6 @@ dr = \case
                                     (Fst (Var Z))
                                     (LinVar Z)))
 
-  -- SMap2 -> _
-
   SReplicate e ->
     Let (dr e) $
       Pair (Replicate (Fst (Var Z)))
