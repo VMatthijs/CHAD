@@ -273,9 +273,9 @@ usesOfCt' i = \case
   CLZip a b -> usesOfCt' i a <> usesOfCt' i b
   CZero -> mempty
   CPlus a b -> usesOfCt' i a <> usesOfCt' i b
-
-getPick :: Idx env t -> CTerm env a -> Maybe (TupPick t a)
-getPick i (CVar j) | Just Refl <- geq i j = Just TPHere
-getPick i (CFst e) = TPFst <$> getPick i e
-getPick i (CSnd e) = TPSnd <$> getPick i e
-getPick _ _ = Nothing
+  where
+    getPick :: Idx env t -> CTerm env a -> Maybe (TupPick t a)
+    getPick j (CVar j') | Just Refl <- geq j j' = Just TPHere
+    getPick j (CFst e) = TPFst <$> getPick j e
+    getPick j (CSnd e) = TPSnd <$> getPick j e
+    getPick _ _ = Nothing
