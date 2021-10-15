@@ -91,7 +91,7 @@ paper_ex3 :: KnownNat n => STerm '[Scal] (Vect n)
 paper_ex3 =
   SLet (SLambda $ SVar (S Z) `scalprod` SVar Z `scaladd` constant 1) $  -- f
   SLet (SReplicate (SVar (S Z))) $  -- zs
-  SLet (SMap (SVar (S Z)) (SVar Z)) $  -- ys
+  SLet (SMap1 (SVar (S (S Z)) `SApp` SVar Z) (SVar Z)) $  -- ys
     SVar Z
 
 -- Fourth example program in the paper
@@ -114,7 +114,7 @@ paper_ex3 =
 paper_ex4 :: KnownNat n => STerm '[Vect n, Scal] Scal
 paper_ex4 =
   SLet (SLambda $ SVar (S (S Z)) `scalprod` SVar Z) $  -- f
-  SLet (SMap (SVar Z) (SVar (S Z))) $  -- ys
+  SLet (SMap1 (SVar (S Z) `SApp` SVar Z) (SVar (S Z))) $  -- ys
   SLet (SSum (SVar Z)) $  -- w
     SVar Z
 
@@ -174,7 +174,7 @@ quadratic c = cX c `scaladd` xSquared
 
 -- Map a quadratic function (c*x + x^2) over an input vector
 mapQuadratic :: Double -> STerm '[Vect 3] (Vect 3)
-mapQuadratic c = SMap (SLambda (generaliseEnv (quadratic c))) (SVar Z)
+mapQuadratic c = SMap1 (generaliseEnv (quadratic c)) (SVar Z)
   where
     generaliseEnv :: STerm '[a] t -> STerm (a ': env) t
     generaliseEnv = sinkSt (wSink wNil)
