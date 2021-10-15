@@ -267,3 +267,6 @@ The test framework makes use of some definitions from [FinDiff.hs](src/FinDiff.h
 Finite differencing is the dumb way to compute derivatives: loop over all the inputs of the function, individually tweak each of them a bit, and see how much the output changes by doing that.
 It's a fundamentally numerically unstable method, and it's also slow, but it has the tremendous advantage that it requires you to know nothing about the function to be differentiated except that it is sort-of well-behaved (approximately: its actual derivative is sort-of continuous and doesn't get too large).
 For this reason, it makes for a very good reference implementation to test an AD implementation against: one doesn't have to write out the correct derivatives by hand, one only has to think of some interesting input program and the test framework does the rest.
+
+To run the test suite, use `cabal run` or `stack test`.
+This will start the driver executable in [test/Main.hs](test/Main.hs) that does nothing but call `main` from [Test.hs](src/Test.hs).
