@@ -180,11 +180,11 @@ testEvalCT = testEvalStVersus (\val -> evalCt' val . toConcrete . stConvert)
 
 testEvalSCT :: (Approx t, t ~ UnLin t, env ~ UnLinEnv env) => Program env t -> Property
 testEvalSCT = testEvalStVersus (\val ->
-  evalCt' val . simplifyCTerm defaultSettings . toConcrete . stConvert)
+  evalCt' val . simplifyCTerm allSettings . toConcrete . stConvert)
 
 testEvalSCST :: (Approx t, t ~ UnLin t, env ~ UnLinEnv env) => Program env t -> Property
 testEvalSCST = testEvalStVersus (\val ->
-  evalCt' val . simplifyCTerm defaultSettings . toConcrete . simplifyTTerm . stConvert)
+  evalCt' val . simplifyCTerm allSettings . toConcrete . simplifyTTerm . stConvert)
 
 testPrimalF :: (Approx t
                ,t ~ UnLin (Df1 t)
@@ -194,7 +194,7 @@ testPrimalF :: (Approx t
 testPrimalF prog = forAll (progInpGen prog) $ \inp ->
   isApproxQC ("evalSt", evalSt (makeVal inp) (progProgram prog))
              ("fwdprim", fst (evalCt' (makeVal inp) cterm))
-  where cterm = simplifyCTerm defaultSettings (toConcrete (df (progProgram prog)))
+  where cterm = simplifyCTerm allSettings (toConcrete (df (progProgram prog)))
 
 testPrimalR :: (Approx t
                ,t ~ UnLin (Dr1 t)
@@ -204,7 +204,7 @@ testPrimalR :: (Approx t
 testPrimalR prog = forAll (progInpGen prog) $ \inp ->
   isApproxQC ("evalSt", evalSt (makeVal inp) (progProgram prog))
              ("revprim", fst (evalCt' (makeVal inp) cterm))
-  where cterm = simplifyCTerm defaultSettings (toConcrete (dr (progProgram prog)))
+  where cterm = simplifyCTerm allSettings (toConcrete (dr (progProgram prog)))
 
 computeJacF :: (env ~ UnLinEnv (Df1Env env)
                ,FinDiff (UnLin (Df2Env env))
@@ -212,7 +212,7 @@ computeJacF :: (env ~ UnLinEnv (Df1Env env)
                ,LT (Df2Env env))
             => Program env t -> ShowVal env -> [[Scal]]
 computeJacF prog = jacobianByCols (\x dx -> snd (evalCt' (makeVal x) fwdterm) dx)
-  where fwdterm = simplifyCTerm defaultSettings (toConcrete (df (progProgram prog)))
+  where fwdterm = simplifyCTerm allSettings (toConcrete (df (progProgram prog)))
 
 computeJacR :: (env ~ UnLinEnv (Dr1Env env)
                ,FinDiff (UnLin (Dr2 t))
@@ -220,7 +220,7 @@ computeJacR :: (env ~ UnLinEnv (Dr1Env env)
                ,LT (Dr2Env env))
             => Program env t -> ShowVal env -> [[Scal]]
 computeJacR prog = jacobianByRows (\x dy -> snd (evalCt' (makeVal x) revterm) dy)
-  where revterm = simplifyCTerm defaultSettings (toConcrete (dr (progProgram prog)))
+  where revterm = simplifyCTerm allSettings (toConcrete (dr (progProgram prog)))
 
 computeJacD :: (TypeEnvironment env
                ,FinDiff t, Element t ~ Scal

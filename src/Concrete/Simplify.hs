@@ -18,8 +18,11 @@
 -- the 'Settings' object passed to 'simplifyCTerm'.
 module Concrete.Simplify (
   simplifyCTerm,
-  Settings(..), defaultSettings, allSettings,
+  Settings(..), allSettings,
 ) where
+
+import Data.GADT.Compare (geq)
+import Data.Type.Equality ((:~:)(Refl))
 
 import Concrete
 import Count
@@ -33,6 +36,7 @@ data Settings = Settings
   , simpLetPairSplit :: Bool     -- ^ @let x = (a, b) in @e  ~>  @let x1 = a in let x2 = b in e[(x1,x2)/x]@
   , simpLetInline :: Bool        -- ^ @let x = a in e@  ~>  @e[a/x]@  (if @a@ is cheap or used at most once in e)
   , simpPairProj :: Bool         -- ^ @fst (a, b)@  ~>  @a@  (and similarly for @snd@)
+  , simpPairEta :: Bool          -- ^ @(fst a, snd a)@  ~>  @a@
   , simpLetProj :: Bool          -- ^ @fst (let x = a in e)@  ~>  @let x = a in fst e@  (and similarly for @snd@)
   , simpPlusZero :: Bool         -- ^ @plus zero a@  ~>  @a@  (also symmetrically)
   , simpPlusPair :: Bool         -- ^ @plus (a, b) (c, d)@  ~>  @(plus a c, plus b d)@
@@ -43,39 +47,22 @@ data Settings = Settings
   , simpMapZero :: Bool          -- ^ @map (\x -> zero) a@  ~>  @zero@
   , simpSumZip :: Bool           -- ^ @sum (zip a b)@  ~>  @(sum a, sum b)@
   , simpSumZero :: Bool          -- ^ @sum zero@  ~>  @zero@
+  , simpSumSingleton :: Bool     -- ^ @sum (map (\x -> [x]) e)@  ~>  @e@
   }
   deriving (Show, Eq)
 
 instance Semigroup Settings where
-  Settings a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 <>
-      Settings b1 b2 b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14 b15 =
+  Settings a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 <>
+      Settings b1 b2 b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14 b15 b16 b17 =
     Settings (a1 || b1) (a2 || b2) (a3 || b3) (a4 || b4) (a5 || b5)
              (a6 || b6) (a7 || b7) (a8 || b8) (a9 || b9) (a10 || b10)
              (a11 || b11) (a12 || b12) (a13 || b13) (a14 || b14)
-             (a15 || b15)
+             (a15 || b15) (a16 || b16) (a17 || b17)
 
 instance Monoid Settings where
   mempty = Settings False False False False False False False False
-                    False False False False False False False
-
-defaultSettings :: Settings
-defaultSettings = Settings
-  { simpLamAppLet       = True
-  , simpLetRotate       = True
-  , simpLetPairSplit    = True
-  , simpLetInline       = True
-  , simpPairProj        = True
-  , simpLetProj         = True
-  , simpPlusZero        = True
-  , simpPlusPair        = True
-  , simpPlusLet         = True
-  , simpAlgebra         = True
-  , simpLetLamPairSplit = False
-  , simpMapPairSplit    = False
-  , simpMapZero         = False
-  , simpSumZip          = False
-  , simpSumZero         = False
-  }
+                    False False False False False False False False
+                    False
 
 allSettings :: Settings
 allSettings = Settings
@@ -84,6 +71,7 @@ allSettings = Settings
   , simpLetPairSplit    = True
   , simpLetInline       = True
   , simpPairProj        = True
+  , simpPairEta         = True
   , simpLetProj         = True
   , simpPlusZero        = True
   , simpPlusPair        = True
@@ -94,6 +82,7 @@ allSettings = Settings
   , simpMapZero         = True
   , simpSumZip          = True
   , simpSumZero         = True
+  , simpSumSingleton    = True
   }
 
 simplifyCTerm :: Settings -> CTerm env a -> CTerm env a
@@ -109,7 +98,7 @@ simplifyCTerm' (CLambda e) = CLambda (simplifyCTerm' e)
 simplifyCTerm' (CLet rhs e) = simplifyLet (simplifyCTerm' rhs) (simplifyCTerm' e)
 simplifyCTerm' (CApp f a) = simplifyApp (simplifyCTerm' f) (simplifyCTerm' a)
 simplifyCTerm' CUnit = CUnit
-simplifyCTerm' (CPair a b) = CPair (simplifyCTerm' a) (simplifyCTerm' b)
+simplifyCTerm' (CPair a b) = simplifyPair (simplifyCTerm' a) (simplifyCTerm' b)
 simplifyCTerm' (CFst p) = simplifyFst (simplifyCTerm' p)
 simplifyCTerm' (CSnd p) = simplifySnd (simplifyCTerm' p)
 simplifyCTerm' (COp op a) = simplifyCOp op (simplifyCTerm' a)
@@ -132,6 +121,13 @@ simplifyCTerm' (CPlus a b) = simplifyPlus (simplifyCTerm' a) (simplifyCTerm' b)
 simplifyApp :: (?settings :: Settings) => CTerm env (a -> b) -> CTerm env a -> CTerm env b
 simplifyApp (CLambda e) a | simpLamAppLet ?settings = simplifyLet a e
 simplifyApp f a = CApp f a
+
+simplifyPair :: (?settings :: Settings) => CTerm env a -> CTerm env b -> CTerm env (a, b)
+simplifyPair (CFst (CVar i)) (CSnd (CVar j))
+  | simpPairEta ?settings
+  , Just Refl <- geq i j
+  = CVar i
+simplifyPair a b = CPair a b
 
 data SplitLambda env t where
   SLam :: CTerm env a
@@ -242,6 +238,8 @@ simplifyCLSum :: (?settings :: Settings, LT a) => CTerm env [a] -> CTerm env a
 simplifyCLSum (CLZip a b) | simpSumZip ?settings =
   simplifyCTerm' $ CPair (simplifyCLSum a) (simplifyCLSum b)
 simplifyCLSum CZero | simpSumZero ?settings = CZero
+simplifyCLSum (CLMap (CLambda (CLCons (CVar Z) CLNil)) e)
+  | simpSumSingleton ?settings = e
 simplifyCLSum l = CLSum l
 
 -- | Simplify the Plus form
