@@ -17,6 +17,24 @@
 -- The specified tests verify (using QuickCheck) that CHAD forward AD, CHAD
 -- reverse AD and finite differencing all agree on the examples programs in the
 -- "Examples" module.
+--
+-- Tests for all example programs:
+--
+-- * 'testEvalT': @evalSt ~= evalTt . stConvert@
+-- * 'testEvalST': @evalSt ~= evalTt . simplifyTTerm . stConvert@
+-- * 'testEvalCT': @evalSt ~= evalCt . toConcrete . stConvert@
+-- * 'testEvalSCT': @evalSt ~= evalCt . simplifyCTerm . toConcrete . stConvert@
+-- * 'testEvalSCST': @evalSt ~= evalCt . simplifyCTerm . toConcrete . simplifyTTerm . stConvert@
+-- * 'testPrimalF': @forward_primal ~= evalSt@
+-- * 'testPrimalR': @reverse_primal ~= evalSt@
+-- * 'testJacFR': @forward_jacobian ~= reverse_jacobian@
+-- * 'testJacFD': @forward_jacobian ~= fd_jacobian@
+-- * 'testJacRD': @reverse_jacobian ~= fd_jacobian@
+--
+-- where @~=@ denotes elementwise approximate equality.
+--
+-- The four paper exampes are additionally tested against their @_ref@
+-- reference implementations in Haskell.
 module Test where
 
 import Control.Monad (replicateM)
@@ -144,18 +162,6 @@ data Program env t = Program
 instance Show (Program env t) where
   showsPrec p (Program prog _ _) = showParen (p > 10) $
     showString "Program " . showsPrec 11 prog . showString " _ _"
-
--- Tests:
--- testEvalT: evalSt ~= evalTt . stConvert
--- testEvalST: evalSt ~= evalTt . simplifyTTerm . stConvert
--- testEvalCT: evalSt ~= evalCt . toConcrete . stConvert
--- testEvalSCT: evalSt ~= evalCt . simplifyCTerm . toConcrete . stConvert
--- testEvalSCST: evalSt ~= evalCt . simplifyCTerm . toConcrete . simplifyTTerm . stConvert
--- testPrimalF: forward_primal ~= evalSt
--- testPrimalR: reverse_primal ~= evalSt
--- testJacFR: forward_jacobian ~= reverse_jacobian
--- testJacFD: forward_jacobian ~= fd_jacobian
--- testJacRD: reverse_jacobian ~= fd_jacobian
 
 testEvalStVersus :: Approx t
                  => (Val env -> STerm env t -> t) -> Program env t -> Property
@@ -309,26 +315,43 @@ programArb prog = pure (Program prog arbitrary arbitrary)
 main :: IO ()
 main =
   defaultMain $
-  localOption (QuickCheckTests 1000) $
-  testGroup "AD"
-    [testAll "polynomial" (programArb polynomial)
-    ,testAll "slid" (programArb slid)
-    ,testAll "pair" (programArb pair)
-    ,testAll "add" (programArb add)
-    ,testAll "add2" (programArb add2)
-    ,testAll "prod" (programArb prod)
-    ,testAll "prod2" (programArb prod2)
-    ,testAll "addCopy" (programArb addCopy)
-    ,testAll "cX" (programGen (cX <$> arbitrary) arbitrary arbitrary)
-    ,testAll "xSquared" (programArb xSquared)
-    ,testAll "xCubed" (programArb xCubed)
-    ,testAll "quadratic" (programGen (quadratic <$> arbitrary) arbitrary arbitrary)
-    ,testAll "mapQuadratic" (programGen (mapQuadratic <$> arbitrary) arbitrary arbitrary)
-    ,testAll "Paper example 1" (pure $
-        Program paper_ex1 arbitrary (choose (-6, 6) <: pure SVZ))
-    ,testAll "Paper example 2" (pure $
-        Program paper_ex2 arbitrary (choose (-6, 6) <: choose (-6, 6) <:
-                                     choose (-6, 6) <: choose (-6, 6) <: pure SVZ))
-    ,testAll "Paper example 3" (programArb (paper_ex3 @5))
-    ,testAll "Paper example 4" (programArb (paper_ex4 @5))
-    ]
+    localOption (QuickCheckTests 4000) $
+      testGroup "CHAD" [referenceTests, adTests]
+  where
+    referenceTests = testGroup "Reference tests"
+      [testProperty "evalSt (Paper example 1) ~= reference" $
+         property $ \arg -> isApproxQC ("evalSt", evalSt (makeVal arg) paper_ex1)
+                                       ("ref", paper_ex1_ref (envToTup arg))
+      ,testProperty "evalSt (Paper example 2) ~= reference" $
+         property $ \arg -> isApproxQC ("evalSt", evalSt (makeVal arg) paper_ex2)
+                                       ("ref", paper_ex2_ref (envToTup arg))
+      ,testProperty "evalSt (Paper example 3) ~= reference" $
+         property $ \arg -> isApproxQC ("evalSt", evalSt (makeVal arg) (paper_ex3 @10))
+                                       ("ref", paper_ex3_ref (envToTup arg))
+      ,testProperty "evalSt (Paper example 4) ~= reference" $
+         property $ \arg -> isApproxQC ("evalSt", evalSt (makeVal arg) (paper_ex4 @10))
+                                       ("ref", paper_ex4_ref (envToTup arg))
+      ]
+
+    adTests = testGroup "AD"
+      [testAll "polynomial" (programArb polynomial)
+      ,testAll "slid" (programArb slid)
+      ,testAll "pair" (programArb pair)
+      ,testAll "add" (programArb add)
+      ,testAll "add2" (programArb add2)
+      ,testAll "prod" (programArb prod)
+      ,testAll "prod2" (programArb prod2)
+      ,testAll "addCopy" (programArb addCopy)
+      ,testAll "cX" (programGen (cX <$> arbitrary) arbitrary arbitrary)
+      ,testAll "xSquared" (programArb xSquared)
+      ,testAll "xCubed" (programArb xCubed)
+      ,testAll "quadratic" (programGen (quadratic <$> arbitrary) arbitrary arbitrary)
+      ,testAll "mapQuadratic" (programGen (mapQuadratic <$> arbitrary) arbitrary arbitrary)
+      ,testAll "Paper example 1" (pure $
+          Program paper_ex1 arbitrary (choose (-6, 6) <: pure SVZ))
+      ,testAll "Paper example 2" (pure $
+          Program paper_ex2 arbitrary (choose (-6, 6) <: choose (-6, 6) <:
+                                       choose (-6, 6) <: choose (-6, 6) <: pure SVZ))
+      ,testAll "Paper example 3" (programArb (paper_ex3 @5))
+      ,testAll "Paper example 4" (programArb (paper_ex4 @5))
+      ]

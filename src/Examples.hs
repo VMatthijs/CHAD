@@ -8,6 +8,7 @@
 module Examples where
 
 import GHC.TypeNats
+import qualified Data.Vector.Unboxed.Sized as V
 
 import Env
 import Operation
@@ -32,16 +33,8 @@ scalprod = bin EScalProd
 constant :: (a ~ Df1 a, a ~ Dr1 a, a ~ UnLin a, LT a, LT2 a, LT (UnLin (Df2 a)), Show a) => a -> STerm env a
 constant x = SOp (Constant x) SUnit
 
+
 -- First example program in the paper
---
--- x : Scal |- paper_ex1 : ((Scal, Scal), Scal)
--- let y = 2 * x
---     z = x * y
---     w = cos z
---     v = ((y, z), w)
--- in v
---
--- TEST: simplifyTTerm (stConvert paper_ex1) == simplifyTTerm (Fst (dr paper_ex1))
 paper_ex1 :: STerm '[Scal] ((Scal, Scal), Scal)
 paper_ex1 =
   SLet (constant 2 `scalprod` SVar Z) $  -- y
@@ -50,18 +43,17 @@ paper_ex1 =
   SLet (SPair (SPair (SVar (S (S Z))) (SVar (S Z))) (SVar Z)) $  -- v
     SVar Z
 
+paper_ex1_ref :: ((), Scal) -> ((Scal, Scal), Scal)
+paper_ex1_ref ((), x) =
+  let y = 2 * x
+      z = x * y
+      w = cos z
+      v = ((y, z), w)
+  in v
+
 -- Second example program in the paper
 --
--- x1 : Scal, x2 : Scal, x3 : Scal, x4 : Scal |- paper_ex2 : Scal
--- let y = x1 * x4 + 2 * x2
---     z = y * x3
---     w = z + x4
---     v = sin w
--- in v
---
 -- Simplified: sin (x1 * x4 * x3 + 2 * x2 * x3 + x4)
---
--- TEST: simplifyTTerm (stConvert paper_ex2) == simplifyTTerm (Fst (dr paper_ex2))
 paper_ex2 :: STerm '[Scal, Scal, Scal, Scal] Scal
 paper_ex2 =
   SLet (SVar (S (S (S Z))) `scalprod` SVar Z
@@ -71,15 +63,15 @@ paper_ex2 =
   SLet (SOp EScalSin (SVar Z)) $  -- v
     SVar Z
 
+paper_ex2_ref :: (((((), Scal), Scal), Scal), Scal) -> Scal
+paper_ex2_ref (((((), x1), x2), x3), x4) =
+  let y = x1 * x4 + 2 * x2
+      z = y * x3
+      w = z + x4
+      v = sin w
+  in v
+
 -- Third example program in the paper
---
--- x : Scal |- paper_ex3 : Scal^n
--- let f = \z -> x * z + 1
---     zs = replicate x
---     ys = map f zs
--- in ys
---
--- TEST: simplifyTTerm (stConvert (paper_ex3 @5)) == simplifyTTerm (Fst (dr (paper_ex3 @5)))
 --
 -- Simplified, this program is equivalent to:
 --   map (\z -> x * z + 1) (replicate x)
@@ -94,15 +86,14 @@ paper_ex3 =
   SLet (SMap1 (SVar (S (S Z)) `SApp` SVar Z) (SVar Z)) $  -- ys
     SVar Z
 
+paper_ex3_ref :: KnownNat n => ((), Scal) -> Vect n
+paper_ex3_ref ((), x) =
+  let f = \z -> x * z + 1
+      zs = V.replicate x
+      ys = V.map f zs
+  in ys
+
 -- Fourth example program in the paper
---
--- x1 : Scal, x2 : Scal^n |- paper_ex4 : Scal
--- let f = \x2i -> x1 * x2i
---     ys = map f x2
---     w = sum ys
--- in w
---
--- TEST: simplifyTTerm (stConvert (paper_ex4 @5)) == simplifyTTerm (Fst (dr (paper_ex4 @5)))
 --
 -- Simplified, this program is equivalent to:
 --   sum (map (x1 *) x2)
@@ -117,6 +108,13 @@ paper_ex4 =
   SLet (SMap1 (SVar (S Z) `SApp` SVar Z) (SVar (S Z))) $  -- ys
   SLet (SSum (SVar Z)) $  -- w
     SVar Z
+
+paper_ex4_ref :: KnownNat n => (((), Scal), Vect n) -> Scal
+paper_ex4_ref (((), x1), x2) =
+  let f = \x2i -> x1 * x2i
+      ys = V.map f x2
+      w = V.sum ys
+  in w
 
 -- x:Scal |- 2 * ((\y -> y * y) x) + 7 * x + 3
 polynomial :: STerm '[Scal] Scal
