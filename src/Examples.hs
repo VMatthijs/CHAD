@@ -33,6 +33,16 @@ scalprod = bin EScalProd
 constant :: (a ~ Df1 a, a ~ Dr1 a, a ~ UnLin a, LT a, LT2 a, LT (UnLin (Df2 a)), Show a) => a -> STerm env a
 constant x = SOp (Constant x) SUnit
 
+-- | Mixed-second-order map (as used in the examples in the paper) expressed in
+-- terms of the first-order map in the AD macros.
+--
+-- > map2 f xs = map1 (f x) with x from xs
+map2 :: KnownNat n
+     => STerm env (Scal -> Scal)
+     -> STerm env (Vect n)
+     -> STerm env (Vect n)
+map2 fun arg = SMap1 (sinkSt1 fun `SApp` SVar Z) arg
+
 
 -- First example program in the paper
 paper_ex1 :: STerm '[Scal] ((Scal, Scal), Scal)
@@ -83,7 +93,7 @@ paper_ex3 :: KnownNat n => STerm '[Scal] (Vect n)
 paper_ex3 =
   SLet (SLambda $ SVar (S Z) `scalprod` SVar Z `scaladd` constant 1) $  -- f
   SLet (SReplicate (SVar (S Z))) $  -- zs
-  SLet (SMap1 (SVar (S (S Z)) `SApp` SVar Z) (SVar Z)) $  -- ys
+  SLet (map2 (SVar (S Z)) (SVar Z)) $  -- ys
     SVar Z
 
 paper_ex3_ref :: KnownNat n => ((), Scal) -> Vect n
@@ -105,7 +115,7 @@ paper_ex3_ref ((), x) =
 paper_ex4 :: KnownNat n => STerm '[Vect n, Scal] Scal
 paper_ex4 =
   SLet (SLambda $ SVar (S (S Z)) `scalprod` SVar Z) $  -- f
-  SLet (SMap1 (SVar (S Z) `SApp` SVar Z) (SVar (S Z))) $  -- ys
+  SLet (map2 (SVar Z) (SVar (S Z))) $  -- ys
   SLet (SSum (SVar Z)) $  -- w
     SVar Z
 

@@ -66,3 +66,6 @@ sinkSt w (SMap1 a b)    = SMap1 (sinkSt (wSink w) a) (sinkSt w b)
 -- sinkSt _ SMap2          = SMap2
 sinkSt w (SReplicate x) = SReplicate (sinkSt w x)
 sinkSt w (SSum a)       = SSum (sinkSt w a)
+
+sinkSt1 :: STerm env t -> STerm (a ': env) t
+sinkSt1 = sinkSt (wSucc wId)
