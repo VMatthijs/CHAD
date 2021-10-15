@@ -24,6 +24,7 @@ module Concrete.Simplify (
 import Concrete
 import Count
 import Env
+import Operation
 import Types
 
 data Settings = Settings
@@ -36,6 +37,7 @@ data Settings = Settings
   , simpPlusZero :: Bool         -- ^ @plus zero a@  ~>  @a@  (also symmetrically)
   , simpPlusPair :: Bool         -- ^ @plus (a, b) (c, d)@  ~>  @(plus a c, plus b d)@
   , simpPlusLet :: Bool          -- ^ @plus (let x = e in a) b@  ~>  @let x = e in plus a b@  (also symmetrically)
+  , simpAlgebra :: Bool          -- ^ @0 * x = 0@, etc.
   , simpLetLamPairSplit :: Bool  -- ^ @let f = \x -> (a, b) in e@  ~>  @let f1 = \x -> a ; f2 = \x -> b in e[(\x->(f1 x,f2 x))/f]@
   , simpMapPairSplit :: Bool     -- ^ @map (\x -> (b, c)) a@  ~>  @let a' = a in (map (\x -> b) a', map (\x -> c) a')@
   , simpMapZero :: Bool          -- ^ @map (\x -> zero) a@  ~>  @zero@
@@ -45,15 +47,16 @@ data Settings = Settings
   deriving (Show, Eq)
 
 instance Semigroup Settings where
-  Settings a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 <>
-      Settings b1 b2 b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14 =
+  Settings a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 <>
+      Settings b1 b2 b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14 b15 =
     Settings (a1 || b1) (a2 || b2) (a3 || b3) (a4 || b4) (a5 || b5)
              (a6 || b6) (a7 || b7) (a8 || b8) (a9 || b9) (a10 || b10)
              (a11 || b11) (a12 || b12) (a13 || b13) (a14 || b14)
+             (a15 || b15)
 
 instance Monoid Settings where
   mempty = Settings False False False False False False False False
-                    False False False False False False
+                    False False False False False False False
 
 defaultSettings :: Settings
 defaultSettings = Settings
@@ -66,6 +69,7 @@ defaultSettings = Settings
   , simpPlusZero        = True
   , simpPlusPair        = True
   , simpPlusLet         = True
+  , simpAlgebra         = True
   , simpLetLamPairSplit = False
   , simpMapPairSplit    = False
   , simpMapZero         = False
@@ -84,6 +88,7 @@ allSettings = Settings
   , simpPlusZero        = True
   , simpPlusPair        = True
   , simpPlusLet         = True
+  , simpAlgebra         = True
   , simpLetLamPairSplit = True
   , simpMapPairSplit    = True
   , simpMapZero         = True
@@ -107,7 +112,7 @@ simplifyCTerm' CUnit = CUnit
 simplifyCTerm' (CPair a b) = CPair (simplifyCTerm' a) (simplifyCTerm' b)
 simplifyCTerm' (CFst p) = simplifyFst (simplifyCTerm' p)
 simplifyCTerm' (CSnd p) = simplifySnd (simplifyCTerm' p)
-simplifyCTerm' (COp op a) = COp op (simplifyCTerm' a)
+simplifyCTerm' (COp op a) = simplifyCOp op (simplifyCTerm' a)
 simplifyCTerm' (CMap a b) = CMap (simplifyCTerm' a) (simplifyCTerm' b)
 simplifyCTerm' (CZipWith a b c) = CZipWith (simplifyCTerm' a) (simplifyCTerm' b) (simplifyCTerm' c)
 simplifyCTerm' (CReplicate x) = CReplicate (simplifyCTerm' x)
@@ -200,6 +205,29 @@ simplifySnd :: (?settings :: Settings) => CTerm env (a, b) -> CTerm env b
 simplifySnd (CPair _ s)  | simpPairProj ?settings = s
 simplifySnd (CLet rhs e) | simpLetProj ?settings = simplifyLet rhs (simplifySnd e)
 simplifySnd p            = CSnd p
+
+simplifyCOp :: (?settings :: Settings) => Operation a b -> CTerm env a -> CTerm env b
+simplifyCOp op arg | simpAlgebra ?settings = case (op, arg) of
+  (Constant x, _) -> COp (Constant x) CUnit
+  (EAdd, CPair (CReplicate t) e) | zeroish t -> e
+  (EAdd, CPair e (CReplicate t)) | zeroish t -> e
+  (EProd, CPair (CReplicate (COp (Constant 1.0) _)) e) -> e
+  (EProd, CPair e (CReplicate (COp (Constant 1.0) _))) -> e
+  (EScalAdd, CPair a b)
+    | zeroish a -> b
+    | zeroish b -> a
+  (EScalSubt, CPair e t) | zeroish t -> e
+  (EScalProd, CPair a b)
+    | zeroish a || zeroish b -> CZero
+  (EScalProd, CPair (COp (Constant 1.0) _) e) -> e
+  (EScalProd, CPair e (COp (Constant 1.0) _)) -> e
+  _ -> COp op arg
+  where
+    zeroish :: CTerm env Scal -> Bool
+    zeroish (COp (Constant 0.0) _) = True
+    zeroish CZero = True
+    zeroish _ = False
+simplifyCOp op arg = COp op arg
 
 simplifyCLMap :: (?settings :: Settings) => CTerm env (a -> b) -> CTerm env [a] -> CTerm env [b]
 simplifyCLMap (CLambda (CPair a b)) l | simpMapPairSplit ?settings =
