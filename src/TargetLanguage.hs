@@ -323,28 +323,28 @@ printTt _ env (Pair a b) = do
   r1 <- printTt 0 env a
   r2 <- printTt 0 env b
   pure $ showString "(" . r1 . showString ", " . r2 . showString ")"
-printTt d env (Fst p) = showFunction d env [] "fst" [SomeTTerm p]
-printTt d env (Snd p) = showFunction d env [] "snd" [SomeTTerm p]
+printTt d env (Fst p) = showFunctionTt d env [] "fst" [SomeTTerm p]
+printTt d env (Snd p) = showFunctionTt d env [] "snd" [SomeTTerm p]
 printTt d env (Op op a) = case (op, a) of
   (Constant x, Unit) -> pure $ showString (show x)
-  (EAdd, Pair a1 a2) -> showFunction d env [] "vecadd" [SomeTTerm a1, SomeTTerm a2]
-  (EProd, Pair a1 a2) -> showFunction d env [] "vecprod" [SomeTTerm a1, SomeTTerm a2]
+  (EAdd, Pair a1 a2) -> showFunctionTt d env [] "vecadd" [SomeTTerm a1, SomeTTerm a2]
+  (EProd, Pair a1 a2) -> showFunctionTt d env [] "vecprod" [SomeTTerm a1, SomeTTerm a2]
   (EScalAdd, Pair a1 a2) -> binary a1 (6, " + ") a2
   (EScalSubt, Pair a1 a2) -> binary a1 (6, " - ") a2
   (EScalProd, Pair a1 a2) -> binary a1 (7, " * ") a2
-  (EScalSin, _) -> showFunction d env [] "sin" [SomeTTerm a]
-  (EScalCos, _) -> showFunction d env [] "cos" [SomeTTerm a]
-  (_, _) -> showFunction d env [] ("evalOp " ++ showOp op) [SomeTTerm a]
+  (EScalSin, _) -> showFunctionTt d env [] "sin" [SomeTTerm a]
+  (EScalCos, _) -> showFunctionTt d env [] "cos" [SomeTTerm a]
+  (_, _) -> showFunctionTt d env [] ("evalOp " ++ showOp op) [SomeTTerm a]
   where
     binary :: TTerm env a -> (Int, String) -> TTerm env b -> State Int ShowS
     binary left (prec, opstr) right = do
       r1 <- printTt (prec + 1) env left
       r2 <- printTt (prec + 1) env right
       pure $ showParen (d > prec) $ r1 . showString opstr . r2
-printTt d env (Map a b) = showFunction d env [] "map" [SomeTTerm a, SomeTTerm b]
-printTt d env (Map1 a b) = showFunction d env [] "map1" [SomeTTerm (Lambda a), SomeTTerm b]
-printTt d env (Replicate x) = showFunction d env [] "replicate" [SomeTTerm x]
-printTt d env (Sum a) = showFunction d env [] "sum" [SomeTTerm a]
+printTt d env (Map a b) = showFunctionTt d env [] "map" [SomeTTerm a, SomeTTerm b]
+printTt d env (Map1 a b) = showFunctionTt d env [] "map1" [SomeTTerm (Lambda a), SomeTTerm b]
+printTt d env (Replicate x) = showFunctionTt d env [] "replicate" [SomeTTerm x]
+printTt d env (Sum a) = showFunctionTt d env [] "sum" [SomeTTerm a]
 printTt d env (LinFun f) = do
     r1 <- printLTt d env ["v"] f
     pure $ showParen (d > 0) $ showString "\\v -> " . r1
@@ -384,29 +384,29 @@ printLTt _ env lenv (LinPair f g) = do
   r1 <- printLTt 0 env lenv f
   r2 <- printLTt 0 env lenv g
   pure $ showString "(" . r1 . showString ", " . r2 . showString ")"
-printLTt d env lenv (LinFst f) = showFunction d env lenv "fst" [SomeLinTTerm f]
-printLTt d env lenv (LinSnd f) = showFunction d env lenv "snd" [SomeLinTTerm f]
+printLTt d env lenv (LinFst f) = showFunctionTt d env lenv "fst" [SomeLinTTerm f]
+printLTt d env lenv (LinSnd f) = showFunctionTt d env lenv "snd" [SomeLinTTerm f]
 printLTt d env lenv (LinLOp op term arg) = do
   r1 <- printTt 11 env term
   r2 <- printLTt 11 env lenv arg
   pure $ showParen (d > 10) $
     showString (showLOp op ++ " ") . r1 . showString " " . r2
 printLTt _ _ _ LinZero = pure $ showString "zero"
-printLTt d env lenv (LinPlus f g) = showFunction d env lenv "plus" [SomeLinTTerm f, SomeLinTTerm g]
-printLTt d env lenv (LinSingleton term f) = showFunction d env lenv "singleton" [SomeTTerm term, SomeLinTTerm f]
-printLTt d env lenv (LinCopowFold term f) = showFunction d env lenv "copowfold" [SomeTTerm term, SomeLinTTerm f]
-printLTt d env lenv (LinZip term f) = showFunction d env lenv "lzip" [SomeTTerm term, SomeLinTTerm f]
-printLTt d env lenv (LinMap f arg) = showFunction d env lenv "lmap" [SomeLinTTerm f, SomeTTerm arg]
-printLTt d env lenv (LinZipWith fun term f) = showFunction d env lenv "lzipWith" [SomeTTerm fun, SomeTTerm term, SomeLinTTerm f]
-printLTt d env lenv (LinReplicate f) = showFunction d env lenv "lreplicate" [SomeLinTTerm f]
-printLTt d env lenv (LinSum f) = showFunction d env lenv "lsum" [SomeLinTTerm f]
+printLTt d env lenv (LinPlus f g) = showFunctionTt d env lenv "plus" [SomeLinTTerm f, SomeLinTTerm g]
+printLTt d env lenv (LinSingleton term f) = showFunctionTt d env lenv "singleton" [SomeTTerm term, SomeLinTTerm f]
+printLTt d env lenv (LinCopowFold term f) = showFunctionTt d env lenv "copowfold" [SomeTTerm term, SomeLinTTerm f]
+printLTt d env lenv (LinZip term f) = showFunctionTt d env lenv "lzip" [SomeTTerm term, SomeLinTTerm f]
+printLTt d env lenv (LinMap f arg) = showFunctionTt d env lenv "lmap" [SomeLinTTerm f, SomeTTerm arg]
+printLTt d env lenv (LinZipWith fun term f) = showFunctionTt d env lenv "lzipWith" [SomeTTerm fun, SomeTTerm term, SomeLinTTerm f]
+printLTt d env lenv (LinReplicate f) = showFunctionTt d env lenv "lreplicate" [SomeLinTTerm f]
+printLTt d env lenv (LinSum f) = showFunctionTt d env lenv "lsum" [SomeLinTTerm f]
 
 data SomeLinTTerm env
   = forall a b. SomeLinTTerm (LinTTerm env a b)
   | forall a. SomeTTerm (TTerm env a)
 
-showFunction :: Int -> [String] -> [String] -> String -> [SomeLinTTerm env] -> State Int ShowS
-showFunction d env lenv funcname args = do
+showFunctionTt :: Int -> [String] -> [String] -> String -> [SomeLinTTerm env] -> State Int ShowS
+showFunctionTt d env lenv funcname args = do
   rs <- mapM (\case SomeLinTTerm t -> (showString " " .) <$> printLTt 11 env lenv t
                     SomeTTerm t -> (showString " " .) <$> printTt 11 env t)
              args

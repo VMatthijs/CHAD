@@ -193,43 +193,43 @@ printCt _ env (CPair a b) = do
   r1 <- printCt 0 env a
   r2 <- printCt 0 env b
   pure $ showString "(" . r1 . showString ", " . r2 . showString ")"
-printCt d env (CFst p) = showFunction d env "fst" [Some p]
-printCt d env (CSnd p) = showFunction d env "snd" [Some p]
+printCt d env (CFst p) = showFunctionCt d env "fst" [Some p]
+printCt d env (CSnd p) = showFunctionCt d env "snd" [Some p]
 printCt d env (COp op a) = case (op, a) of
   (Constant x, CUnit) -> pure $ showString (show x)
-  (EAdd, CPair a1 a2) -> showFunction d env "vecadd" [Some a1, Some a2]
-  (EProd, CPair a1 a2) -> showFunction d env "vecprod" [Some a1, Some a2]
+  (EAdd, CPair a1 a2) -> showFunctionCt d env "vecadd" [Some a1, Some a2]
+  (EProd, CPair a1 a2) -> showFunctionCt d env "vecprod" [Some a1, Some a2]
   (EScalAdd, CPair a1 a2) -> binary a1 (6, " + ") a2
   (EScalSubt, CPair a1 a2) -> binary a1 (6, " - ") a2
   (EScalProd, CPair a1 a2) -> binary a1 (7, " * ") a2
-  (EScalSin, _) -> showFunction d env "sin" [Some a]
-  (EScalCos, _) -> showFunction d env "cos" [Some a]
-  (_, _) -> showFunction d env ("evalOp " ++ showOp op) [Some a]
+  (EScalSin, _) -> showFunctionCt d env "sin" [Some a]
+  (EScalCos, _) -> showFunctionCt d env "cos" [Some a]
+  (_, _) -> showFunctionCt d env ("evalOp " ++ showOp op) [Some a]
   where
     binary :: CTerm env a -> (Int, String) -> CTerm env b -> State Int ShowS
     binary left (prec, opstr) right = do
       r1 <- printCt (prec + 1) env left
       r2 <- printCt (prec + 1) env right
       pure $ showParen (d > prec) $ r1 . showString opstr . r2
-printCt d env (CMap a b) = showFunction d env "vmap" [Some a, Some b]
-printCt d env (CZipWith a b c) = showFunction d env "vzipWith" [Some a, Some b, Some c]
-printCt d env (CReplicate x) = showFunction d env "vreplicate" [Some x]
-printCt d env (CSum x) = showFunction d env "vsum" [Some x]
-printCt d env (CToList x) = showFunction d env "toList" [Some x]
+printCt d env (CMap a b) = showFunctionCt d env "vmap" [Some a, Some b]
+printCt d env (CZipWith a b c) = showFunctionCt d env "vzipWith" [Some a, Some b, Some c]
+printCt d env (CReplicate x) = showFunctionCt d env "vreplicate" [Some x]
+printCt d env (CSum x) = showFunctionCt d env "vsum" [Some x]
+printCt d env (CToList x) = showFunctionCt d env "toList" [Some x]
 printCt _ _ CLNil = pure $ showString "[]"
 printCt d env (CLCons a b) = do
   r1 <- printCt 6 env a
   r2 <- printCt 5 env b
   pure $ showParen (d > 5) $ r1 . showString " : " . r2
-printCt d env (CLMap f a) = showFunction d env "map" [Some f, Some a]
-printCt d env (CLFoldr a b c) = showFunction d env "foldr" [Some a, Some b, Some c]
-printCt d env (CLSum x) = showFunction d env "sum" [Some x]
-printCt d env (CLZip a b) = showFunction d env "zip" [Some a, Some b]
+printCt d env (CLMap f a) = showFunctionCt d env "map" [Some f, Some a]
+printCt d env (CLFoldr a b c) = showFunctionCt d env "foldr" [Some a, Some b, Some c]
+printCt d env (CLSum x) = showFunctionCt d env "sum" [Some x]
+printCt d env (CLZip a b) = showFunctionCt d env "zip" [Some a, Some b]
 printCt _ _ CZero = pure $ showString "zero"
-printCt d env (CPlus a b) = showFunction d env "plus" [Some a, Some b]
+printCt d env (CPlus a b) = showFunctionCt d env "plus" [Some a, Some b]
 
-showFunction :: Int -> [String] -> String -> [Some (CTerm env)] -> State Int ShowS
-showFunction d env funcname args = do
+showFunctionCt :: Int -> [String] -> String -> [Some (CTerm env)] -> State Int ShowS
+showFunctionCt d env funcname args = do
   rs <- mapM (\(Some t) -> (showString " " .) <$> printCt 11 env t) args
   pure $
     showParen (d > 10) $
