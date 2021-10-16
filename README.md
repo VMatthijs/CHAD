@@ -121,7 +121,9 @@ See the examples in [Examples.hs](src/Examples.hs) for, well, examples.
 
 ## Overview of the implementation
 
-For a diagrammatic overview of the repository, see [repo-organisation.svg](repo-organisation.svg).
+We give a diagrammatic overview of the repository:
+
+![repo-organisation.svg](repo-organisation.svg).
 
 This implementation defines three languages, all based on the simply-typed lambda calculus.
 
