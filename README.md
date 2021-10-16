@@ -123,7 +123,7 @@ See the examples in [Examples.hs](src/Examples.hs) for, well, examples.
 
 We give a diagrammatic overview of the repository:
 
-![repo-organisation.svg](repo-organisation.svg).
+![repo-organisation.svg](repo-organisation.svg)
 
 This implementation defines three languages, all based on the simply-typed lambda calculus.
 
