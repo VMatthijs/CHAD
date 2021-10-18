@@ -182,7 +182,7 @@ The `LT2`, `LTU` and `LT2U` contraint type synonyms can be found there too.
 
 ### Automatic Differentiation
 
-_For more background, motivation, proofs and definitions, see one of the publications about CHAD linked above, or our pending publication that presents the CHAD framework in a more accessible form on the lambda calculus.
+_For more background, motivation, proofs and definitions, see one of the publications about CHAD linked above, or our revised paper (under review at TOPLAS) that presents the CHAD framework in a more accessible form on the lambda calculus &mdash; like this implementation does.
 This readme only gives a brief overview to understand how the implementation is structured._
 
 The AD transformations defined in the CHAD framework give a transformation on types as well as a transformation on programs (that, of course, follows the transformation on types).
