@@ -24,7 +24,10 @@ data STerm env a where
   SPair :: (LT2 a, LT2 b) => STerm env a -> STerm env b -> STerm env (a, b)
   SFst :: (LT2 a, LT2U b) => STerm env (a, b) -> STerm env a
   SSnd :: (LT2U a, LT2 b) => STerm env (a, b) -> STerm env b
-  SOp :: (a ~ Df1 a, b ~ Df1 b, a ~ Dr1 a, b ~ Dr1 b, a ~ UnLin a, b ~ UnLin b, LT2 a, LT2 b, LT (UnLin (Df2 b))) => Operation a b -> STerm env a -> STerm env b
+  SOp :: (a ~ Df1 a, b ~ Df1 b, a ~ Dr1 a, b ~ Dr1 b
+         ,a ~ UnLin a, b ~ UnLin b
+         ,LT2 a, LT2 b, LT (UnLin (Df2 b)))
+      => Operation a b -> STerm env a -> STerm env b
 
   SMap :: KnownNat n => STerm env (Scal -> Scal) -> STerm env (Vect n) -> STerm env (Vect n)
   SMap1 :: KnownNat n => STerm (Scal ': env) Scal -> STerm env (Vect n) -> STerm env (Vect n)
