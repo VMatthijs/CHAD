@@ -44,8 +44,8 @@ instance GEq (Idx env) where
 
 -- | Valuation; the environment in an interpreter
 data Val env where
-    VZ :: Val '[]
-    VS :: t -> Val env -> Val (t ': env)
+  VZ :: Val '[]
+  VS :: t -> Val env -> Val (t ': env)
 
 -- | Project a value from a valuation
 valProject :: Val env -> Idx env t -> t
