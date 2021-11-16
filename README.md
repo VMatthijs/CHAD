@@ -272,3 +272,8 @@ For this reason, it makes for a very good reference implementation to test an AD
 
 To run the test suite, use `cabal run` or `stack test`.
 This will start the driver executable in [test/Main.hs](test/Main.hs) that does nothing but call `main` from [Test.hs](src/Test.hs).
+
+
+## Funding 
+This project has received funding from the European Union’s Horizon 2020 research and innovation
+programme under the Marie Skłodowska-Curie grant agreement No. 895827 as well as from NWO Veni grant VI.Veni.202.124.
