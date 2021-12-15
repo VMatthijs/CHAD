@@ -22,7 +22,7 @@ library:
   dependencies:
   - vector-sized
   - mtl
-  - ghc-typelits-natnormalise
+  # - ghc-typelits-natnormalise
   - containers
   - some
   - tasty
