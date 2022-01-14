@@ -38,6 +38,9 @@ data CTerm env t where
   CPair :: CTerm env a -> CTerm env b -> CTerm env (a, b)
   CFst :: CTerm env (a, b) -> CTerm env a
   CSnd :: CTerm env (a, b) -> CTerm env b
+  CInl :: CTerm env a -> CTerm env (Either a b)
+  CInr :: CTerm env b -> CTerm env (Either a b)
+  CCase :: CTerm env (Either a b) -> CTerm (a ': env) c -> CTerm (b ': env) c -> CTerm env c
   COp :: Operation a b -> CTerm env a -> CTerm env b
 
   CMap :: KnownNat n => CTerm env (Scal -> Scal) -> CTerm env (Vect n) -> CTerm env (Vect n)
@@ -55,6 +58,8 @@ data CTerm env t where
 
   CZero :: LT a => CTerm env a
   CPlus :: LT a => CTerm env a -> CTerm env a -> CTerm env a
+
+  CError :: CTerm env a
 
 deriving instance Show (CTerm env a)
 
@@ -84,6 +89,12 @@ substCt' _ _ _ CUnit = CUnit
 substCt' i v w (CPair a b) = CPair (substCt' i v w a) (substCt' i v w b)
 substCt' i v w (CFst p) = CFst (substCt' i v w p)
 substCt' i v w (CSnd p) = CSnd (substCt' i v w p)
+substCt' i v w (CInl p) = CInl (substCt' i v w p)
+substCt' i v w (CInr p) = CInr (substCt' i v w p)
+substCt' i v w (CCase e a b) =
+  CCase (substCt' i v w e)
+        (substCt' (S i) (sinkCt1 v) (wSink w) a)
+        (substCt' (S i) (sinkCt1 v) (wSink w) b)
 substCt' i v w (COp op y) = COp op (substCt' i v w y)
 substCt' i v w (CMap a b) = CMap (substCt' i v w a) (substCt' i v w b)
 substCt' i v w (CZipWith a b c) = CZipWith (substCt' i v w a) (substCt' i v w b) (substCt' i v w c)
@@ -98,6 +109,7 @@ substCt' i v w (CLFoldr a b c) = CLFoldr (substCt' i v w a) (substCt' i v w b) (
 substCt' i v w (CLSum a) = CLSum (substCt' i v w a)
 substCt' _ _ _ CZero = CZero
 substCt' i v w (CPlus a b) = CPlus (substCt' i v w a) (substCt' i v w b)
+substCt' _ _ _ CError = CError
 
 -- | Evaluate the target language
 evalCt :: CTerm '[] t -> t
@@ -113,6 +125,11 @@ evalCt' _   CUnit = ()
 evalCt' env (CPair a b) = (evalCt' env a, evalCt' env b)
 evalCt' env (CFst p) = fst $ evalCt' env p
 evalCt' env (CSnd p) = snd $ evalCt' env p
+evalCt' env (CInl p) = Left $ evalCt' env p
+evalCt' env (CInr p) = Right $ evalCt' env p
+evalCt' env (CCase e a b) =
+  case evalCt' env e of Left x  -> evalCt' (VS x env) a
+                        Right x -> evalCt' (VS x env) b
 evalCt' env (COp op a) = evalOp op (evalCt' env a)
 evalCt' env (CMap a b) = V.map (evalCt' env a) (evalCt' env b)
 evalCt' env (CZipWith a b c) = V.zipWith (evalCt' env a) (evalCt' env b) (evalCt' env c)
@@ -127,6 +144,7 @@ evalCt' env (CLSum x) = foldr plus zero (evalCt' env x)
 evalCt' env (CLZip a b) = zip (evalCt' env a) (evalCt' env b)
 evalCt' _   CZero = zero
 evalCt' env (CPlus a b) = plus (evalCt' env a) (evalCt' env b)
+evalCt' _   CError = error "error term in CTerm"
 
 sinkCt :: env :> env' -> CTerm env t -> CTerm env' t
 sinkCt w (CVar i)       = CVar (w >:> i)
@@ -137,6 +155,9 @@ sinkCt _ CUnit          = CUnit
 sinkCt w (CPair a b)    = CPair (sinkCt w a) (sinkCt w b)
 sinkCt w (CFst p)       = CFst (sinkCt w p)
 sinkCt w (CSnd p)       = CSnd (sinkCt w p)
+sinkCt w (CInl p)       = CInl (sinkCt w p)
+sinkCt w (CInr p)       = CInr (sinkCt w p)
+sinkCt w (CCase e a b)  = CCase (sinkCt w e) (sinkCt (wSink w) a) (sinkCt (wSink w) b)
 sinkCt w (COp op a)     = COp op (sinkCt w a)
 sinkCt w (CMap a b)     = CMap (sinkCt w a) (sinkCt w b)
 sinkCt w (CZipWith a b c) = CZipWith (sinkCt w a) (sinkCt w b) (sinkCt w c)
@@ -151,6 +172,7 @@ sinkCt w (CLSum x)      = CLSum (sinkCt w x)
 sinkCt w (CLZip a b)    = CLZip (sinkCt w a) (sinkCt w b)
 sinkCt _ CZero          = CZero
 sinkCt w (CPlus a b)    = CPlus (sinkCt w a) (sinkCt w b)
+sinkCt _ CError         = CError
 
 sinkCt1 :: CTerm env t -> CTerm (a ': env) t
 sinkCt1 = sinkCt (wSucc wId)
@@ -195,6 +217,19 @@ printCt _ env (CPair a b) = do
   pure $ showString "(" . r1 . showString ", " . r2 . showString ")"
 printCt d env (CFst p) = showFunctionCt d env "fst" [Some p]
 printCt d env (CSnd p) = showFunctionCt d env "snd" [Some p]
+printCt d env (CInl p) = showFunctionCt d env "inl" [Some p]
+printCt d env (CInr p) = showFunctionCt d env "inr" [Some p]
+printCt d env (CCase e a b) = do
+  e' <- printCt 0 env e
+  name1 <- ('x' :) . show <$> get
+  modify (+1)
+  name2 <- ('x' :) . show <$> get
+  modify (+1)
+  a' <- printCt 0 (name1 : env) a
+  b' <- printCt 0 (name2 : env) b
+  pure $ showParen (d > 0) $
+    showString "case " . e' . showString (" of { Inl " ++ name1 ++ " -> ")
+    . a' . showString (" ; Inr " ++ name2 ++ " -> ") . b' . showString " }"
 printCt d env (COp op a) = case (op, a) of
   (Constant x, CUnit) -> pure $ showString (show x)
   (EAdd, CPair a1 a2) -> showFunctionCt d env "vecadd" [Some a1, Some a2]
@@ -227,6 +262,7 @@ printCt d env (CLSum x) = showFunctionCt d env "sum" [Some x]
 printCt d env (CLZip a b) = showFunctionCt d env "zip" [Some a, Some b]
 printCt _ _ CZero = pure $ showString "zero"
 printCt d env (CPlus a b) = showFunctionCt d env "plus" [Some a, Some b]
+printCt _ _ CError = pure $ showString "error"
 
 showFunctionCt :: Int -> [String] -> String -> [Some (CTerm env)] -> State Int ShowS
 showFunctionCt d env funcname args = do
@@ -259,6 +295,9 @@ usesOfCt' i = \case
   CPair a b -> usesOfCt' i a <> usesOfCt' i b
   p@(CFst p') -> maybe (usesOfCt' i p') (layoutFromPick (OccCount 1 1)) (getPick i p)
   p@(CSnd p') -> maybe (usesOfCt' i p') (layoutFromPick (OccCount 1 1)) (getPick i p)
+  CInl e -> usesOfCt' i e
+  CInr e -> usesOfCt' i e
+  CCase e a b -> usesOfCt' i e <> (occEither <$> usesOfCt' (S i) a <*> usesOfCt' (S i) b)  -- branching
   COp _ a -> usesOfCt' i a
   CMap a b -> usesOfCt' i a <> usesOfCt' i b
   CZipWith a b c -> usesOfCt' i a <> usesOfCt' i b <> usesOfCt' i c
@@ -273,6 +312,7 @@ usesOfCt' i = \case
   CLZip a b -> usesOfCt' i a <> usesOfCt' i b
   CZero -> mempty
   CPlus a b -> usesOfCt' i a <> usesOfCt' i b
+  CError -> mempty
   where
     getPick :: Idx env t -> CTerm env a -> Maybe (TupPick t a)
     getPick j (CVar j') | Just Refl <- geq j j' = Just TPHere

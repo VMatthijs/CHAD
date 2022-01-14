@@ -44,6 +44,9 @@ toConcrete' w = \case
   Pair a b -> CPair (toConcrete' w a) (toConcrete' w b)
   Fst t -> CFst (toConcrete' w t)
   Snd t -> CSnd (toConcrete' w t)
+  Inl t -> CInl (toConcrete' w t)
+  Inr t -> CInr (toConcrete' w t)
+  Case e a b -> CCase (toConcrete' w e) (toConcrete' (wSink w) a) (toConcrete' (wSink w) b)
   Op op t -> COp op (toConcrete' w t)
   Map a b -> CMap (toConcrete' w a) (toConcrete' w b)
   Map1 a b -> CMap (CLambda (toConcrete' (wSink w) a)) (toConcrete' w b)
@@ -68,6 +71,18 @@ toConcreteL' w lw = \case
   LinPair a b -> CPair (toConcreteL' w lw a) (toConcreteL' w lw b)
   LinFst t -> CFst (toConcreteL' w lw t)
   LinSnd t -> CSnd (toConcreteL' w lw t)
+  LinInl t -> CInr (CInl (toConcreteL' w lw t))
+  LinInr t -> CInr (CInr (toConcreteL' w lw t))
+  LinCase e a b ->
+    CCase (toConcreteL' w lw e)
+      CZero
+      (CCase (CVar Z)
+        (toConcreteL' (wSucc (wSucc w)) (mkLW1 e lw) a)  -- unclear why we can't just write 'wSink (wSucc lw)'
+        (toConcreteL' (wSucc (wSucc w)) (mkLW2 e lw) b))
+    where mkLW1 :: LinTTerm env lenv (LEither a b) -> lenv :> denv -> (a ': lenv) :> (a ': Either a b ': denv)
+          mkLW1 _ = wSink . wSucc
+          mkLW2 :: LinTTerm env lenv (LEither a b) -> lenv :> denv -> (b ': lenv) :> (b ': Either a b ': denv)
+          mkLW2 _ = wSink . wSucc
   LinLOp lop a b -> convLinOp lop (toConcrete' w a) (toConcreteL' w lw b)
   LinZero -> CZero
   LinPlus a b -> CPlus (toConcreteL' w lw a) (toConcreteL' w lw b)
@@ -81,6 +96,7 @@ toConcreteL' w lw = \case
   LinZipWith f a b -> CZipWith (toConcrete' w f) (toConcrete' w a) (toConcreteL' w lw b)
   LinReplicate a -> CReplicate (toConcreteL' w lw a)
   LinSum a -> CSum (toConcreteL' w lw a)
+  LinError -> CError
 
 convLinOp :: LinearOperation a b c -> CTerm env a -> CTerm env b -> CTerm env c
 convLinOp LProd = CZipWith (CLambda $ CLambda $ COp EScalProd (CPair (CVar (S Z)) (CVar Z)))

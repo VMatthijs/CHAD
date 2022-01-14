@@ -44,8 +44,12 @@ module Types
   , lCopowFold
   , lZip
   , lMap
+  , lInl
+  , lInr
+  , lCase
   , Copower
   , singleton
+  , LEither
   , Df1
   , Df2
   , Dr1
@@ -75,6 +79,10 @@ newtype Copower a b =
 -- | Linear function
 newtype LFun a b =
   MkLFun (a -> b)
+
+-- | Sum plus an added zero point
+newtype LEither a b =
+  MkLEither (Maybe (Either a b))
 
 -- Methods for copowers
 singleton :: LT b => a -> LFun b (Copower a b)
@@ -169,6 +177,20 @@ lPlus (MkLFun f) (MkLFun g) = MkLFun $ \x -> plus (f x) (g x)
 lMap :: KnownNat n => Vect n -> LFun (Scal -> Scal) (Vect n)
 lMap x = MkLFun $ \g -> V.map g x
 
+lInl :: (LT s, LT t) => LFun s (LEither s t)
+lInl = MkLFun (MkLEither . Just . Left)
+
+lInr :: (LT s, LT t) => LFun t (LEither s t)
+lInr = MkLFun (MkLEither . Just . Right)
+
+-- The additional 'a' argument should not be necessary, but somehow I seem to need it.
+lCase :: (LT s, LT t, LT a, LT b) => LFun (s, a) b -> LFun (t, a) b -> LFun (LEither s t, a) b
+lCase f g =
+  MkLFun $ \(x, a) -> case x of
+    MkLEither Nothing          -> zero  -- :: b
+    MkLEither (Just (Left y))  -> f `lApp` (y, a)
+    MkLEither (Just (Right y)) -> g `lApp` (y, a)
+
 -- Forward mode AD type families
 type family Df1 a = r | r -> a where
   Df1 Scal = Scal
@@ -176,6 +198,7 @@ type family Df1 a = r | r -> a where
   Df1 (a -> b) = Df1 a -> (Df1 b, LFun (Df2 a) (Df2 b))
   Df1 (a, b) = (Df1 a, Df1 b)
   Df1 () = ()
+  Df1 (Either a b) = Either (Df1 a) (Df1 b)
 
 type family Df2 a where
   Df2 Scal = Scal
@@ -183,6 +206,7 @@ type family Df2 a where
   Df2 (a -> b) = Df1 a -> Df2 b
   Df2 (a, b) = (Df2 a, Df2 b)
   Df2 () = ()
+  Df2 (Either a b) = LEither (Df2 a) (Df2 b)
 
 -- Reverse mode AD type families
 type family Dr1 a = r | r -> a where
@@ -191,6 +215,7 @@ type family Dr1 a = r | r -> a where
   Dr1 (a, b) = (Dr1 a, Dr1 b)
   Dr1 () = ()
   Dr1 (a -> b) = Dr1 a -> (Dr1 b, LFun (Dr2 b) (Dr2 a))
+  Dr1 (Either a b) = Either (Dr1 a) (Dr1 b)
 
 type family Dr2 a where
   Dr2 Scal = Scal
@@ -198,6 +223,7 @@ type family Dr2 a where
   Dr2 (a, b) = (Dr2 a, Dr2 b)
   Dr2 () = ()
   Dr2 (a -> b) = Copower (Dr1 a) (Dr2 b)
+  Dr2 (Either a b) = LEither (Dr2 a) (Dr2 b)
 
 -- | "Linear types": types with the structure of a symmetric monoid under
 -- arithmetic addition. These types are used as tangent and adjoint types in
@@ -264,11 +290,21 @@ instance (LT a, LT b) => LT (LFun a b) where
   zero = MkLFun (const zero)
   plus = lPlus
 
+type instance LTctx (LEither a b) = (LT a, LT b)
+
+instance (LT a, LT b) => LT (LEither a b) where
+  zero = MkLEither Nothing
+  plus (MkLEither Nothing) b = b
+  plus a (MkLEither Nothing) = a
+  plus (MkLEither (Just (Left a))) (MkLEither (Just (Left b))) = MkLEither (Just (Left (plus a b)))
+  plus (MkLEither (Just (Right a))) (MkLEither (Just (Right b))) = MkLEither (Just (Right (plus a b)))
+  plus _ _ = error "plus on LEither: inconsistent left/right"
+
 type instance LTctx [a] = ()
 
 instance LT [a] where
-    zero = []
-    plus = (++)
+  zero = []
+  plus = (++)
 
 -- | Convenience constraint set that requires 'LT' on the types of (co)tangents
 type LT2 a = (LT (Df2 a), LT (Dr2 a))
@@ -291,3 +327,5 @@ type family UnLin a where
   UnLin (LFun a b) = UnLin a -> UnLin b
   UnLin (Copower a b) = [(UnLin a, UnLin b)]
   UnLin (Vect n) = Vect n
+  UnLin (Either a b) = Either (UnLin a) (UnLin b)
+  UnLin (LEither a b) = Either () (Either (UnLin a) (UnLin b))

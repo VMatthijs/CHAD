@@ -33,6 +33,9 @@ data TTerm env t where
   Pair :: TTerm env a -> TTerm env b -> TTerm env (a, b)
   Fst :: TTerm env (a, b) -> TTerm env a
   Snd :: TTerm env (a, b) -> TTerm env b
+  Inl :: TTerm env a -> TTerm env (Either a b)
+  Inr :: TTerm env b -> TTerm env (Either a b)
+  Case :: TTerm env (Either a b) -> TTerm (a ': env) c -> TTerm (b ': env) c -> TTerm env c
   Op :: (a ~ UnLin a, b ~ UnLin b) => Operation a b -> TTerm env a -> TTerm env b
 
   Map :: KnownNat n => TTerm env (Scal -> Scal) -> TTerm env (Vect n) -> TTerm env (Vect n)
@@ -58,6 +61,9 @@ data LinTTerm env lenv t where
   LinPair :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv s -> LinTTerm env lenv t -> LinTTerm env lenv (s, t)
   LinFst :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv (s, t) -> LinTTerm env lenv s
   LinSnd :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv (s, t) -> LinTTerm env lenv t
+  LinInl :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv s -> LinTTerm env lenv (LEither s t)
+  LinInr :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv t -> LinTTerm env lenv (LEither s t)
+  LinCase :: (LTenv lenv, LT s, LT t, LTU u) => LinTTerm env lenv (LEither s t) -> LinTTerm env (s ': lenv) u -> LinTTerm env (t ': lenv) u -> LinTTerm env lenv u
   LinLOp :: (LTenv lenv, LT b, LT t, s ~ UnLin s, b ~ UnLin b, t ~ UnLin t) => LinearOperation s b t -> TTerm env s -> LinTTerm env lenv b -> LinTTerm env lenv t
   LinZero :: (LTenv lenv, LTU t) => LinTTerm env lenv t
   LinPlus :: (LTenv lenv, LTU t) => LinTTerm env lenv t -> LinTTerm env lenv t -> LinTTerm env lenv t
@@ -79,6 +85,8 @@ data LinTTerm env lenv t where
              -> LinTTerm env lenv (Vect n)
   LinReplicate :: KnownNat n => LinTTerm env lenv Scal -> LinTTerm env lenv (Vect n)
   LinSum :: KnownNat n => LinTTerm env lenv (Vect n) -> LinTTerm env lenv Scal
+
+  LinError :: LinTTerm env lenv a
 
 deriving instance Show (LinTTerm env a b)
 
@@ -112,6 +120,12 @@ substTt' _ _ _ Unit = Unit
 substTt' i v w (Pair a b) = Pair (substTt' i v w a) (substTt' i v w b)
 substTt' i v w (Fst p) = Fst (substTt' i v w p)
 substTt' i v w (Snd p) = Snd (substTt' i v w p)
+substTt' i v w (Inl p) = Inl (substTt' i v w p)
+substTt' i v w (Inr p) = Inr (substTt' i v w p)
+substTt' i v w (Case e a b) =
+  Case (substTt' i v w e)
+       (substTt' (S i) (sinkTt1 v) (wSink w) a)
+       (substTt' (S i) (sinkTt1 v) (wSink w) b)
 substTt' i v w (Op op y) = Op op (substTt' i v w y)
 substTt' i v w (Map a b) = Map (substTt' i v w a) (substTt' i v w b)
 substTt' i v w (Map1 a b) = Map1 (substTt' (S i) (sinkTt1 v) (wSink w) a) (substTt' i v w b)
@@ -130,6 +144,9 @@ substLTt' _ _ _ (LinVar j) = LinVar j
 substLTt' i v w (LinPair f g) = LinPair (substLTt' i v w f) (substLTt' i v w g)
 substLTt' i v w (LinFst f) = LinFst (substLTt' i v w f)
 substLTt' i v w (LinSnd f) = LinSnd (substLTt' i v w f)
+substLTt' i v w (LinInl f) = LinInl (substLTt' i v w f)
+substLTt' i v w (LinInr f) = LinInr (substLTt' i v w f)
+substLTt' i v w (LinCase f g h) = LinCase (substLTt' i v w f) (substLTt' i v w g) (substLTt' i v w h)
 substLTt' i v w (LinLOp op term arg) = LinLOp op (substTt' i v w term) (substLTt' i v w arg)
 substLTt' _ _ _ LinZero = LinZero
 substLTt' i v w (LinPlus f g) = LinPlus (substLTt' i v w f) (substLTt' i v w g)
@@ -140,6 +157,7 @@ substLTt' i v w (LinMap f arg) = LinMap (substLTt' i v w f) (substTt' i v w arg)
 substLTt' i v w (LinZipWith fun term f) = LinZipWith (substTt' i v w fun) (substTt' i v w term) (substLTt' i v w f)
 substLTt' i v w (LinReplicate f) = LinReplicate (substLTt' i v w f)
 substLTt' i v w (LinSum f) = LinSum (substLTt' i v w f)
+substLTt' _ _ _ LinError = LinError
 
 -- | Substitute variable with De Bruijn index zero in a 'LinTTerm'
 substLinTt :: LTenv lenv' => lenv :> lenv' -> LinTTerm env lenv' u -> LinTTerm env (u ': lenv) t -> LinTTerm env lenv' t
@@ -166,6 +184,12 @@ substLinTt' i v w (LinVar i')
 substLinTt' i v w (LinPair a b) = LinPair (substLinTt' i v w a) (substLinTt' i v w b)
 substLinTt' i v w (LinFst p) = LinFst (substLinTt' i v w p)
 substLinTt' i v w (LinSnd p) = LinSnd (substLinTt' i v w p)
+substLinTt' i v w (LinInl p) = LinInl (substLinTt' i v w p)
+substLinTt' i v w (LinInr p) = LinInr (substLinTt' i v w p)
+substLinTt' i v w (LinCase f g h) =
+  LinCase (substLinTt' i v w f)
+          (substLinTt' (S i) (sinkLinTt (wSucc wId) v) (wSink w) g)
+          (substLinTt' (S i) (sinkLinTt (wSucc wId) v) (wSink w) h)
 substLinTt' i v w (LinLOp op term arg) = LinLOp op term (substLinTt' i v w arg)
 substLinTt' _ _ _ LinZero = LinZero
 substLinTt' i v w (LinPlus a b) = LinPlus (substLinTt' i v w a) (substLinTt' i v w b)
@@ -176,6 +200,7 @@ substLinTt' i v w (LinMap f arg) = LinMap (substLinTt' i v w f) arg
 substLinTt' i v w (LinZipWith fun term f) = LinZipWith fun term (substLinTt' i v w f)
 substLinTt' i v w (LinReplicate f) = LinReplicate (substLinTt' i v w f)
 substLinTt' i v w (LinSum f) = LinSum (substLinTt' i v w f)
+substLinTt' _ _ _ LinError = LinError
 
 -- | Evaluate the target language
 evalTt :: TTerm '[] t -> t
@@ -191,6 +216,10 @@ evalTt' _   Unit = ()
 evalTt' env (Pair a b) = (evalTt' env a, evalTt' env b)
 evalTt' env (Fst p) = fst $ evalTt' env p
 evalTt' env (Snd p) = snd $ evalTt' env p
+evalTt' env (Inl e) = Left $ evalTt' env e
+evalTt' env (Inr e) = Right $ evalTt' env e
+evalTt' env (Case e a b) = case evalTt' env e of Left v  -> evalTt' (VS v env) a
+                                                 Right v -> evalTt' (VS v env) b
 evalTt' env (Op op a) = evalOp op (evalTt' env a)
 evalTt' env (Map a b) = V.map (evalTt' env a) (evalTt' env b)
 evalTt' env (Map1 a b) = V.map (\v -> evalTt' (VS v env) a) (evalTt' env b)
@@ -215,6 +244,12 @@ evalLTt' _   (LinVar j) = makeProj j
 evalLTt' env (LinPair e1 e2) = lPair (evalLTt' env e1) (evalLTt' env e2)
 evalLTt' env (LinFst e) = lComp (evalLTt' env e) lFst
 evalLTt' env (LinSnd e) = lComp (evalLTt' env e) lSnd
+evalLTt' env (LinInl e) = evalLTt' env e `lComp` lInl
+evalLTt' env (LinInr e) = evalLTt' env e `lComp` lInr
+evalLTt' env (LinCase e a b) =
+  lPair (evalLTt' env e) lId
+    `lComp` lCase (lPair lSnd lFst `lComp` evalLTt' env a)
+                  (lPair lSnd lFst `lComp` evalLTt' env b)
 evalLTt' env (LinLOp lop term arg) = evalLTt' env arg `lComp` evalLOp lop (evalTt' env term)
 evalLTt' _   LinZero = zero
 evalLTt' env (LinPlus e1 e2) = plus (evalLTt' env e1) (evalLTt' env e2)
@@ -225,6 +260,7 @@ evalLTt' env (LinMap a f) = evalLTt' env a `lComp` lMap (evalTt' env f)
 evalLTt' env (LinZipWith f p d) = evalLTt' env d `lComp` lZipWith (evalTt' env f) (evalTt' env p)
 evalLTt' env (LinReplicate e) = evalLTt' env e `lComp` lExpand
 evalLTt' env (LinSum e) = evalLTt' env e `lComp` lSum
+evalLTt' _   LinError = error "LinError"
 
 sinkTt :: env :> env' -> TTerm env t -> TTerm env' t
 sinkTt w (Var i)       = Var (w >:> i)
@@ -235,6 +271,9 @@ sinkTt _ Unit          = Unit
 sinkTt w (Pair a b)    = Pair (sinkTt w a) (sinkTt w b)
 sinkTt w (Fst p)       = Fst (sinkTt w p)
 sinkTt w (Snd p)       = Snd (sinkTt w p)
+sinkTt w (Inl p)       = Inl (sinkTt w p)
+sinkTt w (Inr p)       = Inr (sinkTt w p)
+sinkTt w (Case e a b)  = Case (sinkTt w e) (sinkTt (wSink w) a) (sinkTt (wSink w) b)
 sinkTt w (Op op a)     = Op op (sinkTt w a)
 sinkTt w (Map a b)     = Map (sinkTt w a) (sinkTt w b)
 sinkTt w (Map1 a b)    = Map1 (sinkTt (wSink w) a) (sinkTt w b)
@@ -254,6 +293,9 @@ sinkTtL _ (LinVar i) = LinVar i
 sinkTtL w (LinPair f g) = LinPair (sinkTtL w f) (sinkTtL w g)
 sinkTtL w (LinFst f) = LinFst (sinkTtL w f)
 sinkTtL w (LinSnd f) = LinSnd (sinkTtL w f)
+sinkTtL w (LinInl f) = LinInl (sinkTtL w f)
+sinkTtL w (LinInr f) = LinInr (sinkTtL w f)
+sinkTtL w (LinCase f g h) = LinCase (sinkTtL w f) (sinkTtL w g) (sinkTtL w h)
 sinkTtL w (LinLOp op term arg) = LinLOp op (sinkTt w term) (sinkTtL w arg)
 sinkTtL _ LinZero = LinZero
 sinkTtL w (LinPlus f g) = LinPlus (sinkTtL w f) (sinkTtL w g)
@@ -264,6 +306,7 @@ sinkTtL w (LinMap f arg) = LinMap (sinkTtL w f) (sinkTt w arg)
 sinkTtL w (LinZipWith fun term f) = LinZipWith (sinkTt w fun) (sinkTt w term) (sinkTtL w f)
 sinkTtL w (LinReplicate f) = LinReplicate (sinkTtL w f)
 sinkTtL w (LinSum f) = LinSum (sinkTtL w f)
+sinkTtL _ LinError = LinError
 
 sinkLinTt :: LTenv lenv' => lenv :> lenv' -> LinTTerm env lenv b -> LinTTerm env lenv' b
 sinkLinTt w (LinApp term f) = LinApp term (sinkLinTt w f)
@@ -274,6 +317,9 @@ sinkLinTt w (LinVar i) = LinVar (w >:> i)
 sinkLinTt w (LinPair f g) = LinPair (sinkLinTt w f) (sinkLinTt w g)
 sinkLinTt w (LinFst f) = LinFst (sinkLinTt w f)
 sinkLinTt w (LinSnd f) = LinSnd (sinkLinTt w f)
+sinkLinTt w (LinInl f) = LinInl (sinkLinTt w f)
+sinkLinTt w (LinInr f) = LinInr (sinkLinTt w f)
+sinkLinTt w (LinCase f g h) = LinCase (sinkLinTt w f) (sinkLinTt (wSink w) g) (sinkLinTt (wSink w) h)
 sinkLinTt w (LinLOp op term arg) = LinLOp op term (sinkLinTt w arg)
 sinkLinTt _ LinZero = LinZero
 sinkLinTt w (LinPlus f g) = LinPlus (sinkLinTt w f) (sinkLinTt w g)
@@ -284,6 +330,7 @@ sinkLinTt w (LinMap f arg) = LinMap (sinkLinTt w f) arg
 sinkLinTt w (LinZipWith fun term f) = LinZipWith fun term (sinkLinTt w f)
 sinkLinTt w (LinReplicate f) = LinReplicate (sinkLinTt w f)
 sinkLinTt w (LinSum f) = LinSum (sinkLinTt w f)
+sinkLinTt _ LinError = LinError
 
 -- | Pretty print the augmented lambda calculus in 'TTerm'
 --
@@ -325,6 +372,19 @@ printTt _ env (Pair a b) = do
   pure $ showString "(" . r1 . showString ", " . r2 . showString ")"
 printTt d env (Fst p) = showFunctionTt d env [] "fst" [SomeTTerm p]
 printTt d env (Snd p) = showFunctionTt d env [] "snd" [SomeTTerm p]
+printTt d env (Inl p) = showFunctionTt d env [] "inl" [SomeTTerm p]
+printTt d env (Inr p) = showFunctionTt d env [] "inr" [SomeTTerm p]
+printTt d env (Case e a b) = do
+  e' <- printTt 0 env e
+  name1 <- ('x' :) . show <$> get
+  modify (+1)
+  name2 <- ('x' :) . show <$> get
+  modify (+1)
+  a' <- printTt 0 (name1 : env) a
+  b' <- printTt 0 (name2 : env) b
+  pure $ showParen (d > 0) $
+    showString "case " . e' . showString (" of { Inl " ++ name1 ++ " -> ")
+    . a' . showString (" ; Inr " ++ name2 ++ " -> ") . b' . showString " }"
 printTt d env (Op op a) = case (op, a) of
   (Constant x, Unit) -> pure $ showString (show x)
   (EAdd, Pair a1 a2) -> showFunctionTt d env [] "vecadd" [SomeTTerm a1, SomeTTerm a2]
@@ -386,6 +446,19 @@ printLTt _ env lenv (LinPair f g) = do
   pure $ showString "(" . r1 . showString ", " . r2 . showString ")"
 printLTt d env lenv (LinFst f) = showFunctionTt d env lenv "fst" [SomeLinTTerm f]
 printLTt d env lenv (LinSnd f) = showFunctionTt d env lenv "snd" [SomeLinTTerm f]
+printLTt d env lenv (LinInl f) = showFunctionTt d env lenv "inl" [SomeLinTTerm f]
+printLTt d env lenv (LinInr f) = showFunctionTt d env lenv "inr" [SomeLinTTerm f]
+printLTt d env lenv (LinCase e a b) = do
+  e' <- printLTt 0 env lenv e
+  name1 <- ('v' :) . show <$> get
+  modify (+1)
+  name2 <- ('v' :) . show <$> get
+  modify (+1)
+  a' <- printLTt 0 env (name1 : lenv) a
+  b' <- printLTt 0 env (name1 : lenv) b
+  pure $ showParen (d > 0) $
+    showString "case " . e' . showString (" of { Inl " ++ name1 ++ " -> ")
+    . a' . showString (" ; Inr " ++ name2 ++ " -> ") . b' . showString " }"
 printLTt d env lenv (LinLOp op term arg) = do
   r1 <- printTt 11 env term
   r2 <- printLTt 11 env lenv arg
@@ -400,6 +473,7 @@ printLTt d env lenv (LinMap f arg) = showFunctionTt d env lenv "lmap" [SomeLinTT
 printLTt d env lenv (LinZipWith fun term f) = showFunctionTt d env lenv "lzipWith" [SomeTTerm fun, SomeTTerm term, SomeLinTTerm f]
 printLTt d env lenv (LinReplicate f) = showFunctionTt d env lenv "lreplicate" [SomeLinTTerm f]
 printLTt d env lenv (LinSum f) = showFunctionTt d env lenv "lsum" [SomeLinTTerm f]
+printLTt _ _ _ LinError = pure $ showString "error"
 
 data SomeLinTTerm env
   = forall a b. SomeLinTTerm (LinTTerm env a b)
@@ -441,6 +515,9 @@ usesOfTt' i = \case
   Pair a b -> usesOfTt' i a <> usesOfTt' i b
   p@(Fst p') -> maybe (usesOfTt' i p') (layoutFromPick (OccCount 1 1)) (getPick i p)
   p@(Snd p') -> maybe (usesOfTt' i p') (layoutFromPick (OccCount 1 1)) (getPick i p)
+  Inl e -> usesOfTt' i e
+  Inr e -> usesOfTt' i e
+  Case e a b -> usesOfTt' i e <> (occEither <$> usesOfTt' (S i) a <*> usesOfTt' (S i) b)  -- branching
   Op _ a -> usesOfTt' i a
   Map a b -> usesOfTt' i a <> usesOfTt' i b
   Map1 a b -> usesOfTt' (S i) a <> usesOfTt' i b
@@ -465,6 +542,9 @@ usesOfTtL i = \case
   LinPair f g -> usesOfTtL i f <> usesOfTtL i g
   LinFst f -> usesOfTtL i f
   LinSnd f -> usesOfTtL i f
+  LinInl f -> usesOfTtL i f
+  LinInr f -> usesOfTtL i f
+  LinCase f g h -> usesOfTtL i f <> (occEither <$> usesOfTtL i g <*> usesOfTtL i h)  -- branching
   LinLOp _ term arg -> usesOfTt' i term <> usesOfTtL i arg
   LinZero -> mempty
   LinPlus f g -> usesOfTtL i f <> usesOfTtL i g
@@ -475,6 +555,7 @@ usesOfTtL i = \case
   LinZipWith term term' f -> usesOfTt' i term <> usesOfTt' i term' <> usesOfTtL i f
   LinReplicate f -> usesOfTtL i f
   LinSum f -> usesOfTtL i f
+  LinError -> mempty
 
 usesOfLinVar :: Idx lenv t -> LinTTerm env lenv b -> Layout t OccCount
 usesOfLinVar i = \case
@@ -488,6 +569,9 @@ usesOfLinVar i = \case
   LinPair f g -> usesOfLinVar i f <> usesOfLinVar i g
   f@(LinFst g) -> maybe (usesOfLinVar i g) (layoutFromPick (OccCount 1 1)) (getPickLin i f)
   f@(LinSnd g) -> maybe (usesOfLinVar i g) (layoutFromPick (OccCount 1 1)) (getPickLin i f)
+  LinInl f -> usesOfLinVar i f
+  LinInr f -> usesOfLinVar i f
+  LinCase f g h -> usesOfLinVar i f <> (occEither <$> usesOfLinVar (S i) g <*> usesOfLinVar (S i) h)  -- branching
   LinLOp _ _ arg -> usesOfLinVar i arg
   LinZero -> mempty
   LinPlus f g -> usesOfLinVar i f <> usesOfLinVar i g
@@ -498,6 +582,7 @@ usesOfLinVar i = \case
   LinZipWith _ _ f -> usesOfLinVar i f
   LinReplicate f -> usesOfLinVar i f
   LinSum f -> usesOfLinVar i f
+  LinError -> mempty
   where
     getPickLin :: Idx lenv t -> LinTTerm env lenv b -> Maybe (TupPick t b)
     getPickLin j (LinVar j') | Just Refl <- geq j j' = Just TPHere

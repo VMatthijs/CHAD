@@ -41,6 +41,9 @@ simplifyTTerm Unit = Unit
 simplifyTTerm (Pair a b) = Pair (simplifyTTerm a) (simplifyTTerm b)
 simplifyTTerm (Fst p) = simplifyFst (simplifyTTerm p)
 simplifyTTerm (Snd p) = simplifySnd (simplifyTTerm p)
+simplifyTTerm (Inl p) = Inl (simplifyTTerm p)
+simplifyTTerm (Inr p) = Inr (simplifyTTerm p)
+simplifyTTerm (Case e a b) = simplifyCase (simplifyTTerm e) (simplifyTTerm a) (simplifyTTerm b)
 simplifyTTerm (Op op a) = Op op (simplifyTTerm a)
 simplifyTTerm (Map a b) = Map (simplifyTTerm a) (simplifyTTerm b)
 simplifyTTerm (Map1 a b) = Map1 (simplifyTTerm a) (simplifyTTerm b)
@@ -62,6 +65,9 @@ simplifyLinTTerm (LinVar i) = LinVar i
 simplifyLinTTerm (LinPair a b) = LinPair (simplifyLinTTerm a) (simplifyLinTTerm b)
 simplifyLinTTerm (LinFst p) = simplifyLinFst (simplifyLinTTerm p)
 simplifyLinTTerm (LinSnd p) = simplifyLinSnd (simplifyLinTTerm p)
+simplifyLinTTerm (LinInl p) = LinInl (simplifyLinTTerm p)
+simplifyLinTTerm (LinInr p) = LinInr (simplifyLinTTerm p)
+simplifyLinTTerm (LinCase e a b) = LinCase (simplifyLinTTerm e) (simplifyLinTTerm a) (simplifyLinTTerm b)
 simplifyLinTTerm (LinLOp lop term arg) = LinLOp lop (simplifyTTerm term) (simplifyLinTTerm arg)
 simplifyLinTTerm LinZero = LinZero
 simplifyLinTTerm (LinPlus a b) = simplifyLinPlus (simplifyLinTTerm a) (simplifyLinTTerm b)
@@ -72,6 +78,7 @@ simplifyLinTTerm (LinMap b arg) = LinMap (simplifyLinTTerm b) (simplifyTTerm arg
 simplifyLinTTerm (LinZipWith fun term b) = LinZipWith (simplifyTTerm fun) (simplifyTTerm term) (simplifyLinTTerm b)
 simplifyLinTTerm (LinReplicate b) = LinReplicate (simplifyLinTTerm b)
 simplifyLinTTerm (LinSum b) = LinSum (simplifyLinTTerm b)
+simplifyLinTTerm LinError = LinError
 
 -- | Simplify the App form. This converts immediate lambda application into
 -- let-binding.
@@ -178,6 +185,11 @@ simplifyLinSnd :: (LTenv lenv, LT a, LT b) => LinTTerm env lenv (a, b) -> LinTTe
 simplifyLinSnd (LinPair _ t) = t
 -- simplifyLinSnd (Let rhs e) = simplifyLet rhs (simplifyLinSnd e)
 simplifyLinSnd p             = LinSnd p
+
+simplifyCase :: TTerm env (Either a b) -> TTerm (a ': env) c -> TTerm (b ': env) c -> TTerm env c
+simplifyCase (Inl e) a _ = simplifyLet e a
+simplifyCase (Inr e) _ b = simplifyLet e b
+simplifyCase e a b = Case e a b
 
 simplifyLinPlus :: (LTenv lenv, LTU b) => LinTTerm env lenv b -> LinTTerm env lenv b -> LinTTerm env lenv b
 simplifyLinPlus a LinZero = a
