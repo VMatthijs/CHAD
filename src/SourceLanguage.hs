@@ -24,8 +24,8 @@ data STerm env a where
   SPair :: (LT2 a, LT2 b) => STerm env a -> STerm env b -> STerm env (a, b)
   SFst :: (LT2 a, LT2U b) => STerm env (a, b) -> STerm env a
   SSnd :: (LT2U a, LT2 b) => STerm env (a, b) -> STerm env b
-  SInl :: (LT2 a, LT2 b) => STerm env a -> STerm env (Either a b)
-  SInr :: (LT2 a, LT2 b) => STerm env b -> STerm env (Either a b)
+  SInl :: (LT2U a, LT2U b) => STerm env a -> STerm env (Either a b)
+  SInr :: (LT2U a, LT2U b) => STerm env b -> STerm env (Either a b)
   SCase :: (LT2U a, LT2U b, LT2 c)
         => STerm env (Either a b)
         -> STerm (a ': env) c

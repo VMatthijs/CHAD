@@ -53,6 +53,7 @@ drOp EScalProd = Lambda $ LinFun $ LinPair (LinLOp LScalProd (Snd (Var Z)) (LinV
 drOp EScalSin = Lambda $ LinFun $ LinLOp LScalProd (Op EScalCos (Var Z)) (LinVar Z)
 drOp EScalCos = Lambda $ LinFun $ LinLOp LScalProd (neg (Op EScalSin (Var Z))) (LinVar Z)
   where neg x = Op EScalSubt (Pair (Op (Constant 0.0) Unit) x)
+drOp EScalSign = Lambda (LinFun LinZero)
 
 dr :: LTU (Dr2Env env) => STerm env t -> TTerm (Dr1Env env) (Dr1 t, LFun (Dr2 t) (Dr2Env env))
 dr = \case

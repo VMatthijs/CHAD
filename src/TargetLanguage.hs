@@ -61,9 +61,9 @@ data LinTTerm env lenv t where
   LinPair :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv s -> LinTTerm env lenv t -> LinTTerm env lenv (s, t)
   LinFst :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv (s, t) -> LinTTerm env lenv s
   LinSnd :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv (s, t) -> LinTTerm env lenv t
-  LinInl :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv s -> LinTTerm env lenv (LEither s t)
-  LinInr :: (LTenv lenv, LT s, LT t) => LinTTerm env lenv t -> LinTTerm env lenv (LEither s t)
-  LinCase :: (LTenv lenv, LT s, LT t, LTU u) => LinTTerm env lenv (LEither s t) -> LinTTerm env (s ': lenv) u -> LinTTerm env (t ': lenv) u -> LinTTerm env lenv u
+  LinInl :: (LTenv lenv, LTU s, LTU t) => LinTTerm env lenv s -> LinTTerm env lenv (LEither s t)
+  LinInr :: (LTenv lenv, LTU s, LTU t) => LinTTerm env lenv t -> LinTTerm env lenv (LEither s t)
+  LinCase :: (LTenv lenv, LTU s, LTU t, LTU u) => LinTTerm env lenv (LEither s t) -> LinTTerm env (s ': lenv) u -> LinTTerm env (t ': lenv) u -> LinTTerm env lenv u
   LinLOp :: (LTenv lenv, LT b, LT t, s ~ UnLin s, b ~ UnLin b, t ~ UnLin t) => LinearOperation s b t -> TTerm env s -> LinTTerm env lenv b -> LinTTerm env lenv t
   LinZero :: (LTenv lenv, LTU t) => LinTTerm env lenv t
   LinPlus :: (LTenv lenv, LTU t) => LinTTerm env lenv t -> LinTTerm env lenv t -> LinTTerm env lenv t

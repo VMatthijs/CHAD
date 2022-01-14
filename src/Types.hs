@@ -47,6 +47,7 @@ module Types
   , lInl
   , lInr
   , lCase
+  , lCaseNonLin
   , Copower
   , singleton
   , LEither
@@ -191,6 +192,12 @@ lCase f g =
     MkLEither (Just (Left y))  -> f `lApp` (y, a)
     MkLEither (Just (Right y)) -> g `lApp` (y, a)
 
+lCaseNonLin :: LT c => LEither a b -> (a -> c) -> (b -> c) -> c
+lCaseNonLin (MkLEither m) f g = case m of
+  Nothing -> zero
+  Just (Left x) -> f x
+  Just (Right x) -> g x
+
 -- Forward mode AD type families
 type family Df1 a = r | r -> a where
   Df1 Scal = Scal
@@ -328,4 +335,4 @@ type family UnLin a where
   UnLin (Copower a b) = [(UnLin a, UnLin b)]
   UnLin (Vect n) = Vect n
   UnLin (Either a b) = Either (UnLin a) (UnLin b)
-  UnLin (LEither a b) = Either () (Either (UnLin a) (UnLin b))
+  UnLin (LEither a b) = LEither (UnLin a) (UnLin b)

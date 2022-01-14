@@ -54,6 +54,7 @@ dfOp EScalProd = Lambda $ LinFun $ LinPlus (LinLOp LScalProd (Fst (Var Z)) (LinS
 dfOp EScalSin = Lambda $ LinFun $ LinLOp LScalProd (Op EScalCos (Var Z)) (LinVar Z)
 dfOp EScalCos = Lambda $ LinFun $ LinLOp LScalProd (neg (Op EScalSin (Var Z))) (LinVar Z)
   where neg x = Op EScalSubt (Pair (Op (Constant 0.0) Unit) x)
+dfOp EScalSign = Lambda (LinFun LinZero)
 
 df :: LTU (Df2Env env) => STerm env t -> TTerm (Df1Env env) (Df1 t, LFun (Df2Env env) (Df2 t))
 df = \case
@@ -129,9 +130,9 @@ df = \case
                (LinFun $
                  Snd (Var Z) `LinApp` LinPair (LinVar Z) (linFromInr $ Snd (Var (S (S Z))) `LinApp` LinVar Z)))
     where
-      linFromInl :: (LTU a, LT b, LTenv lenv) => LinTTerm env lenv (LEither a b) -> LinTTerm env lenv a
+      linFromInl :: (LTU a, LTU b, LTenv lenv) => LinTTerm env lenv (LEither a b) -> LinTTerm env lenv a
       linFromInl e' = LinCase e' (LinVar Z) LinError
-      linFromInr :: (LT a, LTU b, LTenv lenv) => LinTTerm env lenv (LEither a b) -> LinTTerm env lenv b
+      linFromInr :: (LTU a, LTU b, LTenv lenv) => LinTTerm env lenv (LEither a b) -> LinTTerm env lenv b
       linFromInr e' = LinCase e' LinError (LinVar Z)
 
   SOp op arg ->

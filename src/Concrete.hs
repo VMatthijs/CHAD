@@ -56,6 +56,9 @@ data CTerm env t where
   CLSum :: LT a => CTerm env [a] -> CTerm env a
   CLZip :: CTerm env [a] -> CTerm env [b] -> CTerm env [(a, b)]
 
+  CMkLEither :: (LT a, LT b) => CTerm env (Either a b) -> CTerm env (LEither a b)
+  CLCase :: (LT a, LT b, LT c) => CTerm env (LEither a b) -> CTerm (a ': env) c -> CTerm (b ': env) c -> CTerm env c
+
   CZero :: LT a => CTerm env a
   CPlus :: LT a => CTerm env a -> CTerm env a -> CTerm env a
 
@@ -107,6 +110,11 @@ substCt' i v w (CLZip a b) = CLZip (substCt' i v w a) (substCt' i v w b)
 substCt' i v w (CLMap a b) = CLMap (substCt' i v w a) (substCt' i v w b)
 substCt' i v w (CLFoldr a b c) = CLFoldr (substCt' i v w a) (substCt' i v w b) (substCt' i v w c)
 substCt' i v w (CLSum a) = CLSum (substCt' i v w a)
+substCt' i v w (CMkLEither e) = CMkLEither (substCt' i v w e)
+substCt' i v w (CLCase e a b) =
+  CLCase (substCt' i v w e)
+         (substCt' (S i) (sinkCt1 v) (wSink w) a)
+         (substCt' (S i) (sinkCt1 v) (wSink w) b)
 substCt' _ _ _ CZero = CZero
 substCt' i v w (CPlus a b) = CPlus (substCt' i v w a) (substCt' i v w b)
 substCt' _ _ _ CError = CError
@@ -142,6 +150,13 @@ evalCt' env (CLMap a b) = map (evalCt' env a) (evalCt' env b)
 evalCt' env (CLFoldr a b c) = foldr (evalCt' env a) (evalCt' env b) (evalCt' env c)
 evalCt' env (CLSum x) = foldr plus zero (evalCt' env x)
 evalCt' env (CLZip a b) = zip (evalCt' env a) (evalCt' env b)
+evalCt' env (CMkLEither e) =
+  case evalCt' env e of Left x  -> lInl `lApp` x
+                        Right x -> lInr `lApp` x
+evalCt' env (CLCase e a b) =
+  lCaseNonLin (evalCt' env e)
+              (\x -> evalCt' (VS x env) a)
+              (\x -> evalCt' (VS x env) b)
 evalCt' _   CZero = zero
 evalCt' env (CPlus a b) = plus (evalCt' env a) (evalCt' env b)
 evalCt' _   CError = error "error term in CTerm"
@@ -170,6 +185,8 @@ sinkCt w (CLMap a b)    = CLMap (sinkCt w a) (sinkCt w b)
 sinkCt w (CLFoldr a b c) = CLFoldr (sinkCt w a) (sinkCt w b) (sinkCt w c)
 sinkCt w (CLSum x)      = CLSum (sinkCt w x)
 sinkCt w (CLZip a b)    = CLZip (sinkCt w a) (sinkCt w b)
+sinkCt w (CMkLEither x) = CMkLEither (sinkCt w x)
+sinkCt w (CLCase e a b) = CLCase (sinkCt w e) (sinkCt (wSink w) a) (sinkCt (wSink w) b)
 sinkCt _ CZero          = CZero
 sinkCt w (CPlus a b)    = CPlus (sinkCt w a) (sinkCt w b)
 sinkCt _ CError         = CError
@@ -260,6 +277,18 @@ printCt d env (CLMap f a) = showFunctionCt d env "map" [Some f, Some a]
 printCt d env (CLFoldr a b c) = showFunctionCt d env "foldr" [Some a, Some b, Some c]
 printCt d env (CLSum x) = showFunctionCt d env "sum" [Some x]
 printCt d env (CLZip a b) = showFunctionCt d env "zip" [Some a, Some b]
+printCt d env (CMkLEither x) = showFunctionCt d env "mkleither" [Some x]
+printCt d env (CLCase e a b) = do
+  e' <- printCt 0 env e
+  name1 <- ('x' :) . show <$> get
+  modify (+1)
+  name2 <- ('x' :) . show <$> get
+  modify (+1)
+  a' <- printCt 0 (name1 : env) a
+  b' <- printCt 0 (name2 : env) b
+  pure $ showParen (d > 0) $
+    showString "lcase " . e' . showString (" of { LInl " ++ name1 ++ " -> ")
+    . a' . showString (" ; LInr " ++ name2 ++ " -> ") . b' . showString " }"
 printCt _ _ CZero = pure $ showString "zero"
 printCt d env (CPlus a b) = showFunctionCt d env "plus" [Some a, Some b]
 printCt _ _ CError = pure $ showString "error"
@@ -310,6 +339,8 @@ usesOfCt' i = \case
   CLFoldr a b c -> usesOfCt' i a <> usesOfCt' i b <> usesOfCt' i c
   CLSum x -> usesOfCt' i x
   CLZip a b -> usesOfCt' i a <> usesOfCt' i b
+  CMkLEither x -> usesOfCt' i x
+  CLCase e a b -> usesOfCt' i e <> (occEither <$> usesOfCt' (S i) a <*> usesOfCt' (S i) b)  -- branching
   CZero -> mempty
   CPlus a b -> usesOfCt' i a <> usesOfCt' i b
   CError -> mempty

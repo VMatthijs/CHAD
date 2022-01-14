@@ -71,18 +71,12 @@ toConcreteL' w lw = \case
   LinPair a b -> CPair (toConcreteL' w lw a) (toConcreteL' w lw b)
   LinFst t -> CFst (toConcreteL' w lw t)
   LinSnd t -> CSnd (toConcreteL' w lw t)
-  LinInl t -> CInr (CInl (toConcreteL' w lw t))
-  LinInr t -> CInr (CInr (toConcreteL' w lw t))
+  LinInl t -> CMkLEither (CInl (toConcreteL' w lw t))
+  LinInr t -> CMkLEither (CInr (toConcreteL' w lw t))
   LinCase e a b ->
-    CCase (toConcreteL' w lw e)
-      CZero
-      (CCase (CVar Z)
-        (toConcreteL' (wSucc (wSucc w)) (mkLW1 e lw) a)  -- unclear why we can't just write 'wSink (wSucc lw)'
-        (toConcreteL' (wSucc (wSucc w)) (mkLW2 e lw) b))
-    where mkLW1 :: LinTTerm env lenv (LEither a b) -> lenv :> denv -> (a ': lenv) :> (a ': Either a b ': denv)
-          mkLW1 _ = wSink . wSucc
-          mkLW2 :: LinTTerm env lenv (LEither a b) -> lenv :> denv -> (b ': lenv) :> (b ': Either a b ': denv)
-          mkLW2 _ = wSink . wSucc
+    CLCase (toConcreteL' w lw e)
+      (toConcreteL' (wSucc w) (wSink lw) a)
+      (toConcreteL' (wSucc w) (wSink lw) b)
   LinLOp lop a b -> convLinOp lop (toConcrete' w a) (toConcreteL' w lw b)
   LinZero -> CZero
   LinPlus a b -> CPlus (toConcreteL' w lw a) (toConcreteL' w lw b)

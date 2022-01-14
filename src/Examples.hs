@@ -186,3 +186,9 @@ mapQuadratic c = SMap1 (generaliseEnv (quadratic c)) (SVar Z)
   where
     generaliseEnv :: STerm '[a] t -> STerm (a ': env) t
     generaliseEnv = sinkSt (wSink wNil)
+
+abs' :: STerm (Scal ': env) Scal
+abs' =
+  SCase (SOp EScalSign (SVar Z))
+    (SOp EScalSubt (SPair (SOp (Constant 0) SUnit) (SVar (S Z))))
+    (SVar (S Z))
