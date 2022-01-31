@@ -23,7 +23,7 @@ import           Operation          (LinearOperation (..), Operation (..))
 import           SourceLanguage
 import           TargetLanguage
 import           Env
-import           Types              (LT, LTU, UnLin, Df1, Df2, LFun)
+import           Types              (LT, LTU, UnLin, Df1, Df2, LFun, LEither)
 
 type family Df1Env env where
   Df1Env '[] = '[]
@@ -54,6 +54,7 @@ dfOp EScalProd = Lambda $ LinFun $ LinPlus (LinLOp LScalProd (Fst (Var Z)) (LinS
 dfOp EScalSin = Lambda $ LinFun $ LinLOp LScalProd (Op EScalCos (Var Z)) (LinVar Z)
 dfOp EScalCos = Lambda $ LinFun $ LinLOp LScalProd (neg (Op EScalSin (Var Z))) (LinVar Z)
   where neg x = Op EScalSubt (Pair (Op (Constant 0.0) Unit) x)
+dfOp EScalSign = Lambda (LinFun LinZero)
 
 df :: LTU (Df2Env env) => STerm env t -> TTerm (Df1Env env) (Df1 t, LFun (Df2Env env) (Df2 t))
 df = \case
@@ -106,6 +107,33 @@ df = \case
     Let (df e) $
       Pair (Snd (Fst (Var Z)))
            (LinFun $ LinSnd (Snd (Var Z) `LinApp` LinVar Z))
+
+  SInl e ->
+    Let (df e) $
+      Pair (Inl (Fst (Var Z)))
+           (LinFun $ LinInl (Snd (Var Z) `LinApp` LinVar Z))
+
+  SInr e ->
+    Let (df e) $
+      Pair (Inr (Fst (Var Z)))
+           (LinFun $ LinInr (Snd (Var Z) `LinApp` LinVar Z))
+
+  SCase e a b ->
+    Let (df e) $
+      Case (Fst (Var Z))
+        (Let (sinkTt (wSink (wSucc wId)) (df a)) $
+          Pair (Fst (Var Z))
+               (LinFun $
+                 Snd (Var Z) `LinApp` LinPair (LinVar Z) (linFromInl $ Snd (Var (S (S Z))) `LinApp` LinVar Z)))
+        (Let (sinkTt (wSink (wSucc wId)) (df b)) $
+          Pair (Fst (Var Z))
+               (LinFun $
+                 Snd (Var Z) `LinApp` LinPair (LinVar Z) (linFromInr $ Snd (Var (S (S Z))) `LinApp` LinVar Z)))
+    where
+      linFromInl :: (LTU a, LTU b, LTenv lenv) => LinTTerm env lenv (LEither a b) -> LinTTerm env lenv a
+      linFromInl e' = LinCase e' (LinVar Z) LinError
+      linFromInr :: (LTU a, LTU b, LTenv lenv) => LinTTerm env lenv (LEither a b) -> LinTTerm env lenv b
+      linFromInr e' = LinCase e' LinError (LinVar Z)
 
   SOp op arg ->
     Let (df arg) $

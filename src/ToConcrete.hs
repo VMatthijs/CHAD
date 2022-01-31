@@ -44,6 +44,9 @@ toConcrete' w = \case
   Pair a b -> CPair (toConcrete' w a) (toConcrete' w b)
   Fst t -> CFst (toConcrete' w t)
   Snd t -> CSnd (toConcrete' w t)
+  Inl t -> CInl (toConcrete' w t)
+  Inr t -> CInr (toConcrete' w t)
+  Case e a b -> CCase (toConcrete' w e) (toConcrete' (wSink w) a) (toConcrete' (wSink w) b)
   Op op t -> COp op (toConcrete' w t)
   Map a b -> CMap (toConcrete' w a) (toConcrete' w b)
   Map1 a b -> CMap (CLambda (toConcrete' (wSink w) a)) (toConcrete' w b)
@@ -68,6 +71,12 @@ toConcreteL' w lw = \case
   LinPair a b -> CPair (toConcreteL' w lw a) (toConcreteL' w lw b)
   LinFst t -> CFst (toConcreteL' w lw t)
   LinSnd t -> CSnd (toConcreteL' w lw t)
+  LinInl t -> CMkLEither (CInl (toConcreteL' w lw t))
+  LinInr t -> CMkLEither (CInr (toConcreteL' w lw t))
+  LinCase e a b ->
+    CLCase (toConcreteL' w lw e)
+      (toConcreteL' (wSucc w) (wSink lw) a)
+      (toConcreteL' (wSucc w) (wSink lw) b)
   LinLOp lop a b -> convLinOp lop (toConcrete' w a) (toConcreteL' w lw b)
   LinZero -> CZero
   LinPlus a b -> CPlus (toConcreteL' w lw a) (toConcreteL' w lw b)
@@ -81,6 +90,7 @@ toConcreteL' w lw = \case
   LinZipWith f a b -> CZipWith (toConcrete' w f) (toConcrete' w a) (toConcreteL' w lw b)
   LinReplicate a -> CReplicate (toConcreteL' w lw a)
   LinSum a -> CSum (toConcreteL' w lw a)
+  LinError -> CError
 
 convLinOp :: LinearOperation a b c -> CTerm env a -> CTerm env b -> CTerm env c
 convLinOp LProd = CZipWith (CLambda $ CLambda $ COp EScalProd (CPair (CVar (S Z)) (CVar Z)))

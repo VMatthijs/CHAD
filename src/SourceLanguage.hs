@@ -24,6 +24,13 @@ data STerm env a where
   SPair :: (LT2 a, LT2 b) => STerm env a -> STerm env b -> STerm env (a, b)
   SFst :: (LT2 a, LT2U b) => STerm env (a, b) -> STerm env a
   SSnd :: (LT2U a, LT2 b) => STerm env (a, b) -> STerm env b
+  SInl :: (LT2U a, LT2U b) => STerm env a -> STerm env (Either a b)
+  SInr :: (LT2U a, LT2U b) => STerm env b -> STerm env (Either a b)
+  SCase :: (LT2U a, LT2U b, LT2 c)
+        => STerm env (Either a b)
+        -> STerm (a ': env) c
+        -> STerm (b ': env) c
+        -> STerm env c
   SOp :: (a ~ Df1 a, b ~ Df1 b, a ~ Dr1 a, b ~ Dr1 b
          ,a ~ UnLin a, b ~ UnLin b
          ,LT2 a, LT2 b, LT (UnLin (Df2 b)))
@@ -46,6 +53,10 @@ evalSt _   SUnit = ()
 evalSt env (SPair a b) = (evalSt env a, evalSt env b)
 evalSt env (SFst p) = fst $ evalSt env p
 evalSt env (SSnd p) = snd $ evalSt env p
+evalSt env (SInl e) = Left $ evalSt env e
+evalSt env (SInr e) = Right $ evalSt env e
+evalSt env (SCase e a b) = case evalSt env e of Left v  -> evalSt (VS v env) a
+                                                Right v -> evalSt (VS v env) b
 evalSt env (SOp op a) = evalOp op (evalSt env a)
 evalSt env (SMap a b) = V.map (evalSt env a) (evalSt env b)
 evalSt env (SMap1 a b) = V.map (\v -> evalSt (VS v env) a) (evalSt env b)
@@ -61,6 +72,9 @@ sinkSt _ SUnit          = SUnit
 sinkSt w (SPair a b)    = SPair (sinkSt w a) (sinkSt w b)
 sinkSt w (SFst p)       = SFst (sinkSt w p)
 sinkSt w (SSnd p)       = SSnd (sinkSt w p)
+sinkSt w (SInl p)       = SInl (sinkSt w p)
+sinkSt w (SInr p)       = SInr (sinkSt w p)
+sinkSt w (SCase e a b)  = SCase (sinkSt w e) (sinkSt (wSink w) a) (sinkSt (wSink w) b)
 sinkSt w (SOp op a)     = SOp op (sinkSt w a)
 sinkSt w (SMap a b)     = SMap (sinkSt w a) (sinkSt w b)
 sinkSt w (SMap1 a b)    = SMap1 (sinkSt (wSink w) a) (sinkSt w b)

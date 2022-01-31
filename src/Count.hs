@@ -23,6 +23,12 @@ instance Functor (Layout t) where
   fmap f (LyLeaf x)     = LyLeaf (f x)
   fmap f (LyPair l1 l2) = LyPair (fmap f l1) (fmap f l2)
 
+instance Applicative (Layout t) where
+  pure = LyLeaf
+  LyLeaf f <*> l = f <$> l
+  l@LyPair{} <*> LyLeaf x = l <*> LyPair (LyLeaf x) (LyLeaf x)
+  LyPair fs1 fs2 <*> LyPair xs1 xs2 = LyPair (fs1 <*> xs1) (fs2 <*> xs2)
+
 instance Foldable (Layout t) where
   foldMap f (LyLeaf x)     = f x
   foldMap f (LyPair l1 l2) = foldMap f l1 <> foldMap f l2
@@ -136,3 +142,11 @@ instance Monoid OccCount where
 -- occurrence count ('runtimeOccs') with 'Many'.
 occRepeatRuntime :: OccCount -> OccCount
 occRepeatRuntime count = count { runtimeOccs = Many * runtimeOccs count }
+
+-- | Given occurrence counts of a variable inside two branches, return the
+-- occurrence count of that variable as seen from outside a conditional having
+-- those two branches. The assumption is that exactly one of these branches is
+-- taken.
+occEither :: OccCount -> OccCount -> OccCount
+occEither c1 c2 = OccCount { syntacticOccs = syntacticOccs c1 + syntacticOccs c2
+                           , runtimeOccs = runtimeOccs c1 `max` runtimeOccs c2 }

@@ -53,6 +53,7 @@ drOp EScalProd = Lambda $ LinFun $ LinPair (LinLOp LScalProd (Snd (Var Z)) (LinV
 drOp EScalSin = Lambda $ LinFun $ LinLOp LScalProd (Op EScalCos (Var Z)) (LinVar Z)
 drOp EScalCos = Lambda $ LinFun $ LinLOp LScalProd (neg (Op EScalSin (Var Z))) (LinVar Z)
   where neg x = Op EScalSubt (Pair (Op (Constant 0.0) Unit) x)
+drOp EScalSign = Lambda (LinFun LinZero)
 
 dr :: LTU (Dr2Env env) => STerm env t -> TTerm (Dr1Env env) (Dr1 t, LFun (Dr2 t) (Dr2Env env))
 dr = \case
@@ -111,6 +112,30 @@ dr = \case
     Let (dr e) $
       Pair (Snd (Fst (Var Z)))
            (LinFun $ Snd (Var Z) `LinApp` LinPair LinZero (LinVar Z))
+
+  SInl e ->
+    Let (dr e) $
+      Pair (Inl (Fst (Var Z)))
+           (LinFun $ LinCase (LinVar Z) (Snd (Var Z) `LinApp` LinVar Z) LinError)
+
+  SInr e ->
+    Let (dr e) $
+      Pair (Inr (Fst (Var Z)))
+           (LinFun $ LinCase (LinVar Z) LinError (Snd (Var Z) `LinApp` LinVar Z))
+
+  SCase e a b ->
+    Let (dr e) $
+      Case (Fst (Var Z))
+        (Let (sinkTt (wSink (wSucc wId)) (dr a)) $
+          Pair (Fst (Var Z))
+               (LinFun $
+                 LinLet (Snd (Var Z) `LinApp` LinVar Z) $
+                   LinPlus (LinFst (LinVar Z)) (Snd (Var (S (S Z))) `LinApp` LinInl (LinSnd (LinVar Z)))))
+        (Let (sinkTt (wSink (wSucc wId)) (dr b)) $
+          Pair (Fst (Var Z))
+               (LinFun $
+                 LinLet (Snd (Var Z) `LinApp` LinVar Z) $
+                   LinPlus (LinFst (LinVar Z)) (Snd (Var (S (S Z))) `LinApp` LinInr (LinSnd (LinVar Z)))))
 
   SOp op arg ->
     Let (dr arg) $

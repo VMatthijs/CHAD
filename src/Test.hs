@@ -337,6 +337,7 @@ main =
       [testAll "polynomial" (programArb polynomial)
       ,testAll "slid" (programArb slid)
       ,testAll "pair" (programArb pair)
+      ,testAll "abs'" (programArb (abs' :: STerm '[Scal] Scal))
       ,testAll "add" (programArb add)
       ,testAll "add2" (programArb add2)
       ,testAll "prod" (programArb prod)

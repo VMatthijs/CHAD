@@ -23,6 +23,7 @@ data Operation a b where
   EScalProd :: Operation (Scal, Scal) Scal
   EScalSin :: Operation Scal Scal
   EScalCos :: Operation Scal Scal
+  EScalSign :: Operation Scal (Either () ())
 
 deriving instance Show (Operation a b)
 
@@ -35,6 +36,7 @@ showOp EScalSubt    = "EScalSubt"
 showOp EScalProd    = "EScalProd"
 showOp EScalSin     = "EScalSin"
 showOp EScalCos     = "EScalCos"
+showOp EScalSign    = "EScalSign"
 
 -- | Evaluate an operator
 evalOp :: Operation a b -> a -> b
@@ -46,6 +48,7 @@ evalOp EScalSubt    = uncurry (-)
 evalOp EScalProd    = uncurry (*)
 evalOp EScalSin     = sin
 evalOp EScalCos     = cos
+evalOp EScalSign    = \x -> if x >= 0 then Right () else Left ()
 
 -- | @a -> 'LFun' b c@
 data LinearOperation a b c where
